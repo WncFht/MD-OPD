@@ -1,18 +1,17 @@
 #!/bin/bash
-# MOPD -- multi-teacher OPD with ability routing.
+# MOPD：按 ability 路由的多 teacher OPD。
 #
-# Same distillation objective as opd.sh, but several frozen teachers. Each row is
-# routed to a teacher by its `ability` column; rows sharing a teacher are
-# forwarded as one group and scattered back into the original batch order, so the
-# reward tensor keeps its input ordering. Every step logs
+# 蒸馏目标与 opd.sh 相同，但使用多个冻结 teacher。每行按 `ability` 列路由到
+# 对应 teacher；属于同一 teacher 的行组成一个分组计算，再散回原 batch 顺序，
+# 因此 reward tensor 的顺序保持不变。每一步都会记录
 #     [MOPD] batch routing: {teacher: count}
 #
-# Usage:
-#     bash recipe/mopd.sh                      # full data
-#     MODE=oneshot bash recipe/mopd.sh         # 1-shot prompts
+# 用法：
+#     bash recipe/mopd.sh                      # 完整数据
+#     MODE=oneshot bash recipe/mopd.sh         # 1-shot prompt
 #
-# Adding or removing a teacher is a parameter change: pass name:path pairs to
-# multi_teacher_args and extend ABILITY_TO_TEACHER.
+# 增加或移除 teacher 只需修改参数：向 multi_teacher_args 传入 name:path，
+# 并扩展 ABILITY_TO_TEACHER。
 
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
@@ -33,8 +32,7 @@ export ABILITY_TO_TEACHER=${ABILITY_TO_TEACHER:-'{math:math,code:code,instructio
 export STRICT_ROUTING=${STRICT_ROUTING:-True}
 
 if [ "$MODE" = "oneshot" ]; then
-    # Only math ships a 1-shot corpus. Pass CODE_TRAIN/IF_TRAIN explicitly if you
-    # want this combination.
+    # 只有 math 提供 1-shot corpus。若需要这种组合，请显式传入 CODE_TRAIN/IF_TRAIN。
     MATH_TRAIN=${MATH_TRAIN:-${DATA_BASE}/math/DAPO-oneshot/t22.parquet}
 else
     MATH_TRAIN=${MATH_TRAIN:-${DATA_BASE}/math/DAPO/train.parquet}

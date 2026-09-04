@@ -61,8 +61,16 @@ LCB_FUNCTIONAL_PROMPT_TEMPLATE = (
 #: The parquets are byte-identical to the huggingface.co originals (same sha256
 #: as the LFS objects), which are unreachable from the cluster.
 _EVALPLUS_MS = {
-    "humanevalplus": ("evalscope/humanevalplus", "data/test-00000-of-00001-5973903632b82d40.parquet", 164),
-    "mbppplus": ("evalscope/mbppplus", "data/test-00000-of-00001-d5781c9c51e02795.parquet", 378),
+    "humanevalplus": (
+        "evalscope/humanevalplus",
+        "data/test-00000-of-00001-5973903632b82d40.parquet",
+        164,
+    ),
+    "mbppplus": (
+        "evalscope/mbppplus",
+        "data/test-00000-of-00001-d5781c9c51e02795.parquet",
+        378,
+    ),
 }
 
 

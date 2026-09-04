@@ -1,46 +1,8 @@
-<div align="center">
-  <h1>Rethinking On-Policy Distillation of Large Language Models II: One Training Example</h1>
-  <p>
-    <a href="https://arxiv.org/pdf/2609.04172"><img src="https://img.shields.io/badge/paper-A42C25?style=for-the-badge&amp;logo=arxiv&amp;logoColor=white" alt="Paper"></a>&nbsp;&nbsp;
-    <a href="https://github.com/Thinking-Space/One-Shot-OPD"><img src="https://img.shields.io/badge/One--Shot--OPD-000000?style=for-the-badge&amp;logo=github&amp;logoColor=white" alt="GitHub"></a>&nbsp;&nbsp;
-    <a href="https://huggingface.co/papers/2609.04172"><img src="https://img.shields.io/badge/HF--Paper-%23FFD14D?style=for-the-badge&amp;logo=huggingface&amp;logoColor=black" alt="Hugging Face Paper"></a>&nbsp;&nbsp;
-    <a href="https://huggingface.co/collections/Thinking-Space/one-shot-opd"><img src="https://img.shields.io/badge/Collection-%23FFD14D?style=for-the-badge&amp;logo=huggingface&amp;logoColor=black" alt="Hugging Face Collection"></a>
-    <a href="https://x.com/HBX_hbx/status/2095716853196747175"><img src="https://img.shields.io/badge/Twitter-%23000000.svg?style=for-the-badge&logo=x&logoColor=white" alt="X Thread"></a>
-  </p>
-</div>
-<div align="center">
-  <p>
-    <a href="#news">🎉 News</a> •
-    <a href="#Overview">📖 Overview</a> •
-    <a href="#getting-started">✨ Getting Started</a>
- </p>
- <p>
-    <a href="#contact">📨 Contact</a> •
-    <a href="#citation">🎈 Citation</a> 
- </p>
-</div>
+# ✨快速开始
 
+## 环境配置
 
-## 🎉News
-
-- **[2026-09-04]** Part II: We examine the role of training data in on-policy distillation (OPD) at the data-minimal limit by training on a single query, and find that OPD is data-overfed but algorithm-starved. Check it out: [Paper](https://arxiv.org/abs/2609.04172).
-- **[2026-04-15]** Part I of this series: [Rethinking On-Policy Distillation of Large Language Models](https://arxiv.org/abs/2604.13016).
-
-<a id="Overview"></a>
-
-## 📖Overview
-
-<img src="figs/main1.png" alt="One-shot OPD versus full-data OPD on mathematical reasoning, and the multi-teacher OPD comparison"  />
-
-On-policy distillation (OPD) combines student-generated rollouts with dense token-level supervision from a teacher. Existing work has mainly studied its algorithmic behavior, leaving the role of training data unclear. We examine this role at the data-minimal limit by training on a single query. One-shot OPD keeps improving for hundreds of steps and recovers most of full-data OPD's gain across task domains and model families. We explain this result through the *states* visited during training and the *rate* at which the student aligns with the teacher. A single query reaches 71.5% state coverage relative to full-data OPD, with most coverage appearing in the first 100 steps. Adding semantically distinct queries increases state coverage and validation accuracy together, and sixteen queries reach 98.9% coverage and match full-data training. Yet alignment slows at a similar pace whether OPD trains on one query or all 17k, and even a fixed set of states takes hundreds of steps to absorb. OPD is therefore data-overfed but algorithm-starved. Its rollouts quickly expose broad supervision, while the student absorbs that supervision increasingly slowly. The state-coverage result extends to multi-teacher OPD, where 16 semantically diverse queries per domain match full-data MOPD. As a further stress test, content-light templates and off-domain WildChat queries also approach the real-query baseline. Task content and induced state coverage can therefore come apart. We hope these findings direct future work toward the step efficiency of OPD, and prompt a re-examination of the data and the mechanisms behind its recent successes in frontier post-training.
-
-<a id="getting-started"></a>
-
-## ✨Getting Started
-
-### Environment Setup
-
-We implement OPD and MOPD by extending [veRL](https://github.com/volcengine/verl). The vendored copy under [`verl/`](verl/) is what the launchers run, so a fresh clone needs no separate veRL install — only its dependencies.
+本项目通过扩展 [veRL](https://github.com/volcengine/verl) 实现 OPD 和 MOPD。启动脚本使用仓库内 [`verl/`](verl/) 目录中的 vendored 版本，因此新 clone 后不需要另外安装 veRL，只需安装其依赖。
 
 ```text
 Python 3.12      vllm 0.28.0 (torch 2.13.0  transformers 5.10.4)      verl 0.9.0
@@ -50,38 +12,38 @@ Python 3.12      vllm 0.28.0 (torch 2.13.0  transformers 5.10.4)      verl 0.9.0
 git clone https://github.com/Thinking-Space/One-Shot-OPD.git
 cd One-Shot-OPD
 
-export MODEL_BASE=/your/models          # student + teacher checkpoints live here
-export CONDA_ENV_BIN=/your/env/bin      # vllm >= 0.18, transformers 5.x
+export MODEL_BASE=/your/models          # student 和 teacher checkpoint 所在目录
+export CONDA_ENV_BIN=/your/env/bin      # vllm >= 0.18，transformers 5.x
 ```
 
-- Reference numbers come from a single 8-GPU node (H100/A100 80 GB); the teacher worker shares the actor's GPU pool.
-- No dataset ships with this repository. Data is rebuilt from public sources by [`data/prep/`](data/prep/README.md); the expected layout, row counts, and `data_source` values are in [`data/README.md`](data/README.md).
+- 文中的参考结果来自单台 8-GPU 节点（H100/A100 80 GB）；teacher worker 与 actor 共用 GPU 资源池。
+- 仓库不附带数据集。数据由 [`data/prep/`](data/prep/README.md) 根据公开来源重新构建；预期目录结构、行数以及 `data_source` 取值见 [`data/README.md`](data/README.md)。
 
-### Training
+## 训练
 
-| Script | Reward | Teachers |
+| 脚本 | Reward | Teacher 数量 |
 | --- | --- | --- |
-| `grpo.sh` | rule-based verifier, grouped over `n` samples | none |
-| `opd.sh` | teacher reverse KL | one |
-| `mopd.sh` | teacher reverse KL, routed per row by the `ability` column | several |
+| `grpo.sh` | 基于规则的 verifier，按每个 prompt 的 `n` 个样本分组 | 无 |
+| `opd.sh` | teacher reverse KL | 1 个 |
+| `mopd.sh` | teacher reverse KL，按每行的 `ability` 列路由 | 多个 |
 
 ```bash
 bash recipe/grpo.sh                 # baseline
-bash recipe/opd.sh                  # OPD, full data
+bash recipe/opd.sh                  # OPD，完整数据
 MODE=oneshot bash recipe/opd.sh     # One-shot OPD
-MODE=template bash recipe/opd.sh    # the student writes its own input
-bash recipe/mopd.sh                 # MOPD, three teachers
+MODE=template bash recipe/opd.sh    # 由 student 自己写输入
+bash recipe/mopd.sh                 # MOPD，三个 teacher
 ```
 
-`DOMAIN` selects the teacher and the parquets, `MODE` selects which prompts are read, and the two are independent. Anything appended on the command line goes to Hydra.
+`DOMAIN` 选择 teacher 和 parquet，`MODE` 选择读取哪种 prompt；两者相互独立。命令行末尾追加的内容会原样传给 Hydra。
 
 ```bash
-DOMAIN=code bash recipe/opd.sh              # math (default) / code / fc / if
-DOMAIN=fc MODE=oneshot bash recipe/opd.sh   # only math ships a 1-shot corpus
+DOMAIN=code bash recipe/opd.sh              # math（默认）/ code / fc / if
+DOMAIN=fc MODE=oneshot bash recipe/opd.sh   # 只有 math 提供 1-shot corpus
 MODE=oneshot LOG_PROB_TOP_K=16 bash recipe/opd.sh trainer.total_training_steps=10
 ```
 
-For MOPD, each teacher is a name–path pair passed to `multi_teacher_args`. Adding one means adding a path variable and extending both the routing map and the call:
+对于 MOPD，每个 teacher 都以 `名称:路径` 的形式传给 `multi_teacher_args`。增加 teacher 时，需要增加路径变量，并同时扩展路由映射和调用：
 
 ```bash
 export TEACHER_AGENTIC_PATH=${TEACHER_AGENTIC_PATH:-${MODEL_BASE}/MyAgentTeacher}
@@ -98,104 +60,83 @@ launch "$EXPERIMENT_NAME" \
     ...
 ```
 
-<details>
-<summary><b>Key parameters</b></summary>
+<summary><b>关键参数</b></summary>
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `DOMAIN` | `math` | `math` / `code` / `fc` / `if` — selects teacher and datasets |
-| `MODE` | `full` | `full` / `oneshot` / `template` — selects the data variant |
-| `ACTOR_MODEL_PATH` | per `DOMAIN` | Student (policy) model to be trained |
-| `TEACHER_MODEL_PATH` | per `DOMAIN` | Frozen teacher that provides the token-level reward |
-| `MODEL_BASE` | required | Directory the two model paths resolve against |
-| `N_RESPONSES` | `1` | Rollout responses per prompt |
-| `LOG_PROB_TOP_K` | `0` | Top-K tokens kept when computing the token reward; `0` falls back to sampled-token OPD |
-| `METRIC_TOP_K` | `0` | Same computation, **observability only** — the reward stays plain reverse KL |
-| `TOP_K_STRATEGY` | `only_stu` | Support set: `only_stu` / `only_tch` / `intersection` / `union` / `union-intersection` |
-| `REWARD_WEIGHT_MODE` | `student_p` | Token weighting: `student_p` / `teacher_p` / `none` |
-| `VAL_N` / `VAL_TEMPERATURE` / `VAL_TOP_P` | `16` / `0.7` / `0.9` | Validation sampling, giving `avg@16` |
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `DOMAIN` | `math` | `math` / `code` / `fc` / `if`，选择 teacher 和数据集 |
+| `MODE` | `full` | `full` / `oneshot` / `template`，选择数据变体 |
+| `ACTOR_MODEL_PATH` | 按 `DOMAIN` 决定 | 要训练的 student（policy）模型 |
+| `TEACHER_MODEL_PATH` | 按 `DOMAIN` 决定 | 提供 token-level reward 的冻结 teacher |
+| `MODEL_BASE` | 必填 | 两个模型路径所基于的目录 |
+| `N_RESPONSES` | `1` | 每个 prompt 生成的 rollout 数量 |
+| `LOG_PROB_TOP_K` | `0` | 计算 token reward 时保留的 top-K token；为 `0` 时退回到 sampled-token OPD |
+| `METRIC_TOP_K` | `0` | 同样的计算仅用于**观测**；reward 仍是普通 reverse KL |
+| `TOP_K_STRATEGY` | `only_stu` | 支持集：`only_stu` / `only_tch` / `intersection` / `union` / `union-intersection` |
+| `REWARD_WEIGHT_MODE` | `student_p` | token 加权：`student_p` / `teacher_p` / `none` |
+| `VAL_N` / `VAL_TEMPERATURE` / `VAL_TOP_P` | `16` / `0.7` / `0.9` | 验证采样设置，产生 `avg@16` |
 
-> The two top-K knobs mean different things. `LOG_PROB_TOP_K` changes the training reward; `METRIC_TOP_K` only measures it.
+> 两个 top-K 参数含义不同：`LOG_PROB_TOP_K` 会改变训练 reward；`METRIC_TOP_K` 只用于测量。
 
+<summary><b>论文中 OPD 使用的默认超参数</b></summary>
 
-</details>
-
-<details>
-<summary><b>Default hyperparameters for OPD used in the paper</b></summary>
-
-| Item | Value |
-|---|---|
+| 项目 | 值 |
+| --- | --- |
 | Rollout batch size | 64 |
 | Mini batch size | 64 |
-| Responses per prompt | 1 |
-| KL coefficient | 0.0 |
-| LogProb top-`k` | 0 (default) / 16 |
-| Top-`k` strategy | student top-`k` |
-| Loss aggregation | `token-mean` |
+| 每个 prompt 的 response 数 | 1 |
+| KL 系数 | 0.0 |
+| LogProb top-k | 0（默认）/ 16 |
+| Top-k 策略 | student top-k |
+| Loss 聚合 | `token-mean` |
 | Training temperature | 1.0 |
-| Top-`p` | 1.0 |
-| Optimizer | AdamW (beta1 0.9, beta2 0.999, weight decay 0.01) |
+| Top-p | 1.0 |
+| Optimizer | AdamW（beta1 0.9，beta2 0.999，weight decay 0.01） |
 | Learning rate | 1e-6 |
 | Gradient clip norm | 1.0 |
-| Max prompt length | 1024 (math); 4096 (code, IF, agentic) |
-| Max response length | 7680 (math, code, IF); 2048 (agentic) |
+| 最大 prompt 长度 | 1024（math）；4096（code、IF、agentic） |
+| 最大 response 长度 | 7680（math、code、IF）；2048（agentic） |
 
-</details>
-
-### Validation
+## 验证
 
 ```bash
-VAL_ONLY=True bash recipe/opd.sh    # score the current weights, then exit
+VAL_ONLY=True bash recipe/opd.sh    # 用当前权重打分，然后退出
 ```
 
-The in-training validation loop gives `avg@16` at temperature 0.7. The evaluation protocols reported in the paper are:
+### 训练期间能拿到哪些 validation metrics？
 
-| Domain | Benchmarks | Protocol | Response cap |
-|---|---|---|---|
-| Math | MATH-500, AMC 2023, AIME 2025 | avg@16 | 31,744 |
-| Code | LiveCodeBench v6 | avg@3, official execution-based evaluator | 65,536 |
-| Instruction following | Multi-IF | final-turn score averaged over its eight languages | 16,384 per turn |
-| Agentic tool use | BFCL v3 | avg@8 over the evaluated subsets | 4,096 |
+可以，不需要等训练结束。`TEST_FREQ` 默认是 `20`，训练循环每 20 个 global steps（以及最后一步）执行一次验证；`VAL_BEFORE_TRAIN=True` 时还会在训练开始前先验证一次。验证过程使用当前 student 权重，以 `VAL_N=16`、temperature `0.7`、top-p `0.9` 进行采样，然后调用 [`opd_mixed_verify.py`](verl/verl/utils/reward_score/opd_mixed_verify.py) 中按领域选择的 verifier。
+
+日志（console/SwanLab）中的核心指标通常形如：
+
+- `val-core/<data_source>/acc/mean@16`：每个样本的准确率/通过率的 16 次采样平均值，即 README 里所说的 `avg@16`。数学、代码和函数调用的 verifier 都会将结果写入相应的 `acc` 或 `reward` 变量。
+- `val-aux/<data_source>/<变量>/mean@16`、`std@16`：辅助变量的均值和标准差。
+- `val-aux/.../best@N/mean`、`worst@N/mean`：对每个 prompt 的 N 次采样取最好/最差结果后，再跨 prompt 平均；若 verifier 提供 `pred`，还会有 `maj@N/mean`（多数投票）。N 会从 2、4、8 增长到 16。
+- 多轮数据还会有 `val-aux/num_turns/{min,max,mean}`；验证生成结果也可通过配置写入 JSONL。
+
+每次验证产生的是当前 checkpoint/当前内存权重的即时结果，并不会参与梯度更新。`VAL_ONLY=True` 只是把同一套验证逻辑放到训练前执行一次并退出，适合给已有 checkpoint 单独打分。
+
+论文中的完整评测协议如下；它们不完全等同于训练期间的验证：
+
+| 领域 | Benchmark | 协议 | Response 上限 |
+| --- | --- | --- | --- |
+| 数学 | MATH-500、AMC 2023、AIME 2025 | `avg@16` | 31,744 |
+| 代码 | LiveCodeBench v6 | `avg@3`，官方基于执行的 evaluator | 65,536 |
+| 指令跟随 | Multi-IF | 八种语言的最终轮得分平均 | 每轮 16,384 |
+| Agentic 工具使用 | BFCL v3 | 评测子集上的 `avg@8` | 4,096 |
 
 #### Multi-IF
 
-Multi-IF is multi-turn — turn 2's prompt depends on turn 1's answer — which the in-training loop cannot produce. It runs outside verl, and IF training sets `VAL_FILES='[]'`.
+Multi-IF 是多轮任务：第 2 轮 prompt 依赖第 1 轮回答，而训练内置验证循环只能生成一次，因此无法完成该协议。它在 verl 外部运行；IF 训练会将 `VAL_FILES='[]'`，所以训练期间没有 IF validation 数值，需使用 `eval/run_if_eval.py`：
 
 ```bash
-# 8 GPUs, one vLLM engine each (1.5B model, no tensor parallelism)
+# 8 GPUs，每个 GPU 一个 vLLM engine（1.5B 模型，无 tensor parallelism）
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 \
 python3 eval/run_if_eval.py multiif --model <hf-dir> --out results/multiif_s50
 
-# Re-score existing generations after a scorer or aggregation change, no GPU
+# 已有生成结果重新打分（修改 scorer 或聚合方式时无需 GPU）
 python3 eval/run_if_eval.py rescore --out results/multiif_s50
 
-# Smoke test, a few minutes
+# Smoke test，几分钟即可完成
 python3 eval/run_if_eval.py multiif --model <hf-dir> --out results/smoke --limit 24
 ```
-
-<a id="contact"></a>
-
-## 📨Contact
-
-- Bingxiang He: [hebx24@mails.tsinghua.edu.cn](mailto:hebx24@mails.tsinghua.edu.cn)
-- Ning Ding: [dingning@tsinghua.edu.cn](mailto:dingning@tsinghua.edu.cn)
-- Chaojun Xiao: [xcj@tsinghua.edu.cn](mailto:xcj@tsinghua.edu.cn)
-
-<a id="citation"></a>
-
-## 🎈Citation
-
-If you find this work helpful, please cite us:
-
-```bibtex
-@article{fu2026rethinking,
-  title={Rethinking on-policy distillation of large language models ii: One training example},
-  author={Fu, Zixuan and He, Bingxiang and Zuo, Yuxin and Huang, Haohuan and Zhang, Jinqian and Xiao, Ruhang and Qian, Cheng and Luo, Qinyu and Gao, Huan-ang and Wang, Yudong and others},
-  journal={arXiv preprint arXiv:2609.04172},
-  year={2026}
-}
-```
-
-## License
-
-The code in this repository is released under the Apache License 2.0. The released model checkpoints are subject to the license terms of their respective base models. Please refer to the corresponding model cards for details.

@@ -1,19 +1,19 @@
 #!/bin/bash
-# Shared settings for every launch script in this recipe. Sourced, not executed.
+# 本 recipe 中所有启动脚本共用的设置。该文件会被 source，而不是直接执行。
 #
-#   grpo.sh   verifier reward only, no teacher            (baseline)
-#   opd.sh    one frozen teacher scoring the student      MODE=full|oneshot|template
-#   mopd.sh   several teachers, routed by ability column  MODE=full|oneshot
+#   grpo.sh   仅使用 verifier reward，不使用 teacher（baseline）
+#   opd.sh    一个冻结 teacher 给 student 打分           MODE=full|oneshot|template
+#   mopd.sh   按 ability 列路由到多个 teacher           MODE=full|oneshot
 #
-# All three go through `python -m verl.trainer.main_ppo` with trainer.use_v1=False.
+# 三者都通过 `python -m verl.trainer.main_ppo` 启动，并设置 trainer.use_v1=False。
 
 set -x
 
-# ============ paths ============
+# ============ 路径 ============
 _OPD_RECIPE_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 export OPD_RECIPE_DIR=${OPD_RECIPE_DIR:-$_OPD_RECIPE_DIR}
 export VERL_ROOT=${VERL_ROOT:-$(cd "${_OPD_RECIPE_DIR}/../verl" && pwd)}
-# OPD_ROOT is where data/, logs/ and checkpoints/ live.
+# OPD_ROOT 是 data/、logs/ 和 checkpoints/ 所在目录。
 OPD_ROOT=${OPD_ROOT:-$(cd "${_OPD_RECIPE_DIR}/.." && pwd)}
 export OPD_ROOT
 export PYTHONPATH=${VERL_ROOT}:${PYTHONPATH}
@@ -21,24 +21,117 @@ export PYTHONPATH=${VERL_ROOT}:${PYTHONPATH}
 export MODEL_BASE=${MODEL_BASE:-/path/to/models/opd/baselines}
 export DATA_BASE=${DATA_BASE:-${OPD_ROOT}/data}
 
-export CONDA_ENV_BIN=${CONDA_ENV_BIN:-/path/to/conda/envs/verl/bin}
-export PATH="${CONDA_ENV_BIN}:$PATH"
+# 可使用 conda、venv 或集群预装 Python。保留 CONDA_ENV_BIN 兼容旧配置，但
+# 不再把默认占位路径或空字符串写入 PATH。
+export CONDA_ENV_BIN=${CONDA_ENV_BIN:-}
+if [[ -n "$CONDA_ENV_BIN" ]]; then
+    export PATH="$CONDA_ENV_BIN:$PATH"
+fi
 
-# ============ mode ============
+# ============ 集群 Python/CUDA 环境适配 ============
+# 不假设提交节点激活了 conda；按显式覆盖、当前 conda、项目 .venv 和系统
+# Python 的顺序寻找真正包含训练依赖的解释器。
+opd_sanitize_ld_library_path() {
+    local old_ifs="$IFS" entry sanitized=""
+    IFS=":"
+    for entry in ${LD_LIBRARY_PATH:-}; do
+        case "$entry" in
+            ""|/usr/local/cuda/compat|/usr/local/cuda/compat/*|\
+            /usr/local/lib/python3.10/site-packages/torch/lib|\
+            /usr/local/lib/python3.10/site-packages/torch/lib/*) continue ;;
+        esac
+        [[ -d "$entry" ]] || continue
+        sanitized="${sanitized:+${sanitized}:}${entry}"
+    done
+    IFS="$old_ifs"
+    export LD_LIBRARY_PATH="$sanitized"
+}
+
+opd_python_usable() {
+    local candidate="$1"
+    [[ "$candidate" = */* ]] || candidate="$(command -v "$candidate" 2>/dev/null || true)"
+    [[ -x "$candidate" ]] || return 1
+    env -u PYTHONPATH "$candidate" -c \
+        'import torch, ray, transformers, vllm, hydra, omegaconf' >/dev/null 2>&1
+}
+
+opd_setup_train_env() {
+    opd_sanitize_ld_library_path
+    local candidate configured="${PYTHON_BIN:-}" conda_prefix="${CONDA_PREFIX:-}" virtual_env="${VIRTUAL_ENV:-}"
+    if [[ -n "$configured" ]] && opd_python_usable "$configured"; then
+        :
+    else
+        [[ -z "$configured" ]] || echo "[warn] unusable PYTHON_BIN: $configured" >&2
+        PYTHON_BIN=""
+        [[ -z "$conda_prefix" ]] || for candidate in "$conda_prefix/bin/python" "$conda_prefix/bin/python3"; do
+            opd_python_usable "$candidate" && { PYTHON_BIN="$candidate"; break; }
+        done
+        if [[ -z "$PYTHON_BIN" ]]; then
+            local custom_path
+            IFS=":" read -r -a _opd_custom_paths <<< "${OPD_PYTHON_CANDIDATES:-}"
+            for custom_path in "${_opd_custom_paths[@]}"; do
+                [[ -n "$custom_path" ]] || continue
+                opd_python_usable "$custom_path" && { PYTHON_BIN="$custom_path"; break; }
+            done
+        fi
+        if [[ -z "$PYTHON_BIN" ]]; then
+            for candidate in "$CONDA_ENV_BIN/python" "$virtual_env/bin/python" "$OPD_ROOT/.venv/bin/python" "$VERL_ROOT/.venv/bin/python" \
+                /usr/local/bin/python3 /usr/bin/python3; do
+                opd_python_usable "$candidate" && { PYTHON_BIN="$candidate"; break; }
+            done
+        fi
+    fi
+    [[ -n "$PYTHON_BIN" ]] || { echo "[error] No Python with torch/ray/transformers/vllm/hydra found. Set PYTHON_BIN." >&2; return 2; }
+    export PYTHON_BIN PYTHONNOUSERSITE=1
+    export PYTHONPATH="$VERL_ROOT${PYTHONPATH:+:$PYTHONPATH}"
+    export CUDA_DEVICE_ORDER=PCI_BUS_ID
+}
+
+opd_print_train_env() {
+    echo "[env] hostname=$(hostname)" "date=$(date '+%Y-%m-%dT%H:%M:%S%z')"
+    echo "[env] OPD_ROOT=$OPD_ROOT VERL_ROOT=$VERL_ROOT PYTHON_BIN=$PYTHON_BIN"
+    echo "[env] python_version=$($PYTHON_BIN --version 2>&1)"
+    echo "[env] PYTHONPATH=${PYTHONPATH:-<unset>} LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-<unset>}"
+    echo "[env] CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-<unset>} NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-<unset>}"
+}
+
+opd_require_train_dependencies() {
+    "$PYTHON_BIN" - <<'PY'
+import importlib
+required = ("torch", "ray", "transformers", "vllm", "hydra", "omegaconf")
+for name in required:
+    module = importlib.import_module(name)
+    print(f"[env] dependency_{name}={getattr(module, '__version__', 'ok')}")
+PY
+}
+
+opd_require_cuda() {
+    "$PYTHON_BIN" - <<'PY'
+import os, sys, torch
+print("[env] dependency_python:", sys.executable)
+print("[env] torch:", torch.__version__, "cuda:", torch.version.cuda)
+if not torch.cuda.is_available() or torch.cuda.device_count() < 1:
+    raise SystemExit("CUDA preflight failed: torch CUDA runtime is unavailable.")
+torch.cuda.synchronize()
+print("[env] cuda_devices:", torch.cuda.device_count(), torch.cuda.get_device_name(0))
+PY
+}
+
+# ============ 模式 ============
 export MODE=${MODE:-full}
 [ "$MODE" = "input" ] && export MODE=template
 case "$MODE" in
     full|oneshot|template) ;;
     *)
-        # exit, not return: `return` would only leave this sourced file.
+        # 必须 exit，不能 return；return 只会离开当前被 source 的文件。
         echo "MODE=${MODE} is not one of: full, oneshot, template (alias: input)" >&2
         exit 2
         ;;
 esac
 
-# ============ sequence lengths ============
-# 4096 fits code/IF/agentic; the math launcher sets 1024 itself. Do not lower it
-# globally: data.filter_overlong_prompts=True drops the row rather than truncating.
+# ============ 序列长度 ============
+# 4096 足够容纳 code/IF/agentic；math launcher 会自行设置为 1024。不要在这里
+# 全局降低：data.filter_overlong_prompts=True 会丢弃超长行，而不是截断它们。
 if [ "$MODE" = "oneshot" ]; then
     export MAX_PROMPT_LENGTH=${MAX_PROMPT_LENGTH:-8192}
 fi
@@ -55,7 +148,7 @@ if [ "${MAX_MODEL_LEN}" -lt "$(( MAX_PROMPT_LENGTH + MAX_RESP_LENGTH ))" ]; then
     exit 1
 fi
 
-# ============ training hyper-parameters ============
+# ============ 训练超参数 ============
 export MINI_BATCH_SIZE=${MINI_BATCH_SIZE:-64}
 export TEMPERATURE=${TEMPERATURE:-1.0}
 export TEACHER_TEMPERATURE=${TEACHER_TEMPERATURE:-1.0}
@@ -66,22 +159,33 @@ export LOSS_AGG_MODE=${LOSS_AGG_MODE:-token-mean}
 export MODEL_DTYPE=${MODEL_DTYPE:-bfloat16}
 export USE_KL=${USE_KL:-False}
 
-# ============ top-K distillation ============
-#   LOG_PROB_TOP_K > 0  top-K IS the training reward (token reward becomes 3-D)
-#   METRIC_TOP_K   > 0  top-K for metrics only; reward stays the per-token reverse KL
-# LOG_PROB_TOP_K wins if both are set. 0/0 disables top-K entirely.
+# 默认只保存 Hugging Face 格式模型到 checkpoint/huggingface/，不保存
+# optimizer 或 extra 状态。此模式适合作为推理/发布产物，不支持从该 checkpoint
+# 恢复 optimizer 状态继续训练；如需断点续训，可设置 SAVE_CONTENTS。
+export SAVE_CONTENTS=${SAVE_CONTENTS:-"['hf_model']"}
+# 默认不从 HF-only 产物恢复训练状态；需要断点续训时同时覆盖 SAVE_CONTENTS 和
+# LOAD_CONTENTS（例如保存并加载 model/optimizer/extra）。
+export LOAD_CONTENTS=${LOAD_CONTENTS:-"[]"}
+# HF-only checkpoint 不能用于自动续训，因此默认关闭自动 resume；完整断点续训
+# 时可设置 RESUME_MODE=auto 或 RESUME_MODE=resume_path，并覆盖上面的保存/加载内容。
+export RESUME_MODE=${RESUME_MODE:-disable}
+
+# ============ top-K 蒸馏 ============
+#   LOG_PROB_TOP_K > 0  top-K 会成为训练 reward（token reward 变为 3-D）
+#   METRIC_TOP_K   > 0  top-K 仅用于指标；reward 仍是逐 token reverse KL
+# 两者同时设置时 LOG_PROB_TOP_K 优先。两者都为 0 时完全关闭 top-K。
 export LOG_PROB_TOP_K=${LOG_PROB_TOP_K:-0}
 export METRIC_TOP_K=${METRIC_TOP_K:-0}
 export TOP_K_STRATEGY=${TOP_K_STRATEGY:-only_stu}
 export REWARD_WEIGHT_MODE=${REWARD_WEIGHT_MODE:-student_p}
-# Reward mode adds a candidate axis the stock `vanilla` loss cannot broadcast against.
+# reward 模式会增加 candidate 维度，原生 `vanilla` loss 无法对其广播。
 if [ "${LOG_PROB_TOP_K}" -gt 0 ]; then
     export POLICY_LOSS_MODE=${POLICY_LOSS_MODE:-vanilla_topk}
 else
     export POLICY_LOSS_MODE=${POLICY_LOSS_MODE:-vanilla}
 fi
 
-# ============ template mode (MODE=template) ============
+# ============ template 模式（MODE=template） ============
 export PREFIX_TEMPLATE=${PREFIX_TEMPLATE:-'{bos}{user}<think>\n'}
 export PREFIX_SUFFIX=${PREFIX_SUFFIX:-''}
 export PREFIX_MODE=${PREFIX_MODE:-template}
@@ -91,7 +195,7 @@ export TEMPLATE_DATASET_LENGTH=${TEMPLATE_DATASET_LENGTH:-1000000}
 export TEMPLATE_DATA_SOURCE=${TEMPLATE_DATA_SOURCE:-template}
 export OVERSAMPLE_RATIO=${OVERSAMPLE_RATIO:-1.0}
 
-# ============ cluster ============
+# ============ 集群 ============
 export N_GPUS_PER_NODE=${N_GPUS_PER_NODE:-8}
 export NNODES=${NNODES:-1}
 export TOTAL_EPOCHS=${TOTAL_EPOCHS:-1}
@@ -99,17 +203,17 @@ export SAVE_FREQ=${SAVE_FREQ:-50}
 export TEST_FREQ=${TEST_FREQ:-20}
 export VAL_BEFORE_TRAIN=${VAL_BEFORE_TRAIN:-False}
 
-# VAL_ONLY=True scores the current weights against data.val_files and exits.
+# VAL_ONLY=True 使用当前权重对 data.val_files 打分后退出。
 export VAL_ONLY=${VAL_ONLY:-False}
 [ "$VAL_ONLY" = "True" ] && export VAL_BEFORE_TRAIN=True
 
-# ============ validation sampling ============
-# avg@N, not greedy. Every reference number was produced under these settings.
+# ============ validation 采样 ============
+# 使用 avg@N，而不是 greedy。所有参考结果都在这些设置下产生。
 export VAL_N=${VAL_N:-16}
 export VAL_TEMPERATURE=${VAL_TEMPERATURE:-0.7}
 export VAL_TOP_P=${VAL_TOP_P:-0.9}
 
-# ============ swanlab ============
+# ============ SwanLab ============
 export SWANLAB_PROJECT=${SWANLAB_PROJECT:-}
 export SWANLAB_LOG_DIR=${SWANLAB_LOG_DIR:-${OPD_ROOT}/swanlab}
 export SWANLAB_MODE=${SWANLAB_MODE:-cloud}
@@ -126,24 +230,31 @@ else
     echo "[opd] no SWANLAB_API_KEY (env or ${OPD_ROOT}/.swanlab_key); logging to console only" >&2
 fi
 
-# ============ runtime env ============
+# ============ 运行时环境 ============
 export PYTHONUNBUFFERED=1
 export HYDRA_FULL_ERROR=1
 export TOKENIZERS_PARALLELISM=true
 export RAY_memory_usage_threshold=0.99
-# ray.init's `uv run` probe walks ancestor processes and dies on NoSuchProcess.
+# ray.init 的 `uv run` 探测会遍历祖先进程，并可能因 NoSuchProcess 退出。
 export RAY_ENABLE_UV_RUN_RUNTIME_ENV=${RAY_ENABLE_UV_RUN_RUNTIME_ENV:-0}
-# `local` forces a fresh cluster: auto-discovery can attach to someone else's GCS.
+# `local` 强制创建新集群；自动发现可能连接到别人的 GCS。
 export RAY_ADDRESS=${RAY_ADDRESS:-local}
-# ray + vllm + FSDP exhaust the 1024 soft fd limit, and failure is silent.
+# ray、vllm 和 FSDP 会耗尽 1024 的 soft fd 限制，而且失败时可能没有明显报错。
 ulimit -n "$(ulimit -Hn)" 2>/dev/null || true
 export TORCH_NCCL_BLOCKING_WAIT=1
 export NCCL_TIMEOUT=${NCCL_TIMEOUT:-7200}
-# Override to sdpa if flash-attn cannot be built for the installed torch/CUDA pair.
+# 如果 flash-attn 无法针对当前 torch/CUDA 构建，可覆盖为 sdpa。
 export ATTN_IMPLEMENTATION=${ATTN_IMPLEMENTATION:-flash_attention_2}
-# DataLoader workers fork the trainer; with FSDP CPU offload they get SIGKILL'd.
+# DataLoader worker 会 fork trainer；配合 FSDP CPU offload 时可能收到 SIGKILL。
 export DATALOADER_NUM_WORKERS=${DATALOADER_NUM_WORKERS:-0}
 export NCCL_DEBUG=${NCCL_DEBUG:-WARN}
+
+opd_setup_train_env || exit $?
+opd_print_train_env
+opd_require_train_dependencies || exit $?
+if [ -z "${OPD_DRY_RUN:-}" ]; then
+    opd_require_cuda || exit $?
+fi
 
 DATE=$(date +%m%d)
 TIME_TAG=$(date +%H%M)
@@ -151,7 +262,7 @@ export DATE TIME_TAG
 
 mkdir -p "${OPD_ROOT}/logs"
 
-# Dynamic-bsz token budget must cover one full sequence.
+# dynamic batch size 的 token 预算必须能容纳一条完整序列。
 SEQ_LEN_TOKENS=$(( MAX_PROMPT_LENGTH + MAX_RESP_LENGTH ))
 PPO_MAX_TOKEN_LEN_PER_GPU=${PPO_MAX_TOKEN_LEN_PER_GPU:-$(( SEQ_LEN_TOKENS > 32768 ? SEQ_LEN_TOKENS : 32768 ))}
 if [ "${PPO_MAX_TOKEN_LEN_PER_GPU}" -lt "${SEQ_LEN_TOKENS}" ]; then
@@ -170,8 +281,8 @@ else
 fi
 export KL_ARGS
 
-# common_args -- the Hydra override block every launcher shares. Word-split on
-# purpose (Hydra wants one token per override), so paths must not contain spaces.
+# common_args：所有 launcher 共用的 Hydra override。这里故意按空白分词
+# （Hydra 要求每个 override 一个 token），因此路径不能包含空格。
 common_args() {
     echo "\
         --config-name=ppo_trainer \
@@ -223,15 +334,18 @@ common_args() {
         trainer.total_epochs=${TOTAL_EPOCHS} \
         trainer.save_freq=${SAVE_FREQ} \
         trainer.test_freq=${TEST_FREQ} \
+        trainer.resume_mode=${RESUME_MODE} \
         trainer.val_before_train=${VAL_BEFORE_TRAIN} \
         trainer.val_only=${VAL_ONLY} \
+        actor_rollout_ref.actor.checkpoint.save_contents="${SAVE_CONTENTS}" \
+        actor_rollout_ref.actor.checkpoint.load_contents="${LOAD_CONTENTS}" \
         trainer.logger=${TRAINER_LOGGER}"
 }
 
-# mode_args -- what differs between MODE=full / oneshot / template.
+# mode_args：MODE=full / oneshot / template 之间的差异。
 #
-# The prefix values are wrapped in literal single quotes: they contain `{`, `}`
-# and `<`, which Hydra's override lexer would otherwise read as dict/list syntax.
+# prefix 值使用字面单引号包裹：其中的 `{`、`}` 和 `<` 否则会被 Hydra
+# override lexer 当作字典/列表语法解析。
 mode_args() {
     if [ "$MODE" != "template" ]; then
         echo "data.shuffle=True"
@@ -252,17 +366,17 @@ mode_args() {
         template.oversample_ratio=${OVERSAMPLE_RATIO}"
 }
 
-# teacher_args <path> -- single-teacher OPD reward block.
+# teacher_args <path>：单 teacher OPD reward 配置块。
 teacher_args() {
     echo "\
         $(_teacher_common_args) \
         distillation.fsdp_teacher.model_path=$1"
 }
 
-# multi_teacher_args <name:path> [name:path ...] -- MOPD reward block.
+# multi_teacher_args <name:path> [name:path ...]：MOPD reward 配置块。
 #
-# teachers/ability_to_teacher are not in the structured config, so they need `++`
-# and Hydra's bare-key syntax; JSON quoting fails the parser. No spaces allowed.
+# teachers/ability_to_teacher 不在结构化配置中，因此需要 `++` 和 Hydra 的裸键
+# 语法；JSON 引号会导致解析失败。这里不允许空格。
 multi_teacher_args() {
     local entries="" spec
     for spec in "$@"; do
@@ -289,10 +403,10 @@ _teacher_common_args() {
         distillation.fsdp_teacher.fsdp_config.param_offload=True"
 }
 
-# launch <experiment name> <override>... -- run main_ppo and tee the log.
+# launch <experiment name> <override>...：运行 main_ppo 并将日志 tee 到文件。
 #
-# OPD_DRY_RUN=1 composes and prints the config instead of starting ray. `--cfg job`
-# has to lead: Hydra's argparse stops collecting overrides at the first flag.
+# OPD_DRY_RUN=1 只组合并打印配置，不启动 ray。`--cfg job` 必须放在前面：
+# Hydra 的 argparse 遇到第一个 flag 后会停止收集 override。
 launch() {
     local exp="$1"
     shift
@@ -302,10 +416,10 @@ launch() {
         trainer.default_local_dir="${CKPT_PATH:-${OPD_ROOT}/checkpoints/${exp}}"
 
     if [ -n "${OPD_DRY_RUN:-}" ]; then
-        python3 -m verl.trainer.main_ppo --cfg job "$@"
+        "$PYTHON_BIN" -m verl.trainer.main_ppo --cfg job "$@"
         return
     fi
 
-    python3 -m verl.trainer.main_ppo "$@" \
+    "$PYTHON_BIN" -m verl.trainer.main_ppo "$@" \
         2>&1 | tee "${OPD_ROOT}/logs/${exp}.log"
 }

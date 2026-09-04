@@ -1,15 +1,14 @@
 #!/bin/bash
-# GRPO -- the reference baseline: verifier reward only, no teacher.
+# GRPO：参考 baseline，仅使用 verifier reward，不使用 teacher。
 #
-# Same entry point, data and lengths as opd.sh; the reward comes from the
-# rule-based verifier instead, grouped into a GRPO advantage over N_RESPONSES
-# samples per prompt. No teacher is loaded.
+# 使用与 opd.sh 相同的入口、数据和长度设置；reward 改为规则 verifier，
+# 并基于每个 prompt 的 N_RESPONSES 个样本计算 GRPO advantage。不加载 teacher。
 #
-# Usage:
-#     bash recipe/grpo.sh                      # full data
-#     MODE=oneshot bash recipe/grpo.sh         # 1-shot prompts
+# 用法：
+#     bash recipe/grpo.sh                      # 完整数据
+#     MODE=oneshot bash recipe/grpo.sh         # 1-shot prompt
 
-# Read by _common.sh, so they are set before the source.
+# 由 _common.sh 读取，因此必须在 source 之前设置。
 export ADV_ESTIMATOR=${ADV_ESTIMATOR:-grpo}
 export N_RESPONSES=${N_RESPONSES:-8}
 
