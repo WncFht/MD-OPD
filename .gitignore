@@ -1,16 +1,46 @@
 __pycache__/
 *.pyc
+*.py[cod]
+*.so
 .DS_Store
+._*
+__MACOSX/
 .env
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Training and evaluation outputs
 logs/
 results/
 outputs/
 checkpoints/
+wandb/
 swanlab/
 .swanlab_key
+
+# Local caches and transferred archives
+.cache/
+hf_cache/
+ms_cache/
+om_cache/
+*.tar
+*.tar.gz
+*.tar.gz.part.*
+*.tgz
+*.zip
+*.7z
+
+# Generated evaluation files
+generated_predictions.jsonl
+predictions_score.json
+
+# Datasets are reconstructed locally; keep metadata, prep scripts and fixtures.
 data/*
 !data/prep/
 !data/smoke/
 !data/README.md
-
-*.egg-info/
