@@ -19,7 +19,7 @@ if [ "$MODE" = "template" ]; then
     exit 2
 fi
 
-export PROJECT_NAME=${PROJECT_NAME:-GRPO}
+export PROJECT_NAME=${PROJECT_NAME:-One-Shot-OPD}
 
 export ACTOR_MODEL_PATH=${ACTOR_MODEL_PATH:-${MODEL_BASE}/DeepSeek-R1-Distill-Qwen-1.5B}
 ACTOR_MODEL_NAME=$(basename "$ACTOR_MODEL_PATH")

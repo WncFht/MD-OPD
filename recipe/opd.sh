@@ -23,7 +23,9 @@ case "$DOMAIN" in
     math)
         DOMAIN_TEACHER=JustRL-DeepSeek-1.5B
         DOMAIN_TRAIN=math/DAPO/train.parquet
-        DOMAIN_VAL=math/MATH-500/test.parquet
+        DOMAIN_VAL="math/MATH-500/test.parquet
+                    math/AMC23/test.parquet
+                    math/AIME25/test.parquet"
         ;;
     code)
         DOMAIN_TEACHER=DeepCoder-1.5B-Preview
@@ -61,7 +63,7 @@ esac
 
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 
-export PROJECT_NAME=${PROJECT_NAME:-OPD}
+export PROJECT_NAME=${PROJECT_NAME:-One-Shot-OPD}
 
 export ACTOR_MODEL_PATH=${ACTOR_MODEL_PATH:-${MODEL_BASE}/${DOMAIN_ACTOR:-DeepSeek-R1-Distill-Qwen-1.5B}}
 export TEACHER_MODEL_PATH=${TEACHER_MODEL_PATH:-${MODEL_BASE}/${DOMAIN_TEACHER}}

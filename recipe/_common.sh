@@ -18,7 +18,7 @@ OPD_ROOT=${OPD_ROOT:-$(cd "${_OPD_RECIPE_DIR}/.." && pwd)}
 export OPD_ROOT
 export PYTHONPATH=${VERL_ROOT}:${PYTHONPATH}
 
-export MODEL_BASE=${MODEL_BASE:-/path/to/models/opd/baselines}
+export MODEL_BASE=${MODEL_BASE:-/mnt/dolphinfs/hdd_pool/docker/user/hadoop-hmart-poistar/fanghaotian/model}
 export DATA_BASE=${DATA_BASE:-${OPD_ROOT}/data}
 
 # 可使用 conda、venv 或集群预装 Python。保留 CONDA_ENV_BIN 兼容旧配置，但
@@ -75,8 +75,18 @@ opd_setup_train_env() {
             done
         fi
         if [[ -z "$PYTHON_BIN" ]]; then
-            for candidate in "$CONDA_ENV_BIN/python" "$virtual_env/bin/python" "$OPD_ROOT/.venv/bin/python" "$VERL_ROOT/.venv/bin/python" \
-                /usr/local/bin/python3 /usr/bin/python3; do
+            for candidate in "$CONDA_ENV_BIN/python" "$CONDA_ENV_BIN/python3" \
+                "$virtual_env/bin/python" "$virtual_env/bin/python3" \
+                "$OPD_ROOT/.venv/bin/python" "$OPD_ROOT/.venv/bin/python3" \
+                "$VERL_ROOT/.venv/bin/python" "$VERL_ROOT/.venv/bin/python3" \
+                "$HOME/conda/bin/python" "$HOME/conda/bin/python3" \
+                /usr/local/bin/python3 /usr/local/bin/python \
+                /usr/bin/python3 /usr/bin/python /bin/python3 /bin/python; do
+                opd_python_usable "$candidate" && { PYTHON_BIN="$candidate"; break; }
+            done
+        fi
+        if [[ -z "$PYTHON_BIN" ]]; then
+            for candidate in python3 python; do
                 opd_python_usable "$candidate" && { PYTHON_BIN="$candidate"; break; }
             done
         fi
@@ -175,7 +185,7 @@ export RESUME_MODE=${RESUME_MODE:-disable}
 #   METRIC_TOP_K   > 0  top-K 仅用于指标；reward 仍是逐 token reverse KL
 # 两者同时设置时 LOG_PROB_TOP_K 优先。两者都为 0 时完全关闭 top-K。
 export LOG_PROB_TOP_K=${LOG_PROB_TOP_K:-0}
-export METRIC_TOP_K=${METRIC_TOP_K:-0}
+export METRIC_TOP_K=${METRIC_TOP_K:-16}
 export TOP_K_STRATEGY=${TOP_K_STRATEGY:-only_stu}
 export REWARD_WEIGHT_MODE=${REWARD_WEIGHT_MODE:-student_p}
 # reward 模式会增加 candidate 维度，原生 `vanilla` loss 无法对其广播。
@@ -213,22 +223,11 @@ export VAL_N=${VAL_N:-16}
 export VAL_TEMPERATURE=${VAL_TEMPERATURE:-0.7}
 export VAL_TOP_P=${VAL_TOP_P:-0.9}
 
-# ============ SwanLab ============
-export SWANLAB_PROJECT=${SWANLAB_PROJECT:-}
-export SWANLAB_LOG_DIR=${SWANLAB_LOG_DIR:-${OPD_ROOT}/swanlab}
-export SWANLAB_MODE=${SWANLAB_MODE:-cloud}
-if [ -z "${SWANLAB_API_KEY:-}" ] && [ -f "${OPD_ROOT}/.swanlab_key" ]; then
-    SWANLAB_API_KEY=$(tr -d ' \t\n\r' < "${OPD_ROOT}/.swanlab_key")
-    export SWANLAB_API_KEY
-fi
-
-if [ -n "${SWANLAB_API_KEY:-}" ]; then
-    export TRAINER_LOGGER=${TRAINER_LOGGER:-"['console','swanlab']"}
-    mkdir -p "$SWANLAB_LOG_DIR"
-else
-    export TRAINER_LOGGER=${TRAINER_LOGGER:-"['console']"}
-    echo "[opd] no SWANLAB_API_KEY (env or ${OPD_ROOT}/.swanlab_key); logging to console only" >&2
-fi
+# ============ W&B ============
+# 远程节点默认离线记录；如需上传云端，可设置 WANDB_MODE=online。
+export WANDB_MODE=${WANDB_MODE:-offline}
+# offline 模式不需要 API key，记录 console 和 W&B。
+export TRAINER_LOGGER="['console','wandb']"
 
 # ============ 运行时环境 ============
 export PYTHONUNBUFFERED=1
