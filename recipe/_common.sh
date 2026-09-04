@@ -165,6 +165,7 @@ export TEACHER_TEMPERATURE=${TEACHER_TEMPERATURE:-1.0}
 export N_RESPONSES=${N_RESPONSES:-1}
 export PARALLEL_SIZE=${PARALLEL_SIZE:-1}
 export ADV_ESTIMATOR=${ADV_ESTIMATOR:-token_reward_direct}
+export GAMMA=${GAMMA:-1.0}
 export LOSS_AGG_MODE=${LOSS_AGG_MODE:-token-mean}
 export MODEL_DTYPE=${MODEL_DTYPE:-bfloat16}
 export USE_KL=${USE_KL:-False}
@@ -287,6 +288,7 @@ common_args() {
         --config-name=ppo_trainer \
         trainer.use_v1=False \
         algorithm.adv_estimator=${ADV_ESTIMATOR} \
+        algorithm.gamma=${GAMMA} \
         data.train_batch_size=$(( MINI_BATCH_SIZE * PARALLEL_SIZE )) \
         data.max_prompt_length=${MAX_PROMPT_LENGTH} \
         data.max_response_length=${MAX_RESP_LENGTH} \

@@ -14,6 +14,13 @@
 # DOMAIN 选择 teacher 和 parquet；MODE 选择读取哪种 prompt。
 # 命令行末尾追加的参数会原样传给 Hydra。
 
+# 设置 DISCOUNTED_TOKEN_REWARD=True 可使用无 critic 的 discounted reward-to-go：
+# A_t = r_t + GAMMA * A_{t+1}。默认仍使用 token_reward_direct。
+export DISCOUNTED_TOKEN_REWARD=${DISCOUNTED_TOKEN_REWARD:-False}
+if [ "$DISCOUNTED_TOKEN_REWARD" = "True" ]; then
+    export ADV_ESTIMATOR=${ADV_ESTIMATOR:-discounted_token_reward}
+fi
+
 # --- domain 默认值 ----------------------------------------------------------
 # 在 source _common.sh 之前运行：_common.sh 在 source 时将 MAX_PROMPT_LENGTH /
 # MAX_RESP_LENGTH 解析为 MAX_MODEL_LEN 和 SEQ_LEN_TOKENS，因此需要不同预算的

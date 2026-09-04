@@ -46,6 +46,7 @@ from verl.workers.config import ActorConfig
 __all__ = [
     "compute_token_reward_direct_advantage",
     "compute_token_reward_direct_plus_grpo_advantage",
+    "compute_discounted_token_reward_advantage",
     "compute_policy_loss_vanilla_topk",
 ]
 
@@ -76,6 +77,44 @@ def compute_token_reward_direct_advantage(
         advantages = token_level_rewards * mask
         returns = advantages.clone()
     return advantages, returns
+
+
+@register_adv_est("discounted_token_reward")
+def compute_discounted_token_reward_advantage(
+    token_level_rewards: torch.Tensor,
+    response_mask: torch.Tensor,
+    config: Optional[AlgoConfig] = None,
+    **kwargs,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Use a critic-free discounted reward-to-go as the token advantage.
+
+    This is a Monte-Carlo suffix return, not GAE: the implicit value baseline is
+    zero and no critic is needed.  For a response reward ``r_t`` it computes
+
+        A_t = r_t + gamma * A_{t+1}
+
+    along the response dimension.  A trailing top-K candidate dimension is
+    preserved, so the same estimator can be used with top-K OPD rewards.
+    """
+    gamma = 1.0
+    if config is not None:
+        gamma = float(config.get("gamma", 1.0))
+    if not 0.0 <= gamma <= 1.0:
+        raise ValueError(f"discounted_token_reward requires gamma in [0, 1], got {gamma}")
+
+    mask = response_mask.to(dtype=token_level_rewards.dtype)
+    if token_level_rewards.dim() == 3:
+        mask = mask.unsqueeze(-1)
+    rewards = token_level_rewards * mask
+
+    returns = torch.zeros_like(rewards)
+    running = torch.zeros_like(rewards[:, -1])
+    for t in range(rewards.shape[1] - 1, -1, -1):
+        running = rewards[:, t] + gamma * running
+        running = running * mask[:, t]
+        returns[:, t] = running
+
+    return returns, returns.clone()
 
 
 @register_adv_est("token_reward_direct_plus_grpo")
