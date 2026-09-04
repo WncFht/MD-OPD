@@ -13,9 +13,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
-
 from _paths import DATA_ROOT
-
 
 #: Where `ms_fetch.sh datasets facebook/Multi-IF <dir>` drops the CSV.
 DEFAULT_SRC = DATA_ROOT / ".cache" / "multiif" / "multiIF_20241018.csv"
@@ -49,9 +47,7 @@ def build(src: Path) -> pd.DataFrame:
 
 
 def parse_args():
-    p = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--src", type=Path, default=DEFAULT_SRC, help="multiIF_20241018.csv")
     p.add_argument("--out", type=Path, default=DATA_ROOT / "if" / "MultiIF" / "eval_3turn.parquet")
     return p.parse_args()

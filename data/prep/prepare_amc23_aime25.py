@@ -17,7 +17,6 @@ import urllib.request
 from pathlib import Path
 
 import pandas as pd
-
 from _paths import DATA_ROOT
 from align_mopd_schema import REF_SCHEMA, write_aligned
 
@@ -63,14 +62,21 @@ def _expect(n: int, want: int, name: str) -> None:
     not raise, it just makes scores incomparable with the reference table.
     """
     if n != want:
-        raise SystemExit(f"{name}: upstream returned {n} rows, expected {want} -- upstream changed; investigate before editing this number")
+        raise SystemExit(
+            f"{name}: upstream returned {n} rows, expected {want} -- upstream changed; "
+            "investigate before editing this number"
+        )
 
 
 # ----------------------------------------------------------------------------
 # AMC23 -> math/AMC23/test.parquet
 # ----------------------------------------------------------------------------
 def build_amc23(src: Path | None, cache_dir: Path) -> pd.DataFrame:
-    src = src or _fetch("knoveleng/AMC-23", "data/train-00000-of-00001.parquet", cache_dir / "amc23.parquet")
+    src = src or _fetch(
+        "knoveleng/AMC-23",
+        "data/train-00000-of-00001.parquet",
+        cache_dir / "amc23.parquet",
+    )
     up = pd.read_parquet(src)
     print(f"  raw rows: {len(up)}")
     _expect(len(up), 40, "AMC23")
@@ -98,7 +104,11 @@ def build_aime25(src: Path | None, cache_dir: Path) -> pd.DataFrame:
     else:
         raw = []
         for part in ("I", "II"):
-            p = _fetch("opencompass/AIME2025", f"aime2025-{part}.jsonl", cache_dir / f"aime2025-{part}.jsonl")
+            p = _fetch(
+                "opencompass/AIME2025",
+                f"aime2025-{part}.jsonl",
+                cache_dir / f"aime2025-{part}.jsonl",
+            )
             rows = [json.loads(line) for line in p.read_text().splitlines() if line.strip()]
             _expect(len(rows), 15, f"AIME25 part {part}")
             raw += rows
@@ -106,7 +116,12 @@ def build_aime25(src: Path | None, cache_dir: Path) -> pd.DataFrame:
     _expect(len(raw), 30, "AIME25")
     return pd.DataFrame(
         [
-            _row(ex["question"].strip(), "AIME25", str(ex["answer"]).strip(), f"AIME25-{i}")
+            _row(
+                ex["question"].strip(),
+                "AIME25",
+                str(ex["answer"]).strip(),
+                f"AIME25-{i}",
+            )
             for i, ex in enumerate(raw)
         ]
     )
@@ -130,9 +145,10 @@ def _verify(df: pd.DataFrame, ref: Path) -> int:
     bad = 0
     for i in range(len(df)):
         a, b = df.iloc[i], old.iloc[i]
-        if a["prompt"][0]["content"].strip() != b["prompt"][0]["content"].strip() or str(
-            a["reward_model"]["ground_truth"]
-        ).strip() != str(b["reward_model"]["ground_truth"]).strip():
+        if (
+            a["prompt"][0]["content"].strip() != b["prompt"][0]["content"].strip()
+            or str(a["reward_model"]["ground_truth"]).strip() != str(b["reward_model"]["ground_truth"]).strip()
+        ):
             bad += 1
             if bad <= 3:
                 print(f"  VERIFY: row {i} differs")
@@ -143,7 +159,11 @@ def _verify(df: pd.DataFrame, ref: Path) -> int:
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("which", choices=[*_BUILDERS, "all"])
-    p.add_argument("--src", type=Path, help="local file to use instead of downloading from ModelScope")
+    p.add_argument(
+        "--src",
+        type=Path,
+        help="local file to use instead of downloading from ModelScope",
+    )
     p.add_argument("--out", type=Path, help="output path; valid only for a single subcommand")
     p.add_argument("--cache-dir", type=Path, default=DATA_ROOT / ".cache")
     p.add_argument("--verify", type=Path, help="compare against this parquet instead of writing")

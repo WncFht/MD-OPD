@@ -14,12 +14,13 @@
 
 """ttrl_math_v2: 与 ttrl_math 相同，但代码评测路由到 code_eval_v2。"""
 
+import traceback
+
 from latex2sympy2_extended import latex2sympy
 from sympy import simplify
 from sympy.parsing.sympy_parser import parse_expr
-import traceback
 
-from .math_utils import extract_boxed_answer, is_latex_equal, grade_answer_mathd, grade_answer_sympy, timeout_ours
+from .math_utils import extract_boxed_answer, grade_answer_mathd, grade_answer_sympy, is_latex_equal, timeout_ours
 
 
 def extract_answer(passage: str) -> str:
@@ -36,6 +37,7 @@ def grade(model_answer: str, gt_answer: str, fast: bool = True):
         correct = correct or is_latex_equal(model_answer, gt_answer)
     return correct
 
+
 @timeout_ours(timeout_seconds=10)
 def simplify_expression_string(expression_string: str) -> str:
     try:
@@ -44,15 +46,16 @@ def simplify_expression_string(expression_string: str) -> str:
         return str(simplified_expr)
     except TimeoutError:
         return expression_string
-    except Exception as e:
+    except Exception:
         try:
             sympy_expr = latex2sympy(expression_string)
             simplified_expr = simplify(sympy_expr)
             return str(simplified_expr)
         except TimeoutError:
             return expression_string
-        except Exception as e:
+        except Exception:
             return expression_string
+
 
 def compute_score(model_response, gt_answer, fast=False):
     model_answer = extract_answer(model_response)
@@ -78,20 +81,39 @@ def compute_score(model_response, gt_answer, fast=False):
     else:
         return {"score": 0.0, "format_score": 1.0, "acc": False, "extracted_gt": gt_answer, "pred": model_answer}
 
+
 # ----------------------------------------------------------------------------
 # 代码评测路由: 指向 code_eval_v2
 # ----------------------------------------------------------------------------
 _CODE_DATA_SOURCES = {
-    "livecodebench", "livecodebench/code_generation", "livecodebench/code_generation_lite",
-    "humanevalplus", "evalplus/humanevalplus", "openai/openai_humaneval", "openai_humaneval",
-    "mbppplus", "mbpp+", "evalplus/mbppplus", "mbpp", "google-research-datasets/mbpp",
-    "taco", "BAAI/TACO", "apps", "codeparrot/apps",
-    "code_contests", "deepmind/code_contests", "codeforces",
+    "livecodebench",
+    "livecodebench/code_generation",
+    "livecodebench/code_generation_lite",
+    "humanevalplus",
+    "evalplus/humanevalplus",
+    "openai/openai_humaneval",
+    "openai_humaneval",
+    "mbppplus",
+    "mbpp+",
+    "evalplus/mbppplus",
+    "mbpp",
+    "google-research-datasets/mbpp",
+    "taco",
+    "BAAI/TACO",
+    "apps",
+    "codeparrot/apps",
+    "code_contests",
+    "deepmind/code_contests",
+    "codeforces",
 }
 
 _FC_DATA_SOURCES = {
-    "xlam", "bfcl_simple", "bfcl_multiple",
-    "bfcl_parallel", "bfcl_parallel_multiple", "bfcl_live_simple",
+    "xlam",
+    "bfcl_simple",
+    "bfcl_multiple",
+    "bfcl_parallel",
+    "bfcl_parallel_multiple",
+    "bfcl_live_simple",
 }
 
 
@@ -114,7 +136,7 @@ def reward_func(
 
         if isinstance(res, dict):
             return res
-        elif isinstance(res, (int, float, bool)):
+        elif isinstance(res, int | float | bool):
             return float(res)
         else:
             return float(res[0])

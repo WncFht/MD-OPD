@@ -12,17 +12,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
+
+# Reuse the xlam training prompt template so training and validation match.
+import sys
 from pathlib import Path
 
 import pandas as pd
 
-# Reuse the xlam training prompt template so training and validation match.
-import sys
 sys.path.insert(0, str(Path(__file__).parent))
-from prepare_xlam_train import FC_SYSTEM_PROMPT_TEMPLATE  # noqa: E402
-
 from _paths import DATA_ROOT  # noqa: E402
-
+from prepare_xlam_train import FC_SYSTEM_PROMPT_TEMPLATE  # noqa: E402
 
 #: No default path -- where the BFCL checkout lives is a property of the
 #: machine. `--src` overrides it.
@@ -127,9 +126,7 @@ def build_subset(src: Path, subset: str) -> pd.DataFrame:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "--src",
         type=Path,

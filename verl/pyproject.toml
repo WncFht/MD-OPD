@@ -30,7 +30,8 @@ requires-python = ">=3.10"
 # Note: While the formatter will attempt to format lines such that they remain within the line-length,
 # it isn't a hard upper bound, and formatted lines may exceed the line-length.
 line-length = 120
-exclude = ["scripts/legacy_model_merger.py"]
+exclude = ["**/scripts/legacy_model_merger.py"]
+force-exclude = true
 
 [tool.ruff.lint]
 isort = {known-first-party = ["verl"]}
@@ -64,6 +65,15 @@ ignore = [
     # deprecated import
     "UP035",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# This module intentionally keeps helper imports next to the dynamic decoder
+# implementation rather than moving them into the optional-dependency path.
+"verl/verl/utils/reward_score/code_eval_v2/__init__.py" = ["E402"]
+# These files contain generated/runtime Python source templates where wrapping
+# the embedded source would change the payload rather than improve readability.
+"verl/verl/utils/reward_score/code_eval_v2/_base_imports.py" = ["E501"]
+"verl/verl/utils/reward_score/code_eval_v2/_lcb_runner.py" = ["E501"]
 
 # -------------------------------
 # tool.mypy - typechecking config

@@ -599,7 +599,9 @@ class RayPPOTrainer(OPDTrainerMixin):
         # Keep `ability` on the leftover batch: generate_sequences may drop
         # extra non-tensor columns, and MOPD routing reads this field after
         # the gen-output union.
-        reward_keys = set({"data_source", "reward_model", "extra_info", "uid", "ability"}) & batch.non_tensor_batch.keys()
+        reward_keys = (
+            set({"data_source", "reward_model", "extra_info", "uid", "ability"}) & batch.non_tensor_batch.keys()
+        )
 
         # pop those keys for generation
         batch_keys_to_pop = []

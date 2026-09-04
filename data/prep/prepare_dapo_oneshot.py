@@ -13,7 +13,6 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
-
 from _paths import DATA_ROOT
 
 
@@ -37,9 +36,7 @@ def parse_args() -> argparse.Namespace:
         default=22,
         help="Zero-based row position to repeat. Negative values follow pandas iloc.",
     )
-    parser.add_argument(
-        "--repeat", type=int, default=64, help="Number of output rows (= train_batch_size)."
-    )
+    parser.add_argument("--repeat", type=int, default=64, help="Number of output rows (= train_batch_size).")
     return parser.parse_args()
 
 

@@ -11,7 +11,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
 from _paths import DATA_ROOT
 
 # Directory of raw WildChat-1M parquet shards. No default: download
@@ -30,10 +29,10 @@ def extract_first_user_message(conv) -> str | None:
         Text of the first user message, or None if not found.
     """
     try:
-        if hasattr(conv, '__len__') and len(conv) > 0:
+        if hasattr(conv, "__len__") and len(conv) > 0:
             msg = conv[0]
-            if isinstance(msg, dict) and msg.get('role') == 'user' and 'content' in msg:
-                return msg['content']
+            if isinstance(msg, dict) and msg.get("role") == "user" and "content" in msg:
+                return msg["content"]
     except Exception:
         pass
     return None
@@ -41,50 +40,52 @@ def extract_first_user_message(conv) -> str | None:
 
 def main() -> None:
     if DATA_DIR is None:
-        raise SystemExit(
-            "set WILDCHAT_DIR to the directory holding WildChat-1M's parquet shards"
-        )
+        raise SystemExit("set WILDCHAT_DIR to the directory holding WildChat-1M's parquet shards")
     files = sorted(DATA_DIR.glob("*.parquet"))
     print(f"Loading {len(files)} parquet files...")
 
     dfs = []
     for f in files:
-        df = pd.read_parquet(f, columns=[
-            'conversation', 'turn', 'language', 'toxic', 'redacted',
-        ])
+        df = pd.read_parquet(
+            f,
+            columns=[
+                "conversation",
+                "turn",
+                "language",
+                "toxic",
+                "redacted",
+            ],
+        )
         dfs.append(df)
     raw = pd.concat(dfs, ignore_index=True)
     print(f"Raw total: {len(raw):,}")
 
     # Filter
-    mask = (
-        (raw['turn'] == 1) &
-        (raw['language'] == 'English') &
-        (~raw['toxic']) &
-        (~raw['redacted'])
-    )
+    mask = (raw["turn"] == 1) & (raw["language"] == "English") & (~raw["toxic"]) & (~raw["redacted"])
     filtered = raw[mask].copy()
     print(f"After filter (turn=1, English, non-toxic): {len(filtered):,}")
 
     # Extract the first user message
-    filtered['user_msg'] = filtered['conversation'].apply(extract_first_user_message)
-    filtered = filtered.dropna(subset=['user_msg'])
+    filtered["user_msg"] = filtered["conversation"].apply(extract_first_user_message)
+    filtered = filtered.dropna(subset=["user_msg"])
 
     # Length filter
-    msg_lens = filtered['user_msg'].str.len()
+    msg_lens = filtered["user_msg"].str.len()
     filtered = filtered[(msg_lens >= 20) & (msg_lens <= 2000)]
     print(f"After length filter (20-2000 chars): {len(filtered):,}")
 
     # Build the OPD format
     records = []
     for i, (_, row) in enumerate(filtered.iterrows()):
-        records.append({
-            'prompt': np.array([{"role": "user", "content": row['user_msg']}], dtype=object),
-            'data_source': 'WildChat',
-            'ability': 'general',
-            'reward_model': {"ground_truth": "", "style": "rule"},
-            'extra_info': {"index": f"WildChat-{i}", "split": "train"},
-        })
+        records.append(
+            {
+                "prompt": np.array([{"role": "user", "content": row["user_msg"]}], dtype=object),
+                "data_source": "WildChat",
+                "ability": "general",
+                "reward_model": {"ground_truth": "", "style": "rule"},
+                "extra_info": {"index": f"WildChat-{i}", "split": "train"},
+            }
+        )
 
     out_df = pd.DataFrame(records)
 

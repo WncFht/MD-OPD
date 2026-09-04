@@ -17,14 +17,11 @@ import os
 import pickle
 import zlib
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
-
-from _paths import DATA_ROOT
 from _ms import fetch
+from _paths import DATA_ROOT
 from align_mopd_schema import REF_SCHEMA, write_aligned
-
 
 # ----------------------------------------------------------------------------
 # Prompt templates
@@ -261,9 +258,7 @@ def build_lcb_v6() -> pd.DataFrame:
         starter_code = ex.get("starter_code") or ""
         question = ex.get("question_content", "")
         if starter_code:
-            prompt_text = LCB_FUNCTIONAL_PROMPT_TEMPLATE.format(
-                question=question, starter_code=starter_code
-            )
+            prompt_text = LCB_FUNCTIONAL_PROMPT_TEMPLATE.format(question=question, starter_code=starter_code)
         else:
             prompt_text = LCB_STDIN_PROMPT_TEMPLATE.format(question=question)
 

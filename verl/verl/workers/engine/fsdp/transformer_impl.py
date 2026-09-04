@@ -1440,9 +1440,7 @@ class FSDPEngineWithLMHead(FSDPEngine):
             if opd_student_top_k > 0 and not use_fused_kernels:
                 # (total_nnz, K): gather_dim/unpad_dim are both the token axis, so
                 # the trailing K axis rides along untouched.
-                opd_top_k_rmpad = {
-                    k: self._gather_and_unpad_packed(v, pad_size) for k, v in opd_top_k_rmpad.items()
-                }
+                opd_top_k_rmpad = {k: self._gather_and_unpad_packed(v, pad_size) for k, v in opd_top_k_rmpad.items()}
 
             if pad_mode == DatasetPadMode.NO_PADDING:
                 cu_seqlens = input_ids.offsets()

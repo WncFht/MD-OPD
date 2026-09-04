@@ -176,9 +176,7 @@ def compute_top_k_reward(
         valid = student_in_teacher.bool()
         normalize = True
     elif strategy == "union":
-        valid = torch.cat(
-            [torch.ones_like(student_in_teacher, dtype=torch.bool), ~teacher_in_student.bool()], dim=-1
-        )
+        valid = torch.cat([torch.ones_like(student_in_teacher, dtype=torch.bool), ~teacher_in_student.bool()], dim=-1)
         normalize = True
     elif strategy == "union-intersection":
         valid = torch.cat([~student_in_teacher.bool(), ~teacher_in_student.bool()], dim=-1)
@@ -408,9 +406,7 @@ class TeacherWorker(Worker):
                         continue
                     value = out[key]
                     if key not in top_k_parts:
-                        top_k_parts[key] = torch.empty(
-                            (n, *value.shape[1:]), dtype=value.dtype, device=value.device
-                        )
+                        top_k_parts[key] = torch.empty((n, *value.shape[1:]), dtype=value.dtype, device=value.device)
                     # Scatter back by original row index: `order` groups rows out
                     # of batch order, so a plain concat would misalign them.
                     top_k_parts[key][chunk] = value

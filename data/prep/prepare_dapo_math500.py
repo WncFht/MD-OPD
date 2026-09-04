@@ -5,7 +5,7 @@
     python data/prep/prepare_dapo_math500.py --set dapo --verify existing.parquet
 
 Writes math/DAPO/train.parquet (17917 rows) and math/MATH-500/test.parquet
-(500 rows). 
+(500 rows).
 
 """
 
@@ -18,7 +18,6 @@ import urllib.request
 from pathlib import Path
 
 import pandas as pd
-
 from _paths import DATA_ROOT
 from align_mopd_schema import REF_SCHEMA, write_aligned
 
@@ -31,6 +30,7 @@ _DAPO_PREFIX = (
     "the form Answer: $Answer (without quotes) where $Answer is the answer to the problem.\n\n"
 )
 _DAPO_SUFFIX = '\n\nRemember to put your answer on its own line after "Answer:".'
+
 
 def _fetch(repo: str, path: str, cache: Path) -> Path:
     """Fetch one file from ModelScope into the cache; no-op if already present."""
@@ -87,9 +87,7 @@ def build_dapo(src: Path | None, cache_dir: Path) -> pd.DataFrame:
             content = content[len(_DAPO_PREFIX) :]
         if content.endswith(_DAPO_SUFFIX):
             content = content[: -len(_DAPO_SUFFIX)]
-        rows.append(
-            _row(content.strip(), "DAPO", "math", str(r.reward_model["ground_truth"]), f"DAPO-{i}", "train")
-        )
+        rows.append(_row(content.strip(), "DAPO", "math", str(r.reward_model["ground_truth"]), f"DAPO-{i}", "train"))
 
     df = pd.DataFrame(rows)
     # The 1-shot set is sliced by row number, so order changes must fail here.
@@ -136,7 +134,7 @@ def _norm(v):
         return int(v)
     if isinstance(v, dict):
         return {k: _norm(x) for k, x in v.items()}
-    if isinstance(v, (list, tuple)):
+    if isinstance(v, list | tuple):
         return [_norm(x) for x in v]
     return v
 
@@ -191,11 +189,22 @@ def _verify(df: pd.DataFrame, ref: Path) -> int:
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--set", dest="which", choices=[*_BUILDERS, "all"], required=True)
-    p.add_argument("--src", type=Path, default=None, help="pre-downloaded upstream file; otherwise fetched from ModelScope")
-    p.add_argument("--out", type=Path, default=None, help="output path; defaults to the standard location under <data-root>")
+    p.add_argument(
+        "--src", type=Path, default=None, help="pre-downloaded upstream file; otherwise fetched from ModelScope"
+    )
+    p.add_argument(
+        "--out", type=Path, default=None, help="output path; defaults to the standard location under <data-root>"
+    )
     p.add_argument("--data-root", type=Path, default=DATA_ROOT)
-    p.add_argument("--cache-dir", type=Path, default=None, help="download cache for upstream files; defaults to <data-root>/.cache/upstream")
-    p.add_argument("--verify", type=Path, default=None, help="compare row by row against this parquet; nonzero exit on mismatch")
+    p.add_argument(
+        "--cache-dir",
+        type=Path,
+        default=None,
+        help="download cache for upstream files; defaults to <data-root>/.cache/upstream",
+    )
+    p.add_argument(
+        "--verify", type=Path, default=None, help="compare row by row against this parquet; nonzero exit on mismatch"
+    )
     a = p.parse_args()
 
     if a.which == "all" and (a.src or a.out or a.verify):

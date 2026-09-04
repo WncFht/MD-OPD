@@ -33,7 +33,6 @@ import types
 from pathlib import Path
 from typing import Any
 
-
 # Multi-IF scoring is OpenCompass's instruction checkers, loaded
 # by file path -- there is no pip package that exposes them. The tree therefore
 # has to exist somewhere, and where is a property of the machine, not of this
@@ -180,8 +179,7 @@ def _score_one(data_source: str, prediction: str, reference: dict[str, Any]) -> 
     family = _SOURCE_TO_FAMILY.get(data_source)
     if family is None:
         raise NotImplementedError(
-            f"Unsupported instruction-following source: {data_source!r} "
-            f"(known: {sorted(_SOURCE_TO_FAMILY)})"
+            f"Unsupported instruction-following source: {data_source!r} (known: {sorted(_SOURCE_TO_FAMILY)})"
         )
     mod = sys.modules[f"opencompass.datasets.{family}.{_FAMILIES[family]}"]
 
@@ -269,6 +267,7 @@ def score_single_turn(
 
 def reward_func(data_source, solution_str, ground_truth, extra_info=None, **kwargs):
     import json as _json
+
     if isinstance(ground_truth, str):
         ground_truth = _json.loads(ground_truth)
     prediction = extract_non_reasoning_content_internal(solution_str)

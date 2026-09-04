@@ -13,7 +13,6 @@ from pathlib import Path
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-
 from _paths import DATA_ROOT
 
 #: The five files MOPD concatenates, TACO first -- it defines the schema.
@@ -30,10 +29,16 @@ MOPD_FILES = [
 #: rather than whichever file happens to be on disk.
 SCHEMA = pa.schema(
     [
-        pa.field("prompt", pa.list_(pa.struct([("content", pa.string()), ("role", pa.string())]))),
+        pa.field(
+            "prompt",
+            pa.list_(pa.struct([("content", pa.string()), ("role", pa.string())])),
+        ),
         pa.field("data_source", pa.large_string()),
         pa.field("ability", pa.large_string()),
-        pa.field("reward_model", pa.struct([("ground_truth", pa.string()), ("style", pa.string())])),
+        pa.field(
+            "reward_model",
+            pa.struct([("ground_truth", pa.string()), ("style", pa.string())]),
+        ),
         pa.field(
             "extra_info",
             pa.struct(

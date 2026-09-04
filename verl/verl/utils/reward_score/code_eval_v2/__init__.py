@@ -40,9 +40,7 @@ def clean_code_main_block(code: str) -> str:
     filtered_lines = []
     skip_block = False
     for line in code_lines:
-        if line.strip().startswith('if __name__ == "__main__"') or line.strip().startswith(
-            "if __name__ == '__main__'"
-        ):
+        if line.strip().startswith('if __name__ == "__main__"') or line.strip().startswith("if __name__ == '__main__'"):
             skip_block = True
             continue
         if skip_block:
@@ -61,23 +59,25 @@ def _prune_to_code(text: str, max_chars: int = 20000) -> str:
     """从模型输出提取代码块，加速 sanitize（对齐 opencompass 逻辑）."""
     if not isinstance(text, str):
         return text
-    if '```' in text:
-        blocks = re.findall(r'```[Pp]ython\s*\n?(.*?)```', text, re.DOTALL)
+    if "```" in text:
+        blocks = re.findall(r"```[Pp]ython\s*\n?(.*?)```", text, re.DOTALL)
         if not blocks:
-            blocks = re.findall(r'```\w*\s*\n?(.*?)```', text, re.DOTALL)
+            blocks = re.findall(r"```\w*\s*\n?(.*?)```", text, re.DOTALL)
         if blocks:
             text = blocks[0].strip()
-    if '```' not in text:
-        m = re.search(r'(^|\n)(import\s|from\s|def\s|class\s)', text)
+    if "```" not in text:
+        m = re.search(r"(^|\n)(import\s|from\s|def\s|class\s)", text)
         if m:
-            text = text[m.start(2):]
+            text = text[m.start(2) :]
     if len(text) > max_chars:
         text = text[:max_chars]
     return text
 
 
 def heplus_check_correctness(
-    test_code: str, code: str, entry_point: str | None = None,
+    test_code: str,
+    code: str,
+    entry_point: str | None = None,
     timeout_per_test: int = 1,
 ) -> tuple[bool, dict]:
     """HumanEval+ 单题评测（subprocess 模式，v2 修复版）.
@@ -91,7 +91,8 @@ def heplus_check_correctness(
     Returns:
         (passed, detail_dict)
     """
-    from ._heplus_runner import run_test as heplus_run_test, _MAX_TIMEOUT
+    from ._heplus_runner import _MAX_TIMEOUT
+    from ._heplus_runner import run_test as heplus_run_test
 
     cleaned_code = clean_code_main_block(code)
     # timeout 直接用硬上限 60s
@@ -122,31 +123,30 @@ def heplus_check_correctness_batch(
     """
     import os
     import tempfile
-    from concurrent.futures import ThreadPoolExecutor, as_completed as t_as_completed
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import as_completed as t_as_completed
 
     try:
         from evalplus.data import get_human_eval_plus, write_jsonl
-        from evalplus.eval import PASS, estimate_pass_at_k
+        from evalplus.eval import PASS
         from evalplus.evaluate import evaluate
         from evalplus.sanitize import sanitize
     except ImportError:
-        raise ImportError("请安装 evalplus: pip install evalplus")
+        raise ImportError("请安装 evalplus: pip install evalplus") from None
 
     if dataset_path:
-        os.environ['HUMANEVAL_OVERRIDE_PATH'] = dataset_path
+        os.environ["HUMANEVAL_OVERRIDE_PATH"] = dataset_path
 
-    dataset_metadata = get_human_eval_plus(mini=False, noextreme=False, version='default')
+    dataset_metadata = get_human_eval_plus(mini=False, noextreme=False, version="default")
     task_ids = sorted(dataset_metadata.keys())  # HumanEval/0 .. HumanEval/163
     n_tasks = len(task_ids)
 
     # 推断每道题有多少个 sample
-    assert len(completions) % n_tasks == 0, (
-        f"completions 长度 {len(completions)} 不是题数 {n_tasks} 的整数倍"
-    )
+    assert len(completions) % n_tasks == 0, f"completions 长度 {len(completions)} 不是题数 {n_tasks} 的整数倍"
     n_samples = len(completions) // n_tasks
 
     # sanitize 所有 completions
-    entry_points = {tid: dataset_metadata[tid]['entry_point'] for tid in task_ids}
+    entry_points = {tid: dataset_metadata[tid]["entry_point"] for tid in task_ids}
 
     def _sanitize_one(idx: int):
         sample_idx = idx // n_samples
@@ -159,7 +159,7 @@ def heplus_check_correctness_batch(
         futures = [ex.submit(_sanitize_one, i) for i in range(len(completions))]
         sanitized_samples = [None] * len(completions)
         for fut in t_as_completed(futures):
-            res = fut.result()
+            fut.result()
             # 需要保留顺序，用 index
             pass
     # 顺序版（保证顺序正确）
@@ -184,7 +184,7 @@ def heplus_check_correctness_batch(
         results_path = samples_path.replace(".jsonl", "_eval_results.json")
         if not os.path.exists(results_path):
             results_path = samples_path.replace(".jsonl", ".eval_results.json")
-        with open(results_path, "r") as f:
+        with open(results_path) as f:
             results = json.load(f)
 
     # 解析结果
@@ -197,8 +197,7 @@ def heplus_check_correctness_batch(
         task_results = eval_data.get(tid, [])
         if within_idx < len(task_results):
             r = task_results[within_idx]
-            passed = (r.get("base_status", "") == PASS and
-                      r.get("plus_status", "") == PASS)
+            passed = r.get("base_status", "") == PASS and r.get("plus_status", "") == PASS
         else:
             passed = False
         pass_results.append(passed)
@@ -254,9 +253,7 @@ def _lcb_eval_single(args: tuple) -> tuple[bool, dict]:
     return all_passed, {"results": [r is True for r in result[0]]}
 
 
-def lcb_check_correctness(
-    sample: list[dict], generation: str, timeout: int = 6
-) -> tuple[bool, dict]:
+def lcb_check_correctness(sample: list[dict], generation: str, timeout: int = 6) -> tuple[bool, dict]:
     """LCB 单题评测（兼容旧接口）."""
     processed = _postprocess_lcb_sample(sample)
     return _lcb_eval_single((processed, generation, timeout))
@@ -280,14 +277,11 @@ def lcb_check_correctness_batch(
         list[bool], 每道题是否全部通过.
     """
     processed_list = [_postprocess_lcb_sample(s) for s in samples]
-    args_list = [(p, g, timeout) for p, g in zip(processed_list, generations)]
+    args_list = [(p, g, timeout) for p, g in zip(processed_list, generations, strict=False)]
 
     results = [False] * len(args_list)
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        future_to_idx = {
-            executor.submit(_lcb_eval_single, args): idx
-            for idx, args in enumerate(args_list)
-        }
+        future_to_idx = {executor.submit(_lcb_eval_single, args): idx for idx, args in enumerate(args_list)}
         for future in as_completed(future_to_idx):
             idx = future_to_idx[future]
             try:
@@ -303,14 +297,22 @@ def lcb_check_correctness_batch(
 # 统一入口 (单个 completion 评测，供 verl reward_func 调用)
 # ============================================================================
 _LCB_SOURCES = {
-    "livecodebench", "livecodebench/code_generation",
+    "livecodebench",
+    "livecodebench/code_generation",
     "livecodebench/code_generation_lite",
-    "taco", "BAAI/TACO", "apps", "codeparrot/apps",
-    "code_contests", "deepmind/code_contests", "codeforces",
+    "taco",
+    "BAAI/TACO",
+    "apps",
+    "codeparrot/apps",
+    "code_contests",
+    "deepmind/code_contests",
+    "codeforces",
 }
 _HUMANEVAL_SOURCES = {
-    "humanevalplus", "evalplus/humanevalplus",
-    "openai/openai_humaneval", "openai_humaneval",
+    "humanevalplus",
+    "evalplus/humanevalplus",
+    "openai/openai_humaneval",
+    "openai_humaneval",
 }
 
 
@@ -373,7 +375,7 @@ import zlib
 
 def _load_ground_truth(ground_truth: Any) -> Any:
     """解析 ground_truth 字段."""
-    if isinstance(ground_truth, (dict, list)):
+    if isinstance(ground_truth, dict | list):
         return ground_truth
     if not isinstance(ground_truth, str):
         return ground_truth

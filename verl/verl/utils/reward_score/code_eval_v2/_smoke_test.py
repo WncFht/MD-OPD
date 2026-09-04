@@ -12,11 +12,10 @@ import json
 
 from . import compute_score
 
-
 # ----------------------------------------------------------------------------
 # Case 1: HumanEval+ - has_close_elements (HumanEval 第 0 题)
 # ----------------------------------------------------------------------------
-HE_TEST_CODE = '''
+HE_TEST_CODE = """
 def check(candidate):
     assert candidate([1.0, 2.0, 3.9, 4.0, 5.0, 2.2], 0.3) == True
     assert candidate([1.0, 2.0, 3.9, 4.0, 5.0, 2.2], 0.05) == False
@@ -32,7 +31,7 @@ inputs = [
 results = [True, False, True, False]
 
 check(has_close_elements)
-'''
+"""
 
 HE_RIGHT = """```python
 from typing import List
@@ -55,7 +54,7 @@ def has_close_elements(numbers, threshold):
 # Case 2: MBPP+ - min_cost (MBPP-3, similar EvalPlus 风格)
 # 用一个简单的 add 题目, 因为 MBPP+ 的 test 格式跟 HE+ 完全一样 (check + asserts)
 # ----------------------------------------------------------------------------
-MBPP_TEST_CODE = '''
+MBPP_TEST_CODE = """
 def check(candidate):
     assert candidate(1, 2) == 3
     assert candidate(-1, 1) == 0
@@ -65,7 +64,7 @@ inputs = [(1, 2), (-1, 1), (100, 200)]
 results = [3, 0, 300]
 
 check(add)
-'''
+"""
 
 MBPP_RIGHT = """```python
 def add(a, b):
@@ -130,8 +129,8 @@ def _run(name: str, data_source: str, completion: str, ground_truth, expected: b
     status = "OK" if actual == expected else "FAIL"
     print(
         f"[{status}] {name:40s} data_source={data_source:20s} "
-        f"expected={expected}  actual={actual}  passed_tests={res['metadata'].get('passed_tests','?')}/"
-        f"{res['metadata'].get('total_tests','?')}"
+        f"expected={expected}  actual={actual}  passed_tests={res['metadata'].get('passed_tests', '?')}/"
+        f"{res['metadata'].get('total_tests', '?')}"
     )
     if actual != expected:
         print(f"      full result: {json.dumps(res, default=str)[:500]}")

@@ -16,16 +16,18 @@
 Based on HF math_verify, verl, open reasoner zero, etc.
 """
 
+import traceback
+
 from latex2sympy2_extended import latex2sympy
 from sympy import simplify
 from sympy.parsing.sympy_parser import parse_expr
-import traceback
 
-from .math_utils import extract_boxed_answer, is_latex_equal, grade_answer_mathd, grade_answer_sympy, timeout_ours
+from .math_utils import extract_boxed_answer, grade_answer_mathd, grade_answer_sympy, is_latex_equal, timeout_ours
 
 """
 This code is adapted from Entropy Machanism Recipe (https://github.com/volcengine/verl/tree/main/recipe/entropy/).
 """
+
 
 def extract_answer(passage: str) -> str:
     if "\\boxed" in passage:
@@ -46,6 +48,7 @@ def grade(model_answer: str, gt_answer: str, fast: bool = True):
         )
     return correct
 
+
 @timeout_ours(timeout_seconds=10)
 def simplify_expression_string(expression_string: str) -> str:
     try:
@@ -54,15 +57,16 @@ def simplify_expression_string(expression_string: str) -> str:
         return str(simplified_expr)
     except TimeoutError:
         return expression_string
-    except Exception as e:
+    except Exception:
         try:
             sympy_expr = latex2sympy(expression_string)
             simplified_expr = simplify(sympy_expr)
             return str(simplified_expr)
         except TimeoutError:
             return expression_string
-        except Exception as e:
+        except Exception:
             return expression_string
+
 
 def compute_score(model_response, gt_answer, fast=False):
     model_answer = extract_answer(model_response)
@@ -101,6 +105,7 @@ def compute_score(model_response, gt_answer, fast=False):
             "extracted_gt": gt_answer,
             "pred": model_answer,
         }
+
 
 # ----------------------------------------------------------------------------
 # 代码评测路由: 按 data_source 分流到 code_eval (LCB / HumanEval+ / MBPP+)
@@ -167,7 +172,7 @@ def reward_func(
 
         if isinstance(res, dict):
             return res
-        elif isinstance(res, (int, float, bool)):
+        elif isinstance(res, int | float | bool):
             return float(res)
         else:
             return float(res[0])

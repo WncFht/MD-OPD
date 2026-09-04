@@ -1,5 +1,6 @@
-from verl.utils.reward_score.ttrl_math import compute_score as boxed_score
 from verl.utils.reward_score import math_verify
+from verl.utils.reward_score.ttrl_math import compute_score as boxed_score
+
 
 def reward_func(data_source, solution_str, ground_truth, extra_info=None, **kwargs):
     strict = boxed_score(solution_str, str(ground_truth))

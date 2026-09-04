@@ -22,11 +22,9 @@ import json
 from pathlib import Path
 
 import pandas as pd
-
-from _paths import DATA_ROOT
 from _ms import fetch
+from _paths import DATA_ROOT
 from align_mopd_schema import REF_SCHEMA, write_aligned
-
 
 CODE_PROMPT_TEMPLATE = (
     "You will be given a question (problem specification) and will generate a correct Python "
@@ -196,9 +194,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    df = build_taco_train(
-        difficulties=args.difficulties, max_rows=args.max_rows, max_tests=args.max_tests
-    )
+    df = build_taco_train(difficulties=args.difficulties, max_rows=args.max_rows, max_tests=args.max_tests)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     # Through write_aligned, not df.to_parquet: TACO is one of MOPD's six
     # concatenated files, and plain to_parquet leaves the arrow types to pandas'

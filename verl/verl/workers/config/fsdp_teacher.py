@@ -164,8 +164,7 @@ class FsdpTeacherConfig(BaseConfig):
             )
         if self.reward_weight_mode not in REWARD_WEIGHT_MODES:
             raise ValueError(
-                f"[OPD] reward_weight_mode must be one of {list(REWARD_WEIGHT_MODES)}, "
-                f"got '{self.reward_weight_mode}'"
+                f"[OPD] reward_weight_mode must be one of {list(REWARD_WEIGHT_MODES)}, got '{self.reward_weight_mode}'"
             )
         if self.log_prob_top_k < 0:
             raise ValueError(f"[OPD] log_prob_top_k must be >= 0, got {self.log_prob_top_k}")

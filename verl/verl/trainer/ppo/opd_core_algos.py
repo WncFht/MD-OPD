@@ -95,9 +95,7 @@ def compute_token_reward_direct_plus_grpo_advantage(
 
     ``algorithm.grpo_outcome_weight`` scales the GRPO term (default 1.0).
     """
-    direct_adv, _ = compute_token_reward_direct_advantage(
-        token_level_rewards, response_mask, config, **kwargs
-    )
+    direct_adv, _ = compute_token_reward_direct_advantage(token_level_rewards, response_mask, config, **kwargs)
 
     rewards_for_grpo = kwargs.get("true_token_level_scores")
     if rewards_for_grpo is None:

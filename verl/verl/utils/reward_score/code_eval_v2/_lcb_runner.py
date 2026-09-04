@@ -207,7 +207,10 @@ def grade_call_based(code: str, all_inputs: list, all_outputs: list, fn_name: st
     if method is None:
         return
 
-    all_inputs = [[json.loads(line) for line in inputs.split("\n")] if isinstance(inputs, str) else inputs for inputs in all_inputs]
+    all_inputs = [
+        [json.loads(line) for line in inputs.split("\n")] if isinstance(inputs, str) else inputs
+        for inputs in all_inputs
+    ]
 
     all_outputs = [json.loads(output) if isinstance(output, str) else output for output in all_outputs]
 
@@ -353,7 +356,10 @@ def grade_stdio(
             stripped_prediction_line,
             stripped_gt_out_line,
         ) in enumerate(zip(stripped_prediction_lines, stripped_gt_out_lines, strict=False)):
-            WA_send_args["error_message"] = f"Wrong answer at {output_line_idx=}: {truncatefn(stripped_prediction_line)} != {truncatefn(stripped_gt_out_line)}"
+            WA_send_args["error_message"] = (
+                f"Wrong answer at {output_line_idx=}: "
+                f"{truncatefn(stripped_prediction_line)} != {truncatefn(stripped_gt_out_line)}"
+            )
 
             ## CASE 1: exact match
             if stripped_prediction_line == stripped_gt_out_line:

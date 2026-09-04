@@ -50,6 +50,7 @@ logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
 __all__ = ["OPDTrainerMixin", "opd_teacher_enabled", "template_enabled"]
 
+
 def _mean_metric(value):
     """Average a worker metric that may be a scalar or a DP-concat list."""
     if value is None:
@@ -94,10 +95,10 @@ class OPDTrainerMixin:
         micro-batches, so sharing the actor's GPUs costs far less than standing
         up a second resource pool would.
         """
+        import ray
+
         from verl.single_controller.ray import RayClassWithInitArgs
         from verl.workers.fsdp_teacher_worker import TeacherWorker
-
-        import ray
 
         self.opd_teacher_config: FsdpTeacherConfig = omega_conf_to_dataclass(self.config.distillation.fsdp_teacher)
         teacher_cls = RayClassWithInitArgs(cls=ray.remote(TeacherWorker), config=self.config)

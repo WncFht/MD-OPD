@@ -13,9 +13,7 @@ import os
 from pathlib import Path
 
 import pandas as pd
-
 from _paths import DATA_ROOT
-
 
 #: No default path: this file lives wherever whoever accepted xlam's licence
 #: put it, which is a property of the machine and not of this repo.
@@ -137,9 +135,7 @@ def build_xlam_train(src: Path, max_rows: int | None = None) -> pd.DataFrame:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "--src",
         type=Path,

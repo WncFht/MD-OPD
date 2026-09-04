@@ -10,9 +10,8 @@ import json
 from pathlib import Path
 
 import pandas as pd
-
-from align_mopd_schema import REF_SCHEMA, write_aligned
 from _paths import DATA_ROOT
+from align_mopd_schema import REF_SCHEMA, write_aligned
 
 
 def parse_args():
@@ -45,7 +44,10 @@ def build(src: Path) -> pd.DataFrame:
                 "prompt": [{"content": turn["content"], "role": "user"}],
                 "data_source": "MultiIF",
                 "ability": "instruction_following",
-                "reward_model": {"ground_truth": json.dumps(ground_truth), "style": "rule"},
+                "reward_model": {
+                    "ground_truth": json.dumps(ground_truth),
+                    "style": "rule",
+                },
                 # The language survives in `source` rather than in a key of its
                 # own -- the shared struct has no room for one, and no scorer
                 # reads extra_info.

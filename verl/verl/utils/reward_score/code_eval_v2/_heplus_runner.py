@@ -6,6 +6,7 @@
   3. 使用 start_new_session=True 创建新进程组，timeout 时 kill 整个进程组
   4. 增加 RLIMIT_CPU 限制单进程 CPU 时间
 """
+
 import os
 import platform
 import resource
@@ -27,12 +28,12 @@ def _preexec_fn():
         resource.setrlimit(resource.RLIMIT_AS, (mem_limit, mem_limit))
         if platform.uname().system != "Darwin":
             resource.setrlimit(resource.RLIMIT_DATA, (mem_limit, mem_limit))
-    except (ValueError, resource.error):
+    except (OSError, ValueError):
         pass
     # CPU 时间限制 60s（防止 signal 失效时的兜底）
     try:
         resource.setrlimit(resource.RLIMIT_CPU, (60, 65))
-    except (ValueError, resource.error):
+    except (OSError, ValueError):
         pass
 
 
@@ -67,8 +68,7 @@ def run_test(code: str, test: str = None, timeout: int = _MAX_TIMEOUT) -> tuple[
             result = subprocess.run(
                 command,
                 cwd=tmpdir,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 env=env,
                 check=False,
                 timeout=timeout,

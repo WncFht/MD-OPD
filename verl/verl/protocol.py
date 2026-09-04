@@ -979,7 +979,9 @@ class DataProto:
 
             if reward_key_lists:
                 merged_meta_info["reward_extra_keys"] = [
-                    k for k in reward_key_lists[0] if all(k in lst for lst in reward_key_lists) and k in non_tensor_batch
+                    k
+                    for k in reward_key_lists[0]
+                    if all(k in lst for lst in reward_key_lists) and k in non_tensor_batch
                 ]
 
             # Flatten list of dicts to dict of lists for consistent metrics structure

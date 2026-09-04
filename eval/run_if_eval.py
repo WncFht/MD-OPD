@@ -133,21 +133,18 @@ def score_multiif(records: list[dict]) -> dict:
     per_lang: dict[str, dict[int, dict]] = {}
     for rec in records:
         lang = rec["language"]
-        for t, turn in zip(TURNS, rec["turns"]):
+        for t, turn in zip(TURNS, rec["turns"], strict=False):
             counts = _score_response("MultiIF", turn, turn["response"])
             _accumulate(per_lang.setdefault(lang, {}).setdefault(t, {}), counts)
 
     languages = sorted(per_lang)
-    by_lang = {
-        lang: {f"turn_{t}": _rates(per_lang[lang][t]) for t in TURNS} for lang in languages
-    }
+    by_lang = {lang: {f"turn_{t}": _rates(per_lang[lang][t]) for t in TURNS} for lang in languages}
 
     # Unweighted over languages -- see the module docstring.
     lang_avg = {}
     for t in TURNS:
         lang_avg[f"turn_{t}"] = {
-            m: statistics.fmean(by_lang[lang][f"turn_{t}"][m] for lang in languages)
-            for m in (*SUB_METRICS, "overall")
+            m: statistics.fmean(by_lang[lang][f"turn_{t}"][m] for lang in languages) for m in (*SUB_METRICS, "overall")
         }
 
     english = by_lang.get("English")
@@ -159,9 +156,7 @@ def score_multiif(records: list[dict]) -> dict:
             "8lang_3turn_mean": statistics.fmean(lang_avg[f"turn_{t}"]["overall"] for t in TURNS),
             "8lang_turn3": lang_avg["turn_3"]["overall"],
             "english_3turn_mean": (
-                statistics.fmean(english[f"turn_{t}"]["overall"] for t in TURNS)
-                if english
-                else None
+                statistics.fmean(english[f"turn_{t}"]["overall"] for t in TURNS) if english else None
             ),
             "english_turn3": english["turn_3"]["overall"] if english else None,
         },
@@ -226,9 +221,7 @@ def _prompt_len(tokenizer, history: list[dict]) -> int:
     return len(tokenizer(text, add_special_tokens=False)["input_ids"])
 
 
-def _split_by_budget(
-    prompt_lens: list[int], max_model_len: int, reserve: int
-) -> tuple[list[int], list[int]]:
+def _split_by_budget(prompt_lens: list[int], max_model_len: int, reserve: int) -> tuple[list[int], list[int]]:
     """Partition conversation indices into (fits, overflows) by prompt length.
 
     A three-turn conversation carries both earlier answers in its turn-3 prompt,
@@ -276,7 +269,7 @@ def _generate_here(records: list[dict], args) -> None:
     tokenizer = llm.get_tokenizer()
     n_turns = len(records[0]["turns"])
     for t in range(n_turns):
-        for hist, rec in zip(histories, records):
+        for hist, rec in zip(histories, records, strict=False):
             hist.append({"role": "user", "content": rec["turns"][t]["prompt"]})
         lens = [_prompt_len(tokenizer, h) for h in histories]
         fits, overflows = _split_by_budget(lens, args.max_model_len, _PROMPT_RESERVE)
@@ -289,21 +282,16 @@ def _generate_here(records: list[dict], args) -> None:
             records[i]["turns"][t]["finish_reason"] = "prompt_too_long"
             histories[i].append({"role": "assistant", "content": ""})
         outputs = llm.chat([histories[i] for i in fits], params, add_generation_prompt=True)
-        for i, out in zip(fits, outputs):
+        for i, out in zip(fits, outputs, strict=False):
             hist, rec = histories[i], records[i]
             raw = out.outputs[0].text
             rec["turns"][t]["response"] = raw
             rec["turns"][t]["finish_reason"] = out.outputs[0].finish_reason
-            carried = (
-                raw
-                if args.history_keeps_reasoning
-                else if_eval.extract_non_reasoning_content_internal(raw)
-            )
+            carried = raw if args.history_keeps_reasoning else if_eval.extract_non_reasoning_content_internal(raw)
             hist.append({"role": "assistant", "content": carried})
         capped = sum(1 for r in records if r["turns"][t]["finish_reason"] == "length")
         print(
-            f"[turn {t + 1}] {len(fits)} generated, {capped} hit the token cap, "
-            f"{len(overflows)} skipped as over-long",
+            f"[turn {t + 1}] {len(fits)} generated, {capped} hit the token cap, {len(overflows)} skipped as over-long",
             flush=True,
         )
 
@@ -384,9 +372,7 @@ def generate(records: list[dict], args) -> None:
             # Set in the parent so the child inherits it at spawn, i.e. before
             # it imports torch. Setting it inside the child races with whatever
             # CUDA has already cached by then.
-            os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(
-                devices[i * args.tp : (i + 1) * args.tp]
-            )
+            os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(devices[i * args.tp : (i + 1) * args.tp])
             p = ctx.Process(target=_shard_worker, args=(args, part, str(path)))
             p.start()
             procs.append(p)
@@ -399,7 +385,7 @@ def generate(records: list[dict], args) -> None:
             os.environ["CUDA_VISIBLE_DEVICES"] = saved
 
     failed = []
-    for i, (p, path) in enumerate(zip(procs, paths)):
+    for i, (p, path) in enumerate(zip(procs, paths, strict=False)):
         p.join()
         if p.exitcode != 0 or not path.exists():
             failed.append(f"shard {i} (exit {p.exitcode})")
@@ -411,10 +397,10 @@ def generate(records: list[dict], args) -> None:
         )
 
     # The children mutated copies, so read the responses back onto the originals.
-    for part, path in zip(slices, paths):
-        for rec, line in zip(part, path.open()):
+    for part, path in zip(slices, paths, strict=False):
+        for rec, line in zip(part, path.open(), strict=False):
             done = json.loads(line)
-            for turn, done_turn in zip(rec["turns"], done["turns"]):
+            for turn, done_turn in zip(rec["turns"], done["turns"], strict=False):
                 turn["response"] = done_turn["response"]
                 turn["finish_reason"] = done_turn["finish_reason"]
 
@@ -452,9 +438,7 @@ def _print_report(report: dict) -> None:
 
 
 def parse_args(argv=None):
-    p = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("benchmark", choices=["multiif", "rescore"])
     p.add_argument("--model", help="HF directory (merge FSDP shards first: verl.model_merger)")
     p.add_argument("--data", type=Path, help="override the default parquet")
@@ -494,9 +478,7 @@ def main(argv=None) -> int:
     else:
         path = args.data or DATA_ROOT / "if" / "MultiIF" / "eval_3turn.parquet"
         if not path.exists():
-            raise SystemExit(
-                f"{path} not found.\nBuild it: python3 data/prep/prepare_multiif_eval.py"
-            )
+            raise SystemExit(f"{path} not found.\nBuild it: python3 data/prep/prepare_multiif_eval.py")
         records = load_multiif(path, args.limit or None)
         generate(records, args)
 

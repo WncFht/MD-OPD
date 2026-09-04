@@ -94,9 +94,7 @@ def extract_fc_calls(model_response: str) -> Optional[list]:
             if "name" in obj:
                 return [obj]
             continue
-        if isinstance(obj, list) and all(
-            isinstance(c, dict) and "name" in c for c in obj
-        ):
+        if isinstance(obj, list) and all(isinstance(c, dict) and "name" in c for c in obj):
             return obj
     return None
 
@@ -108,7 +106,7 @@ def _normalize_value(v: Any) -> Any:
     """把 value 规范化, 让 "1" 和 1, True 和 "true" 之类的比较更鲁棒."""
     if isinstance(v, bool):
         return v
-    if isinstance(v, (int, float)):
+    if isinstance(v, int | float):
         return v
     if isinstance(v, str):
         s = v.strip()
@@ -208,9 +206,7 @@ def _match_call_bfcl(pred: dict, gt_entry: dict) -> bool:
         if not isinstance(possible_values, list) or len(possible_values) == 0:
             return False
         # 空字符串 "" 表示可缺失, 其他值需要严格匹配
-        accept_missing = any(
-            isinstance(pv, str) and pv == "" for pv in possible_values
-        )
+        accept_missing = any(isinstance(pv, str) and pv == "" for pv in possible_values)
         if arg_name not in pred_args:
             if accept_missing:
                 continue
@@ -225,9 +221,7 @@ def _match_call_bfcl(pred: dict, gt_entry: dict) -> bool:
                 break
             # list 类型参数 (例如 [3, 5]): 严格列表比较
             if isinstance(pv, list) and isinstance(pred_args.get(arg_name), list):
-                if [_normalize_value(x) for x in pv] == [
-                    _normalize_value(x) for x in pred_args[arg_name]
-                ]:
+                if [_normalize_value(x) for x in pv] == [_normalize_value(x) for x in pred_args[arg_name]]:
                     matched = True
                     break
         if not matched:
@@ -272,7 +266,7 @@ _BFCL_SOURCES = {
 
 def _load_ground_truth(gt: Any) -> Any:
     """parquet 里 GT 可能是 JSON str / dict / list."""
-    if isinstance(gt, (list, dict)):
+    if isinstance(gt, list | dict):
         return gt
     if not isinstance(gt, str):
         return gt
