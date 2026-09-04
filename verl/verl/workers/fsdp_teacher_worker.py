@@ -30,6 +30,7 @@ Relationship to upstream verl 0.9.0:
 Only the vLLM + FSDP path is supported; no sglang or megatron code is involved.
 """
 
+import inspect
 import logging
 import os
 from typing import Optional
@@ -65,6 +66,13 @@ __all__ = [
 ]
 
 
+# Keep the FP32 vocab-sized temporary bounded independently of the configured
+# teacher micro-batch.  The row cap limits kernel-launch overhead while the
+# byte cap remains safe for larger vocabularies.
+_TOP_K_LOGITS_CHUNK_ROWS = 1024
+_TOP_K_LOGITS_CHUNK_BYTES = 512 * 1024 * 1024
+
+
 def group_rows_by_teacher(routes) -> dict[str, list[int]]:
     """Map teacher name -> the row indices routed to it, in batch order."""
     order: dict[str, list[int]] = {}
@@ -93,42 +101,108 @@ def compute_top_k_teacher_log_probs(
 ):
     """Teacher log-probs over a top-K candidate set, plus student/teacher overlap.
 
-    Pure tensor math (CPU-testable). Shapes: ``logits`` is ``(N, V)``,
-    ``student_ids`` is ``(N, K_s)``.
+    Pure tensor math (CPU-testable). Shapes: ``logits`` is ``(N, V)`` or
+    ``(B, T, V)``, and ``student_ids`` has the matching leading dimensions
+    with a final candidate axis.
 
     Returns a dict with:
-        log_probs:          ``(N, K_s)`` teacher log-prob of each student candidate
-        teacher_top_k_ids:  ``(N, top_k)`` teacher's own top-K token ids
-        teacher_log_probs:  ``(N, top_k)`` teacher log-prob of those ids
-        student_in_teacher: ``(N, K_s)`` bool, student candidate is in teacher top-K
-        teacher_in_student: ``(N, top_k)`` bool, teacher candidate is in student set
+        log_probs:          input leading dimensions plus ``K_s``
+        teacher_top_k_ids:  input leading dimensions plus ``top_k``
+        teacher_log_probs:  input leading dimensions plus ``top_k``
+        student_in_teacher: input leading dimensions plus ``K_s`` bool
+        teacher_in_student: input leading dimensions plus ``top_k`` bool
         overlap_ratio:      scalar fraction of student candidates inside teacher top-K
     """
-    log_denom = torch.logsumexp(logits.float(), dim=-1, keepdim=True)
+    if logits.ndim not in (2, 3):
+        raise ValueError(f"expected logits to have 2 or 3 dimensions, got shape {tuple(logits.shape)}")
+    if logits.shape[:-1] != student_ids.shape[:-1]:
+        raise ValueError(
+            f"logits and student_ids leading dimensions must match, got "
+            f"{tuple(logits.shape)} and {tuple(student_ids.shape)}"
+        )
 
-    t_logits, t_ids = torch.topk(logits.float(), k=top_k, dim=-1)
-    teacher_log_probs = t_logits - log_denom
+    student_k = student_ids.shape[-1]
+    n_rows = logits.shape[0] if logits.ndim == 2 else logits.shape[0] * logits.shape[1]
+    output_shape = logits.shape[:-1]
+    # The old implementation materialized logits.float() for all N rows.  Keep
+    # the public result shapes unchanged, but bound every vocab-sized temporary
+    # to a fixed number of rows.
+    log_probs = torch.empty((*output_shape, student_k), dtype=torch.float32, device=logits.device)
+    teacher_top_k_ids = torch.empty((*output_shape, top_k), dtype=torch.long, device=logits.device)
+    teacher_log_probs = torch.empty((*output_shape, top_k), dtype=torch.float32, device=logits.device)
+    student_in_teacher = torch.empty((*output_shape, student_k), dtype=torch.bool, device=logits.device)
+    teacher_in_student = torch.empty((*output_shape, top_k), dtype=torch.bool, device=logits.device)
 
-    # (N, K_s, top_k) match matrix between the two candidate sets.
-    matches = student_ids.unsqueeze(-1) == t_ids.unsqueeze(-2)
-    student_in_teacher = matches.any(dim=-1)
-    teacher_in_student = matches.any(dim=-2)
-
-    if strategy == "intersection":
-        # Only score student candidates the teacher also ranks highly.
-        masked = t_logits.unsqueeze(-2).masked_fill(~matches, float("-inf"))
-        log_probs = masked.max(dim=-1).values - log_denom
+    chunk_rows = _top_k_logits_chunk_rows(logits)
+    if logits.ndim == 2:
+        row_ranges = ((slice(start, min(start + chunk_rows, n_rows)),) for start in range(0, n_rows, chunk_rows))
     else:
-        log_probs = torch.gather(logits.float(), -1, student_ids) - log_denom
+        bsz, seqlen = logits.shape[:2]
+        row_ranges = (
+            (b, slice(start, min(start + chunk_rows, seqlen)))
+            for b in range(bsz)
+            for start in range(0, seqlen, chunk_rows)
+        )
+
+    for row_range in row_ranges:
+        if logits.ndim == 2:
+            logits_slice = logits[row_range[0]]
+            student_slice = student_ids[row_range[0]]
+            output_slice = row_range[0]
+        else:
+            batch_index, sequence_slice = row_range
+            logits_slice = logits[batch_index, sequence_slice]
+            student_slice = student_ids[batch_index, sequence_slice]
+            output_slice = (batch_index, sequence_slice)
+        # Keep the original FP32 arithmetic and top-k ordering, but only for a
+        # bounded row block.  This is the key peak-memory reduction.
+        chunk_logits = logits_slice.float()
+        log_denom = torch.logsumexp(chunk_logits, dim=-1, keepdim=True)
+        t_logits, t_ids = torch.topk(chunk_logits, k=top_k, dim=-1)
+
+        chunk_teacher_log_probs = t_logits - log_denom
+        chunk_student_ids = student_slice
+        matches = chunk_student_ids.unsqueeze(-1) == t_ids.unsqueeze(-2)
+        chunk_student_in_teacher = matches.any(dim=-1)
+        chunk_teacher_in_student = matches.any(dim=-2)
+
+        if strategy == "intersection":
+            # Only score student candidates the teacher also ranks highly.
+            masked = t_logits.unsqueeze(-2).masked_fill(~matches, float("-inf"))
+            chunk_log_probs = masked.max(dim=-1).values - log_denom
+        else:
+            chunk_log_probs = torch.gather(chunk_logits, -1, chunk_student_ids) - log_denom
+
+        log_probs[output_slice] = chunk_log_probs
+        teacher_top_k_ids[output_slice] = t_ids
+        teacher_log_probs[output_slice] = chunk_teacher_log_probs
+        student_in_teacher[output_slice] = chunk_student_in_teacher
+        teacher_in_student[output_slice] = chunk_teacher_in_student
 
     return {
         "log_probs": log_probs,
-        "teacher_top_k_ids": t_ids,
+        "teacher_top_k_ids": teacher_top_k_ids,
         "teacher_log_probs": teacher_log_probs,
         "student_in_teacher": student_in_teacher,
         "teacher_in_student": teacher_in_student,
         "overlap_ratio": student_in_teacher.float().mean(),
     }
+
+
+def _supports_logits_to_keep(module) -> bool:
+    """Whether the unwrapped CausalLM explicitly supports ``logits_to_keep``."""
+    target = getattr(module, "module", module)
+    try:
+        return "logits_to_keep" in inspect.signature(target.forward).parameters
+    except (TypeError, ValueError):
+        return False
+
+
+def _top_k_logits_chunk_rows(logits: torch.Tensor) -> int:
+    """Return a bounded number of rows for FP32 vocab post-processing."""
+    fp32_bytes = torch.finfo(torch.float32).bits // 8
+    rows_by_bytes = _TOP_K_LOGITS_CHUNK_BYTES // (logits.shape[-1] * fp32_bytes)
+    return max(1, min(_TOP_K_LOGITS_CHUNK_ROWS, rows_by_bytes))
 
 
 def compute_reward_weights(
@@ -296,24 +370,40 @@ class TeacherWorker(Worker):
         response_length = micro_batch["responses"].size(-1)
 
         with torch.autocast(device_type=get_device_name(), dtype=PrecisionType.to_dtype(self.teacher_config.dtype)):
-            output = module(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                use_cache=False,
-            )
+            forward_kwargs = {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+                "position_ids": position_ids,
+                "use_cache": False,
+            }
+            # Recent Transformers CausalLMs can discard prompt-position logits
+            # inside the model.  This is a pure output slicing optimization: the
+            # response logits below retain exactly the same positions and values.
+            if _supports_logits_to_keep(module):
+                forward_kwargs["logits_to_keep"] = response_length + 1
+            output = module(**forward_kwargs)
             # Predict token t from position t-1, so the response slice is shifted left by one.
             logits = output.logits[:, -response_length - 1 : -1, :]
             logits.div_(self.teacher_config.teacher_temperature)
 
             responses = micro_batch["responses"]
-            log_probs = logprobs_from_logits(logits, responses)
+            # The response slice is a non-contiguous view of the full model
+            # output.  logprobs_from_logits flattens its input; doing that on the
+            # whole view would allocate another full BF16 response copy.  Each
+            # unbound batch row is contiguous in (T, V), so the same CE kernel
+            # can run without that hidden O(B*T*V) allocation.
+            log_probs = torch.stack(
+                [
+                    logprobs_from_logits(row_logits, row_responses)
+                    for row_logits, row_responses in zip(logits, responses, strict=True)
+                ]
+            )
 
             result = {"teacher_log_probs": log_probs}
             if top_k > 0 and student_top_k_ids is not None:
                 flat = compute_top_k_teacher_log_probs(
-                    logits.reshape(-1, logits.size(-1)),
-                    student_top_k_ids.reshape(-1, student_top_k_ids.size(-1)),
+                    logits,
+                    student_top_k_ids,
                     top_k=top_k,
                     strategy=self.teacher_config.top_k_strategy,
                 )
