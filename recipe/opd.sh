@@ -76,6 +76,19 @@ export ACTOR_MODEL_PATH=${ACTOR_MODEL_PATH:-${MODEL_BASE}/${DOMAIN_ACTOR:-DeepSe
 export TEACHER_MODEL_PATH=${TEACHER_MODEL_PATH:-${MODEL_BASE}/${DOMAIN_TEACHER}}
 ACTOR_MODEL_NAME=$(basename "$ACTOR_MODEL_PATH")
 
+# Keep experiment names focused on settings that change the training signal:
+# metric-only top-K is intentionally omitted because it does not change reward.
+if [ "${LOG_PROB_TOP_K}" -gt 0 ]; then
+    OPD_SIGNAL_TAG="topk${LOG_PROB_TOP_K}_${TOP_K_STRATEGY}_${REWARD_WEIGHT_MODE}"
+else
+    OPD_SIGNAL_TAG="sampled"
+fi
+case "${ADV_ESTIMATOR}" in
+    token_reward_direct) OPD_ADV_TAG="direct" ;;
+    discounted_token_reward) OPD_ADV_TAG="discounted" ;;
+    *) OPD_ADV_TAG="${ADV_ESTIMATOR}" ;;
+esac
+
 # DOMAIN_VAL 是以空白分隔的 DATA_BASE 相对路径列表；Hydra 要求一个带方括号的
 # 列表。空值保持为空，见下方 `if` 分支。
 if [ -z "${VAL_FILES:-}" ]; then
@@ -105,7 +118,7 @@ case "$MODE" in
         ;;
 esac
 
-export EXPERIMENT_NAME=${EXPERIMENT_NAME:-${DATE}-opd_${DOMAIN}_${MODE}_${ACTOR_MODEL_NAME}-T_${TEMPERATURE}-${TIME_TAG}}
+export EXPERIMENT_NAME=${EXPERIMENT_NAME:-${DATE}-opd_${DOMAIN}_${MODE}_${ACTOR_MODEL_NAME}-${OPD_SIGNAL_TAG}_adv_${OPD_ADV_TAG}-T_${TEMPERATURE}-${TIME_TAG}}
 
 echo "Domain:  $DOMAIN"
 echo "Mode:    $MODE"

@@ -183,8 +183,11 @@ export RESUME_MODE=${RESUME_MODE:-disable}
 
 # ============ top-K 蒸馏 ============
 #   LOG_PROB_TOP_K > 0  top-K 会成为训练 reward（token reward 变为 3-D）
+#                      同时会计算并记录 top-k metrics；不需要再开启 METRIC_TOP_K。
 #   METRIC_TOP_K   > 0  top-K 仅用于指标；reward 仍是逐 token reverse KL
-# 两者同时设置时 LOG_PROB_TOP_K 优先。两者都为 0 时完全关闭 top-K。
+# 两者同时设置时 LOG_PROB_TOP_K 优先（METRIC_TOP_K 被忽略）。
+# 只想观测 top-k 而不改变 reward 时，保持 LOG_PROB_TOP_K=0 并设置 METRIC_TOP_K>0。
+# 两者都为 0 时完全关闭 top-K。
 export LOG_PROB_TOP_K=${LOG_PROB_TOP_K:-0}
 export METRIC_TOP_K=${METRIC_TOP_K:-16}
 export TOP_K_STRATEGY=${TOP_K_STRATEGY:-only_stu}

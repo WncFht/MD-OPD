@@ -28,6 +28,19 @@ export TEACHER_CODE_PATH=${TEACHER_CODE_PATH:-${MODEL_BASE}/Nemotron-Research-Re
 export TEACHER_IF_PATH=${TEACHER_IF_PATH:-${MODEL_BASE}/UltraData-IF-1.5B}
 ACTOR_MODEL_NAME=$(basename "$ACTOR_MODEL_PATH")
 
+# Keep experiment names focused on settings that change the training signal:
+# metric-only top-K is intentionally omitted because it does not change reward.
+if [ "${LOG_PROB_TOP_K}" -gt 0 ]; then
+    OPD_SIGNAL_TAG="topk${LOG_PROB_TOP_K}_${TOP_K_STRATEGY}_${REWARD_WEIGHT_MODE}"
+else
+    OPD_SIGNAL_TAG="sampled"
+fi
+case "${ADV_ESTIMATOR}" in
+    token_reward_direct) OPD_ADV_TAG="direct" ;;
+    discounted_token_reward) OPD_ADV_TAG="discounted" ;;
+    *) OPD_ADV_TAG="${ADV_ESTIMATOR}" ;;
+esac
+
 export ABILITY_TO_TEACHER=${ABILITY_TO_TEACHER:-'{math:math,code:code,instruction_following:if}'}
 export STRICT_ROUTING=${STRICT_ROUTING:-True}
 
@@ -45,7 +58,7 @@ export TRAIN_FILES=${TRAIN_FILES:-["$MATH_TRAIN","$CODE_TRAIN","$IF_TRAIN"]}
 
 export VAL_FILES=${VAL_FILES:-["${DATA_BASE}/math/MATH-500/test.parquet","${DATA_BASE}/code/LCBv6/test.parquet"]}
 
-export EXPERIMENT_NAME=${EXPERIMENT_NAME:-${DATE}-mopd_${MODE}_${ACTOR_MODEL_NAME}-T_${TEMPERATURE}-${TIME_TAG}}
+export EXPERIMENT_NAME=${EXPERIMENT_NAME:-${DATE}-mopd_${MODE}_${ACTOR_MODEL_NAME}-${OPD_SIGNAL_TAG}_adv_${OPD_ADV_TAG}-T_${TEMPERATURE}-${TIME_TAG}}
 
 echo "Mode:         $MODE"
 echo "Actor:        $ACTOR_MODEL_PATH"

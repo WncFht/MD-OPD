@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-# Transfer offline W&B and SwanLab runs without SSH: pack remotely, then unpack locally.
+# Transfer offline W&B runs without SSH: pack remotely, then unpack locally.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 WANDB_DIR="${OPD_WANDB_DIR:-$REPO_ROOT/wandb}"
-SWANLAB_DIR="${OPD_SWANLAB_DIR:-$REPO_ROOT/swanlab}"
 SNAP_DIR="${OPD_LOG_SNAP_DIR:-$REPO_ROOT/log_snap}"
 CHUNK_SIZE="${OPD_LOG_CHUNK_SIZE:-10485760}"
 KEEP_ARCHIVE_AFTER_UNPACK="${KEEP_ARCHIVE_AFTER_UNPACK:-0}"
 
 [[ "$WANDB_DIR" = /* ]] || WANDB_DIR="$REPO_ROOT/$WANDB_DIR"
-[[ "$SWANLAB_DIR" = /* ]] || SWANLAB_DIR="$REPO_ROOT/$SWANLAB_DIR"
 [[ "$SNAP_DIR" = /* ]] || SNAP_DIR="$REPO_ROOT/$SNAP_DIR"
 
 usage() {
@@ -21,7 +19,8 @@ Usage:
   bash scripts/sync-log.sh unpack [archive_or_part]
 
 pack runs on the remote checkout and creates log_One-Shot-OPD_*.tar.gz (or parts).
-After downloading the archive, unpack runs locally and syncs both W&B and SwanLab.
+After a successful pack, older log archives in the snapshot directory are removed.
+After downloading the archive, unpack runs locally and syncs W&B.
 With no input, unpack searches ~/Downloads and the current directory.
 USAGE
 }
@@ -34,10 +33,31 @@ run_changed() {
   return 1
 }
 
+remove_old_log_archives() {
+  local archive_path="$1" archive_dir candidate removed=0
+  local -a candidates=()
+  archive_dir="$(dirname -- "$archive_path")"
+  shopt -s nullglob
+  candidates=(
+    "$archive_dir"/log_One-Shot-OPD_*.tar.gz
+    "$archive_dir"/log_One-Shot-OPD_*.tar.gz.part.*
+  )
+  shopt -u nullglob
+  for candidate in "${candidates[@]}"; do
+    [[ "$candidate" == "$archive_path" ]] && continue
+    [[ "$candidate" == "${archive_path}.part."* ]] && continue
+    rm -f -- "$candidate"
+    removed=$((removed + 1))
+  done
+  if (( removed > 0 )); then
+    echo ">>> Removed $removed old log archive file(s) from: $archive_dir"
+  fi
+}
+
 pack_logs() {
   cd "$REPO_ROOT"
-  [[ -d "$WANDB_DIR" || -d "$SWANLAB_DIR" ]] || {
-    echo "Error: neither W&B nor SwanLab directory exists" >&2
+  [[ -d "$WANDB_DIR" ]] || {
+    echo "Error: W&B directory does not exist: $WANDB_DIR" >&2
     exit 1
   }
   [[ "$CHUNK_SIZE" =~ ^[0-9]+$ ]] && (( CHUNK_SIZE > 0 )) || {
@@ -47,7 +67,7 @@ pack_logs() {
   mkdir -p "$SNAP_DIR"
   local last_file="$SNAP_DIR/.last_sync_logs" tmp_dir archive_path archive_arg found=0 run
   local -a files=()
-  for run in "$WANDB_DIR"/offline-run-* "$SWANLAB_DIR"/run-*; do
+  for run in "$WANDB_DIR"/offline-run-*; do
     [[ -d "$run" ]] || continue
     if run_changed "$run" "$last_file"; then
       files+=("$run")
@@ -59,7 +79,7 @@ pack_logs() {
     echo "Nothing to package: no new or updated offline runs."
     return 0
   fi
-  echo ">>> Packaging updated W&B/SwanLab runs:"; printf '%s\n' "${files[@]}"
+  echo ">>> Packaging updated W&B runs:"; printf '%s\n' "${files[@]}"
   tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/opd_logs_pack.XXXXXX")"
   trap 'rm -rf -- "$tmp_dir"' EXIT
   for run in "${files[@]}"; do
@@ -67,9 +87,6 @@ pack_logs() {
       mkdir -p "$tmp_dir/wandb"
       cp -a "$run" "$tmp_dir/wandb/"
       [[ -f "$run.wandb" ]] && cp -a "$run.wandb" "$tmp_dir/wandb/"
-    else
-      mkdir -p "$tmp_dir/swanlab"
-      cp -a "$run" "$tmp_dir/swanlab/"
     fi
   done
   archive_arg="${1:-log_One-Shot-OPD_$(date +%F-%H%M%S).tar.gz}"
@@ -84,6 +101,7 @@ pack_logs() {
   else
     echo ">>> Created archive: $archive_path ($bytes bytes)"
   fi
+  remove_old_log_archives "$archive_path"
   touch "$last_file"
 }
 
@@ -113,7 +131,7 @@ unpack_logs() {
   extract_dir="$(mktemp -d "${TMPDIR:-/tmp}/opd_logs_extract.XXXXXX")"
   trap 'rm -rf -- "$extract_dir" "$temp_archive"' EXIT
   tar -xzf "$archive" -C "$extract_dir"
-  mkdir -p "$WANDB_DIR" "$SWANLAB_DIR"
+  mkdir -p "$WANDB_DIR"
   local sync_rc=0
   if [[ -d "$extract_dir/wandb" ]]; then
     cp -a "$extract_dir/wandb/." "$WANDB_DIR/"
@@ -122,14 +140,6 @@ unpack_logs() {
       for run in "$WANDB_DIR"/offline-run-*; do echo ">>> wandb sync $run"; wandb sync "$run" || sync_rc=$?; done
       shopt -u nullglob
     else echo ">>> wandb command not found; skipping W&B sync" >&2; fi
-  fi
-  if [[ -d "$extract_dir/swanlab" ]]; then
-    cp -a "$extract_dir/swanlab/." "$SWANLAB_DIR/"
-    if command -v swanlab >/dev/null 2>&1; then
-      shopt -s nullglob
-      for run in "$SWANLAB_DIR"/run-*; do echo ">>> swanlab sync $run"; swanlab sync "$run" || sync_rc=$?; done
-      shopt -u nullglob
-    else echo ">>> swanlab command not found; skipping SwanLab sync" >&2; fi
   fi
   [[ "$KEEP_ARCHIVE_AFTER_UNPACK" == 1 ]] || {
     if [[ "$input" == *.part.* ]]; then rm -f "${input%[0-9][0-9][0-9]}"[0-9][0-9][0-9]; else rm -f "$input"; fi

@@ -1,7 +1,6 @@
 .DEFAULT_GOAL := help
 
 WANDB_DIR ?= wandb
-SWANLAB_DIR ?= swanlab
 LOG_SNAP_DIR ?= log_snap
 LOG_ACTION ?= unpack
 LOG_ARCHIVE ?=
@@ -11,8 +10,8 @@ RESULTS_REMOTE_DIR ?= /mnt/dolphinfs/hdd_pool/docker/user/hadoop-hmart-poistar/f
 RESULTS_LOCAL_DIR ?= results
 RESULTS_ARCHIVE ?=
 ACTION ?= unpack
-HOPE_DIR ?= hope/opdonly
-HOPE_FILE ?= opdonly.hope
+HOPE_DIR ?= hope/opd
+HOPE_FILE ?= opd.hope
 
 .PHONY: help sync-log sync_log sync-log-pack sync_log_pack sync-log-unpack sync_log_unpack
 .PHONY: archive archive-pack archive-unpack opd-submit sync-results sync_results sync-results-pack sync_results_unpack
@@ -29,14 +28,14 @@ help:
 
 sync-log sync_log:
 	@case "$(LOG_ACTION)" in pack|unpack) ;; *) echo "LOG_ACTION must be pack or unpack" >&2; exit 2 ;; esac; \
-	OPD_WANDB_DIR="$(WANDB_DIR)" OPD_SWANLAB_DIR="$(SWANLAB_DIR)" OPD_LOG_SNAP_DIR="$(LOG_SNAP_DIR)" \
+	OPD_WANDB_DIR="$(WANDB_DIR)" OPD_LOG_SNAP_DIR="$(LOG_SNAP_DIR)" \
 	bash scripts/sync-log.sh "$(LOG_ACTION)" $(if $(LOG_ARCHIVE),"$(LOG_ARCHIVE)",)
 
 sync-log-pack sync_log_pack:
-	@$(MAKE) sync-log LOG_ACTION=pack LOG_ARCHIVE="$(LOG_ARCHIVE)" WANDB_DIR="$(WANDB_DIR)" SWANLAB_DIR="$(SWANLAB_DIR)" LOG_SNAP_DIR="$(LOG_SNAP_DIR)"
+	@$(MAKE) sync-log LOG_ACTION=pack LOG_ARCHIVE="$(LOG_ARCHIVE)" WANDB_DIR="$(WANDB_DIR)" LOG_SNAP_DIR="$(LOG_SNAP_DIR)"
 
 sync-log-unpack sync_log_unpack:
-	@$(MAKE) sync-log LOG_ACTION=unpack LOG_ARCHIVE="$(LOG_ARCHIVE)" WANDB_DIR="$(WANDB_DIR)" SWANLAB_DIR="$(SWANLAB_DIR)" LOG_SNAP_DIR="$(LOG_SNAP_DIR)"
+	@$(MAKE) sync-log LOG_ACTION=unpack LOG_ARCHIVE="$(LOG_ARCHIVE)" WANDB_DIR="$(WANDB_DIR)" LOG_SNAP_DIR="$(LOG_SNAP_DIR)"
 
 archive archive-pack:
 	@archive="$(ARCHIVE)"; \
