@@ -226,6 +226,9 @@ export VAL_ONLY=${VAL_ONLY:-False}
 export VAL_N=${VAL_N:-16}
 export VAL_TEMPERATURE=${VAL_TEMPERATURE:-0.7}
 export VAL_TOP_P=${VAL_TOP_P:-0.9}
+# validation 时记录到 tracker 的 rollout 数；TRAINER_LOGGER 包含 wandb 时
+# 会写入 `val/generations` 表。设为 0 可关闭，仍可用 VAL_N 生成评估样本。
+export VAL_LOG_GENERATIONS=${VAL_LOG_GENERATIONS:-8}
 
 # ============ W&B ============
 # 远程节点默认离线记录；如需上传云端，可设置 WANDB_MODE=online。
@@ -331,6 +334,7 @@ common_args() {
         actor_rollout_ref.rollout.val_kwargs.temperature=${VAL_TEMPERATURE} \
         actor_rollout_ref.rollout.val_kwargs.top_p=${VAL_TOP_P} \
         actor_rollout_ref.rollout.val_kwargs.max_tokens=${MAX_VAL_RESP_LENGTH} \
+        trainer.log_val_generations=${VAL_LOG_GENERATIONS} \
         reward.custom_reward_function.path=${VERL_ROOT}/verl/utils/reward_score/opd_mixed_verify.py \
         reward.custom_reward_function.name=reward_func \
         trainer.n_gpus_per_node=${N_GPUS_PER_NODE} \

@@ -85,7 +85,7 @@ else
 fi
 case "${ADV_ESTIMATOR}" in
     token_reward_direct) OPD_ADV_TAG="direct" ;;
-    discounted_token_reward) OPD_ADV_TAG="discounted" ;;
+    discounted_token_reward) OPD_ADV_TAG="discounted_g${GAMMA}" ;;
     *) OPD_ADV_TAG="${ADV_ESTIMATOR}" ;;
 esac
 

@@ -134,11 +134,21 @@ unpack_logs() {
   mkdir -p "$WANDB_DIR"
   local sync_rc=0
   if [[ -d "$extract_dir/wandb" ]]; then
+    local -a runs_to_sync=()
+    local extracted_run
+    shopt -s nullglob
+    for extracted_run in "$extract_dir/wandb"/offline-run-*; do
+      [[ -d "$extracted_run" ]] || continue
+      runs_to_sync+=("$WANDB_DIR/$(basename -- "$extracted_run")")
+    done
+    shopt -u nullglob
+
     cp -a "$extract_dir/wandb/." "$WANDB_DIR/"
     if command -v wandb >/dev/null 2>&1; then
-      shopt -s nullglob
-      for run in "$WANDB_DIR"/offline-run-*; do echo ">>> wandb sync $run"; wandb sync "$run" || sync_rc=$?; done
-      shopt -u nullglob
+      for run in "${runs_to_sync[@]}"; do
+        echo ">>> wandb sync $run"
+        wandb sync "$run" || sync_rc=$?
+      done
     else echo ">>> wandb command not found; skipping W&B sync" >&2; fi
   fi
   [[ "$KEEP_ARCHIVE_AFTER_UNPACK" == 1 ]] || {
