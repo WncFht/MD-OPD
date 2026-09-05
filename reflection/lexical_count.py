@@ -220,6 +220,8 @@ def main() -> None:
             "tokens": 0,
             "keywords": Counter(),
             "categories": Counter(),
+            "keyword_responses": Counter(),
+            "keyword_rates": Counter(),
         }
     )
 
@@ -238,10 +240,14 @@ def main() -> None:
             stats["repetition"] += 1
             continue
         counts, categories = count_keywords(text)
+        n_words = max(len(text.split()), 1)
         stats["kept"] += 1
-        stats["tokens"] += len(text.split())
+        stats["tokens"] += n_words
         stats["keywords"].update(counts)
         stats["categories"].update(categories)
+        for keyword, keyword_count in counts.items():
+            stats["keyword_responses"][keyword] += 1
+            stats["keyword_rates"][keyword] += 1000.0 * keyword_count / n_words
         per_rollout.append(
             {
                 **item,
@@ -257,8 +263,12 @@ def main() -> None:
         )
 
     write_csv(output_dir / "per_rollout.csv", per_rollout)
+    category_order = {category: idx for idx, category in enumerate(LEXICAL_LIST)}
+    ordered_keywords = sorted(ALL_KEYWORDS, key=lambda kw: (category_order[KEYWORD_CATEGORY[kw]], kw))
     summary_rows = []
     top_rows = []
+    word_rows = []
+    word_response_rows = []
     for (mode, model), stats in sorted(aggregate.items()):
         kept = stats["kept"]
         summary_rows.append(
@@ -284,6 +294,33 @@ def main() -> None:
                 **{f"count_{category}": stats["categories"][category] for category in LEXICAL_LIST},
             }
         )
+        for keyword in ordered_keywords:
+            count = stats["keywords"][keyword]
+            with_word = stats["keyword_responses"][keyword]
+            word_rows.append(
+                {
+                    "mode": mode,
+                    "model": model,
+                    "word": keyword,
+                    "category": KEYWORD_CATEGORY[keyword],
+                    "count": count,
+                    "rate_per_1k_words": round(1000 * count / max(stats["tokens"], 1), 6),
+                }
+            )
+            word_response_rows.append(
+                {
+                    "mode": mode,
+                    "model": model,
+                    "word": keyword,
+                    "category": KEYWORD_CATEGORY[keyword],
+                    "count": count,
+                    "responses_with_word": with_word,
+                    "share_of_responses": round(with_word / max(kept, 1), 6),
+                    "mean_count_per_response": round(count / max(kept, 1), 6),
+                    "mean_count_when_present": round(count / with_word, 6) if with_word else 0.0,
+                    "mean_rate_per_1k_words": round(stats["keyword_rates"][keyword] / max(kept, 1), 6),
+                }
+            )
         for keyword, count in stats["keywords"].most_common(args.top_k):
             top_rows.append(
                 {
@@ -297,6 +334,8 @@ def main() -> None:
             )
 
     write_csv(output_dir / "model_summary.csv", summary_rows)
+    write_csv(output_dir / "word_stats.csv", word_rows)
+    write_csv(output_dir / "word_response_stats.csv", word_response_rows)
     write_csv(output_dir / "top_keywords.csv", top_rows)
     (output_dir / "lexical_list.json").write_text(
         json.dumps(LEXICAL_LIST, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
@@ -311,11 +350,18 @@ def main() -> None:
         },
         "matching": "case-insensitive, boundary-aware, longest phrase first",
         "excluded_rollouts": "any rollout with a local zlib compression ratio >= threshold",
+        "word_stats": "every keyword in the lexical list per (mode, model), including zero counts",
+        "word_response_stats": (
+            "per-response per-word statistics: responses containing each word, "
+            "share of responses, and mean per-response counts/rates"
+        ),
     }
     (output_dir / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     print(f"kept rollouts: {len(per_rollout)}")
     print(f"wrote: {output_dir / 'per_rollout.csv'}")
     print(f"wrote: {output_dir / 'model_summary.csv'}")
+    print(f"wrote: {output_dir / 'word_stats.csv'}")
+    print(f"wrote: {output_dir / 'word_response_stats.csv'}")
     print(f"wrote: {output_dir / 'top_keywords.csv'}")
 
 
