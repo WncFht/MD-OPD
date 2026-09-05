@@ -21,14 +21,17 @@ stride=256, threshold=10, so the training-time metric stays comparable with
 the offline window-scan analysis of eval rollouts.
 
 Per-response values are scalars so they aggregate with the existing metric
-pipelines: mean/p90/max over a rollout batch for training, and the
-per-data_source mean@N grouping for validation.
+pipelines: mean/p90/max over a rollout batch for training, and the per-prompt
+group channel (``compute_grouped_repetition_metrics``) for validation — the
+latter deliberately bypasses the per-sample pass@k/best@N machinery, which
+only carries signal for {0,1}-success-valued metrics like acc.
 """
 
 from __future__ import annotations
 
 import zlib
-from typing import Any
+from collections import defaultdict
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -148,3 +151,76 @@ def compute_repetition_metrics(texts: list[str], **kwargs: Any) -> dict[str, flo
         "repetition/post_onset_frac/mean": float(np.mean(per_response["post_onset_frac"])),
         "compression/ratio/mean": float(np.mean(per_response["compression_ratio"])),
     }
+
+
+def compute_group_repetition_metrics(per_response: dict[str, list[float]]) -> dict[str, float]:
+    """Per-prompt repetition aggregates over one group of n responses.
+
+    Metric names mirror the train-side :func:`compute_repetition_metrics`
+    aggregates so both dashboards read the same quantity, plus
+    ``repetition/all_flagged`` — the share of prompts whose every sample
+    degenerated, which the per-sample pipeline could only approximate with a
+    worst@N bootstrap.  A single response is a valid group (val runs with
+    ``n=1`` still emit meaningful values).
+
+    Parameters are the aligned per-response lists produced by
+    :func:`analyze_responses`.
+    """
+    if not per_response:
+        return {}
+    n = len(per_response["repetition"])
+    if n == 0:
+        return {}
+
+    flags = [bool(flagged) for flagged in per_response["repetition"]]
+    max_ratios = np.asarray(per_response["max_window_ratio"], dtype=float)
+    return {
+        "repetition/frac": float(np.mean(flags)),
+        "repetition/all_flagged": float(all(flags)),
+        "repetition/max_window_ratio/mean": float(np.mean(max_ratios)),
+        "repetition/max_window_ratio/p90": float(np.percentile(max_ratios, 90)),
+        "repetition/max_window_ratio/max": float(np.max(max_ratios)),
+        "repetition/onset_frac/mean": float(np.mean(per_response["onset_frac"])),
+        "repetition/post_onset_frac/mean": float(np.mean(per_response["post_onset_frac"])),
+        "compression/ratio/mean": float(np.mean(per_response["compression_ratio"])),
+    }
+
+
+def compute_grouped_repetition_metrics(
+    per_response: dict[str, list[float]],
+    uids: Sequence,
+    data_sources: Sequence,
+    valid: Sequence[bool] | None = None,
+) -> dict[str, dict[str, list[float]]]:
+    """Group per-response repetition values by uid for the validation channel.
+
+    Returns ``{data_source: {metric: [one value per group]}}``; callers
+    aggregate by averaging over groups.  ``valid`` optionally masks out
+    aborted responses (empty texts) so they neither dilute the rates nor
+    count as clean samples, matching the train-side denominator.
+    """
+    if not per_response:
+        return {}
+    n = len(per_response["repetition"])
+    if uids is not None and len(uids) != n:
+        raise ValueError(f"uids has {len(uids)} entries for {n} per-response values.")
+    if data_sources is not None and len(data_sources) != n:
+        raise ValueError(f"data_sources has {len(data_sources)} entries for {n} per-response values.")
+    if valid is not None and len(valid) != n:
+        raise ValueError(f"valid has {len(valid)} entries for {n} per-response values.")
+
+    groups: dict[str, list[int]] = defaultdict(list)
+    for index, uid in enumerate(uids):
+        if valid is None or valid[index]:
+            groups[str(uid)].append(index)
+
+    results: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
+    for indices in groups.values():
+        group_values = {key: [values[i] for i in indices] for key, values in per_response.items()}
+        group_metrics = compute_group_repetition_metrics(group_values)
+        if not group_metrics:
+            continue
+        data_source = str(data_sources[indices[0]])
+        for name, value in group_metrics.items():
+            results[data_source][name].append(value)
+    return results

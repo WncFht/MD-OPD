@@ -18,11 +18,15 @@ train 侧（`repetition/*`、`compression/*` 前缀，按 step 记录，分母�
 - `repetition/post_onset_frac/mean`：onset 之后的字符占比，未标记记 0.0，即平均浪费的生成比例
 - `compression/ratio/mean`：全文 zlib 压缩比均值
 
-valid 侧（`val-aux/{data_source}/.../mean@N`，随现有按 data_source 分组聚合；开 `validation_data_dir` 时也会写入 dump JSONL）：
+valid 侧（组级通道，`val-aux/{data_source}/...`，按 uid 分组、跨 prompt 平均；分母排除 aborted/空文本，与 train 对齐）：
 
-- `repetition`、`repetition_max_window_ratio`、`repetition_onset_frac`、`repetition_post_onset_frac`、`response_compression_ratio`
+- `repetition/frac`：每题被标记比例的宏平均
+- `repetition/all_flagged`：整题全崩率（题内所有样本都被标记）；这是原来 worst@N bootstrap 想近似但算不对的量
+- `repetition/max_window_ratio/{mean,p90,max}`：p90/max 是题内 n 条样本的分位数/极值再跨题平均
+- `repetition/{onset_frac,post_onset_frac}/mean`
+- `compression/ratio/mean`
 
-valid 的 onset/post_onset 用 1.0/0.0 哨兵值定义在全样本上，因此直接走 `process_validation_metrics` 的 mean@N 通路，无需单独的 flagged 子集统计。
+命名与 train 侧一致。valid 有意不走 `process_validation_metrics` 的 per-sample 通路：repetition 是 1=坏的二值旗标或连续量，per-sample 通路的 pass@k（"至少一条坏"或恒 0）与 best@N/worst@N bootstrap（mean 的单调变换或写反的 max/min 曲线）全是噪声——每个 bench 会多出约 100 条无意义序列和百万次 bootstrap 调用。同类的组级指标还有 jaccard/answer（`trainer.diversity_metrics`，见 `diversity_metrics.py`）。
 
 ## 配置
 
@@ -40,7 +44,7 @@ repetition_metrics:
 ## 接入点
 
 - train：`ray_trainer.py` fit 中 `compute_data_metrics` 之后调用 `RayPPOTrainer._compute_repetition_metrics`，解码非 aborted 的 `responses` 后聚合。
-- valid：`_validate` 中解码 `output_texts` 后逐条算标量，塞进 `reward_extra_infos_dict`，复用按 uid/data_source 的分组聚合；每个样本都必须有值（空文本按"无 repetition"计）。
+- valid：`_validate` 中解码 `output_texts` 后逐条算标量，经 `compute_grouped_repetition_metrics` 按 uid 分组聚合成每题一个值，写入 `group_infos_dict`（与 jaccard/answer 同一条组级通道），在 `_val_metrics_update` 中跨 prompt 平均输出；aborted/空文本不计入分母。
 
 ## 成本
 

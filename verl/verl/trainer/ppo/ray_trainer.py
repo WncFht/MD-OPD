@@ -60,6 +60,7 @@ from verl.trainer.ppo.repetition_metrics import (
     DEFAULT_THRESHOLD,
     DEFAULT_WINDOW_SIZE,
     analyze_responses,
+    compute_grouped_repetition_metrics,
     compute_repetition_metrics,
 )
 from verl.trainer.ppo.reward import extract_reward
@@ -781,18 +782,25 @@ class RayPPOTrainer(OPDTrainerMixin):
             output_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in output_ids]
             sample_outputs.extend(output_texts)
 
-            # Repetition/compression metrics; scalar per-response values ride the
-            # existing per-data_source validation aggregation (mean@N etc.).
+            # Repetition/compression metrics: per-prompt aggregates ride the
+            # group-level channel.  They are monitoring quantities, not
+            # {0,1}-success scalars, so the per-sample pipeline's pass@k /
+            # best@N bootstrap series would be pure noise.  Aborted (empty)
+            # responses are excluded, matching the train-side denominator.
             repetition_kwargs = self._repetition_metrics_config()
             repetition_flags: list[bool] | None = None
             if repetition_kwargs is not None:
                 per_response = analyze_responses(output_texts, **repetition_kwargs)
                 repetition_flags = [bool(flagged) for flagged in per_response["repetition"]]
-                reward_extra_infos_dict["repetition"].extend(per_response["repetition"])
-                reward_extra_infos_dict["repetition_max_window_ratio"].extend(per_response["max_window_ratio"])
-                reward_extra_infos_dict["repetition_onset_frac"].extend(per_response["onset_frac"])
-                reward_extra_infos_dict["repetition_post_onset_frac"].extend(per_response["post_onset_frac"])
-                reward_extra_infos_dict["response_compression_ratio"].extend(per_response["compression_ratio"])
+                batch_repetition = compute_grouped_repetition_metrics(
+                    per_response,
+                    uids=test_batch.non_tensor_batch["uid"],
+                    data_sources=test_batch.non_tensor_batch.get("data_source", ["unknown"] * len(output_texts)),
+                    valid=[bool(text) for text in output_texts],
+                )
+                for data_source, var2vals in batch_repetition.items():
+                    for var_name, value in var2vals.items():
+                        group_infos_dict[data_source][var_name].append(value)
 
             test_batch = test_batch.union(test_output_gen_batch)
             test_batch.meta_info["validate"] = True
