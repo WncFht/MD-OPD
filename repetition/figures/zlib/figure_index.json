@@ -1,0 +1,38 @@
+{
+  "no-thinking/Qwen3-1.7B": {
+    "relative": "no-thinking__Qwen3-1.7B__compression_relative.png",
+    "absolute": "no-thinking__Qwen3-1.7B__compression_absolute.png"
+  },
+  "no-thinking/Qwen3-1.7B-Base": {
+    "relative": "no-thinking__Qwen3-1.7B-Base__compression_relative.png",
+    "absolute": "no-thinking__Qwen3-1.7B-Base__compression_absolute.png"
+  },
+  "no-thinking/Qwen3-4B": {
+    "relative": "no-thinking__Qwen3-4B__compression_relative.png",
+    "absolute": "no-thinking__Qwen3-4B__compression_absolute.png"
+  },
+  "no-thinking/Qwen3-4B-Base": {
+    "relative": "no-thinking__Qwen3-4B-Base__compression_relative.png",
+    "absolute": "no-thinking__Qwen3-4B-Base__compression_absolute.png"
+  },
+  "no-thinking/Qwen3-4B-Instruct-2507": {
+    "relative": "no-thinking__Qwen3-4B-Instruct-2507__compression_relative.png",
+    "absolute": "no-thinking__Qwen3-4B-Instruct-2507__compression_absolute.png"
+  },
+  "no-thinking/Qwen3-8B": {
+    "relative": "no-thinking__Qwen3-8B__compression_relative.png",
+    "absolute": "no-thinking__Qwen3-8B__compression_absolute.png"
+  },
+  "thinking/Qwen3-1.7B": {
+    "relative": "thinking__Qwen3-1.7B__compression_relative.png",
+    "absolute": "thinking__Qwen3-1.7B__compression_absolute.png"
+  },
+  "thinking/Qwen3-4B": {
+    "relative": "thinking__Qwen3-4B__compression_relative.png",
+    "absolute": "thinking__Qwen3-4B__compression_absolute.png"
+  },
+  "thinking/Qwen3-8B": {
+    "relative": "thinking__Qwen3-8B__compression_relative.png",
+    "absolute": "thinking__Qwen3-8B__compression_absolute.png"
+  }
+}

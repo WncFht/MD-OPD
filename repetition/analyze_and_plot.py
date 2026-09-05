@@ -8,8 +8,11 @@ windows so shorter and mid-response loops are observable.
 from __future__ import annotations
 
 import argparse
+import bz2
 import csv
+import gzip
 import json
+import lzma
 import random
 import re
 import sys
@@ -40,21 +43,34 @@ def load_plot_style(repo_root: Path):
     return module
 
 
-def compression_ratio(text: str) -> float:
+ALGORITHMS = ("zlib", "gzip", "bz2", "lzma")
+
+
+def compression_ratio(text: str, algorithm: str = "zlib") -> float:
     raw = text.encode("utf-8")
     if not raw:
         return 0.0
-    return len(raw) / max(len(zlib.compress(raw, 9)), 1)
+    if algorithm == "zlib":
+        compressed = zlib.compress(raw, 9)
+    elif algorithm == "gzip":
+        compressed = gzip.compress(raw, compresslevel=9)
+    elif algorithm == "bz2":
+        compressed = bz2.compress(raw, compresslevel=9)
+    elif algorithm == "lzma":
+        compressed = lzma.compress(raw, preset=9)
+    else:
+        raise ValueError(f"Unsupported compression algorithm: {algorithm}")
+    return len(raw) / max(len(compressed), 1)
 
 
-def window_ratios(text: str) -> tuple[np.ndarray, np.ndarray]:
+def window_ratios(text: str, algorithm: str = "zlib") -> tuple[np.ndarray, np.ndarray]:
     if len(text) <= WINDOW_SIZE:
-        return np.array([0]), np.array([compression_ratio(text)])
+        return np.array([0]), np.array([compression_ratio(text, algorithm)])
     starts = list(range(0, len(text) - WINDOW_SIZE + 1, STRIDE))
     last = len(text) - WINDOW_SIZE
     if starts[-1] != last:
         starts.append(last)
-    ratios = [compression_ratio(text[start : start + WINDOW_SIZE]) for start in starts]
+    ratios = [compression_ratio(text[start : start + WINDOW_SIZE], algorithm) for start in starts]
     return np.asarray(starts), np.asarray(ratios)
 
 
@@ -74,8 +90,8 @@ class Rollout:
     def label(self) -> str:
         return f"{self.mode}/{self.model}"
 
-    def analyze(self) -> None:
-        self.starts, self.ratios = window_ratios(self.text)
+    def analyze(self, algorithm: str = "zlib") -> None:
+        self.starts, self.ratios = window_ratios(self.text, algorithm)
 
     @property
     def repetition(self) -> bool:
@@ -383,6 +399,7 @@ def main() -> None:
     )
     parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parent)
     parser.add_argument("--sample-per-model", type=int, default=SAMPLE_PER_MODEL)
+    parser.add_argument("--algorithms", nargs="+", choices=ALGORITHMS, default=list(ALGORITHMS))
     args = parser.parse_args()
     figures = args.output_dir / "figures"
     figures.mkdir(parents=True, exist_ok=True)
@@ -390,32 +407,42 @@ def main() -> None:
     style = load_plot_style(repo_root)
     style.apply_rc("tableau-paper")
 
-    all_models: dict[str, list[Rollout]] = {}
-    samples_by_model: dict[str, list[Rollout]] = {}
+    loaded_models: dict[str, list[Rollout]] = {}
     for mode, root in discover_roots(args.eval_root):
         rollouts = load_rollouts(mode, root)
-        for item in rollouts:
-            item.analyze()
         label = f"{mode}/{root.name}"
-        all_models[label] = rollouts
-        rng = random.Random(f"{SEED}:{label}")
-        samples_by_model[label] = rng.sample(rollouts, min(args.sample_per_model, len(rollouts)))
+        loaded_models[label] = rollouts
 
-    summary = write_summary(all_models, args.output_dir)
-    write_sample_manifest(samples_by_model, args.output_dir)
-    plot_rate(summary, figures, style)
-    plot_compression_distribution(all_models, figures)
-    plot_max_ratio_ecdf(all_models, figures)
-    plot_first_position_distribution(all_models, figures)
-    plot_selected_windows(all_models, figures)
-    figure_index = {}
-    for label, samples in samples_by_model.items():
-        figure_index[label] = {
-            "relative": plot_model(samples, figures, relative=True).name,
-            "absolute": plot_model(samples, figures, relative=False).name,
-        }
-    (args.output_dir / "figure_index.json").write_text(json.dumps(figure_index, indent=2))
-    print(f"Analyzed {sum(len(v) for v in all_models.values())} rollouts across {len(all_models)} model configurations")
+    for algorithm in args.algorithms:
+        all_models: dict[str, list[Rollout]] = {}
+        samples_by_model: dict[str, list[Rollout]] = {}
+        for label, rollouts in loaded_models.items():
+            for item in rollouts:
+                item.analyze(algorithm)
+            all_models[label] = rollouts
+            rng = random.Random(f"{SEED}:{algorithm}:{label}")
+            samples_by_model[label] = rng.sample(rollouts, min(args.sample_per_model, len(rollouts)))
+
+        algorithm_figures = figures / algorithm
+        algorithm_figures.mkdir(parents=True, exist_ok=True)
+        algorithm_output = args.output_dir / algorithm
+        algorithm_output.mkdir(parents=True, exist_ok=True)
+        summary = write_summary(all_models, algorithm_output)
+        write_sample_manifest(samples_by_model, algorithm_output)
+        plot_rate(summary, algorithm_figures, style)
+        plot_compression_distribution(all_models, algorithm_figures)
+        plot_max_ratio_ecdf(all_models, algorithm_figures)
+        plot_first_position_distribution(all_models, algorithm_figures)
+        plot_selected_windows(all_models, algorithm_figures)
+        figure_index = {}
+        for label, samples in samples_by_model.items():
+            figure_index[label] = {
+                "relative": plot_model(samples, algorithm_figures, relative=True).name,
+                "absolute": plot_model(samples, algorithm_figures, relative=False).name,
+            }
+        (algorithm_figures / "figure_index.json").write_text(json.dumps(figure_index, indent=2))
+        rollout_count = sum(len(v) for v in all_models.values())
+        print(f"[{algorithm}] analyzed {rollout_count} rollouts across {len(all_models)} model configurations")
 
 
 if __name__ == "__main__":
