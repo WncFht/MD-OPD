@@ -41,6 +41,12 @@ from verl.trainer.config import AlgoConfig
 from verl.trainer.distillation.losses import is_distillation_enabled
 from verl.trainer.ppo import core_algos
 from verl.trainer.ppo.core_algos import AdvantageEstimator, agg_loss
+from verl.trainer.ppo.diversity_metrics import (
+    DEFAULT_ABSOLUTE_PREFIX_TOKENS,
+    DEFAULT_N_GRAM,
+    DEFAULT_RELATIVE_POSITIONS,
+    compute_group_diversity_metrics,
+)
 from verl.trainer.ppo.metric_utils import (
     compute_data_metrics,
     compute_throughout_metrics,
@@ -49,6 +55,13 @@ from verl.trainer.ppo.metric_utils import (
     process_validation_metrics,
 )
 from verl.trainer.ppo.opd_trainer_mixin import OPDTrainerMixin, opd_teacher_enabled, template_enabled
+from verl.trainer.ppo.repetition_metrics import (
+    DEFAULT_STRIDE,
+    DEFAULT_THRESHOLD,
+    DEFAULT_WINDOW_SIZE,
+    analyze_responses,
+    compute_repetition_metrics,
+)
 from verl.trainer.ppo.reward import extract_reward
 from verl.trainer.ppo.utils import (
     Role,
@@ -624,6 +637,77 @@ class RayPPOTrainer(OPDTrainerMixin):
         batch_reward = self.reward_loop_manager.compute_rm_score(batch)
         return batch_reward
 
+    def _repetition_metrics_config(self) -> dict[str, Any] | None:
+        """Repetition-metrics block of trainer config, or None when disabled."""
+        config = self.config.trainer.get("repetition_metrics", None)
+        if config is None or not config.get("enabled", False):
+            return None
+        return {
+            "window_size": config.get("window_size", DEFAULT_WINDOW_SIZE),
+            "stride": config.get("stride", DEFAULT_STRIDE),
+            "threshold": config.get("threshold", DEFAULT_THRESHOLD),
+        }
+
+    def _diversity_metrics_config(self) -> dict[str, Any] | None:
+        """Diversity-metrics block of trainer config, or None when disabled."""
+        config = self.config.trainer.get("diversity_metrics", None)
+        if config is None or not config.get("enabled", False):
+            return None
+        return {
+            "n_gram": config.get("n_gram", DEFAULT_N_GRAM),
+            "relative_positions": list(config.get("relative_positions", DEFAULT_RELATIVE_POSITIONS)),
+            "absolute_prefix_tokens": config.get("absolute_prefix_tokens", DEFAULT_ABSOLUTE_PREFIX_TOKENS),
+            "filter_repetition": config.get("filter_repetition", True),
+        }
+
+    def _collect_diversity_metrics(
+        self,
+        config: dict[str, Any],
+        texts: list[str],
+        uids,
+        data_sources,
+        repetition_flags: list[bool] | None,
+        preds,
+        group_infos_dict: dict[str, dict[str, list]],
+    ) -> None:
+        """Accumulate per-prompt diversity metrics into ``group_infos_dict``.
+
+        ``uids``/``data_sources`` are per-sample arrays aligned with ``texts``.
+        When ``filter_repetition`` is requested but repetition flags were not
+        computed (repetition metrics disabled), flags fall back to the default
+        window detector so the filtered condition stays available.
+        """
+        if config["filter_repetition"] and repetition_flags is None:
+            repetition_flags = [bool(flagged) for flagged in analyze_responses(texts)["repetition"]]
+        batch_metrics = compute_group_diversity_metrics(
+            texts=texts,
+            uids=uids,
+            data_sources=data_sources,
+            tokenize_fn=lambda batch_texts: self.tokenizer(batch_texts, add_special_tokens=False)["input_ids"],
+            n_gram=config["n_gram"],
+            relative_positions=config["relative_positions"],
+            absolute_prefix_tokens=config["absolute_prefix_tokens"],
+            repetition_flags=repetition_flags,
+            preds=preds,
+        )
+        for data_source, var2vals in batch_metrics.items():
+            for var_name, value in var2vals.items():
+                group_infos_dict[data_source][var_name].append(value)
+
+    def _compute_repetition_metrics(self, batch: DataProto) -> dict[str, Any]:
+        """Repetition/compression metrics over decoded training responses."""
+        kwargs = self._repetition_metrics_config()
+        if kwargs is None:
+            return {}
+        interval = max(1, self.config.trainer.repetition_metrics.get("interval", 1))
+        if self.global_steps % interval != 0:
+            return {}
+
+        # Aborted responses are empty text; analyzing them only dilutes the means.
+        non_aborted = batch.batch["response_mask"].sum(-1) > 0
+        texts = self.tokenizer.batch_decode(batch.batch["responses"][non_aborted], skip_special_tokens=True)
+        return compute_repetition_metrics(texts, **kwargs)
+
     def _validate(self, merged: bool = False):
         # Defensive: fit() already gates its two call sites, but _validate is a
         # public-ish hook and the tail of this method (np.concatenate over the
@@ -633,6 +717,7 @@ class RayPPOTrainer(OPDTrainerMixin):
 
         data_source_lst = []
         reward_extra_infos_dict: dict[str, list] = defaultdict(list)
+        group_infos_dict: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(list))
 
         # Lists to collect samples for the table
         sample_inputs = []
@@ -696,6 +781,19 @@ class RayPPOTrainer(OPDTrainerMixin):
             output_texts = [self.tokenizer.decode(ids, skip_special_tokens=True) for ids in output_ids]
             sample_outputs.extend(output_texts)
 
+            # Repetition/compression metrics; scalar per-response values ride the
+            # existing per-data_source validation aggregation (mean@N etc.).
+            repetition_kwargs = self._repetition_metrics_config()
+            repetition_flags: list[bool] | None = None
+            if repetition_kwargs is not None:
+                per_response = analyze_responses(output_texts, **repetition_kwargs)
+                repetition_flags = [bool(flagged) for flagged in per_response["repetition"]]
+                reward_extra_infos_dict["repetition"].extend(per_response["repetition"])
+                reward_extra_infos_dict["repetition_max_window_ratio"].extend(per_response["max_window_ratio"])
+                reward_extra_infos_dict["repetition_onset_frac"].extend(per_response["onset_frac"])
+                reward_extra_infos_dict["repetition_post_onset_frac"].extend(per_response["post_onset_frac"])
+                reward_extra_infos_dict["response_compression_ratio"].extend(per_response["compression_ratio"])
+
             test_batch = test_batch.union(test_output_gen_batch)
             test_batch.meta_info["validate"] = True
 
@@ -720,6 +818,22 @@ class RayPPOTrainer(OPDTrainerMixin):
                     reward_extra_infos_dict[key].extend(values.tolist())
                 else:
                     reward_extra_infos_dict[key].extend(values if isinstance(values, list) else [values])
+
+            # Group-level diversity metrics (pairwise n-gram Jaccard distances
+            # and extracted-answer diversity), one value per prompt over the
+            # n=val_kwargs.n responses; aggregated per data_source in
+            # _val_metrics_update.
+            diversity_config = self._diversity_metrics_config()
+            if diversity_config is not None:
+                self._collect_diversity_metrics(
+                    diversity_config,
+                    texts=output_texts,
+                    uids=test_batch.non_tensor_batch["uid"],
+                    data_sources=test_batch.non_tensor_batch.get("data_source", ["unknown"] * len(output_texts)),
+                    repetition_flags=repetition_flags,
+                    preds=reward_extra_info.get("pred"),
+                    group_infos_dict=group_infos_dict,
+                )
 
             # collect num_turns of each prompt
             if "__num_turns__" in test_batch.non_tensor_batch:
@@ -751,11 +865,16 @@ class RayPPOTrainer(OPDTrainerMixin):
                 "sample_uids": sample_uids,
                 "sample_turns": sample_turns,
                 "reward_extra_infos_dict": reward_extra_infos_dict,
+                "group_infos_dict": group_infos_dict,
             }
         data_sources = np.concatenate(data_source_lst, axis=0)
-        return self._val_metrics_update(data_sources, sample_uids, reward_extra_infos_dict, sample_turns)
+        return self._val_metrics_update(
+            data_sources, sample_uids, reward_extra_infos_dict, sample_turns, group_infos_dict
+        )
 
-    def _val_metrics_update(self, data_sources, sample_uids, reward_extra_infos_dict, sample_turns):
+    def _val_metrics_update(
+        self, data_sources, sample_uids, reward_extra_infos_dict, sample_turns, group_infos_dict=None
+    ):
         data_src2var2metric2val = process_validation_metrics(data_sources, sample_uids, reward_extra_infos_dict)
         metric_dict = {}
         for data_source, var2metric2val in data_src2var2metric2val.items():
@@ -765,7 +884,7 @@ class RayPPOTrainer(OPDTrainerMixin):
                 for metric_name, metric_val in metric2val.items():
                     if (
                         (var_name == core_var)
-                        and any(metric_name.startswith(pfx) for pfx in ["mean", "maj", "best"])
+                        and any(metric_name.startswith(pfx) for pfx in ["mean", "maj", "best", "pass"])
                         and (f"@{n_max}" in metric_name)
                     ):
                         metric_sec = "val-core"
@@ -773,6 +892,14 @@ class RayPPOTrainer(OPDTrainerMixin):
                         metric_sec = "val-aux"
                     pfx = f"{metric_sec}/{data_source}/{var_name}/{metric_name}"
                     metric_dict[pfx] = metric_val
+
+        # Group-level metrics carry one value per prompt; report the mean over
+        # prompts per data_source (no per-sample pass@k machinery applies).
+        if group_infos_dict:
+            for data_source, var2vals in group_infos_dict.items():
+                for var_name, vals in var2vals.items():
+                    if vals:
+                        metric_dict[f"val-aux/{data_source}/{var_name}"] = float(np.mean(vals))
 
         if len(sample_turns) > 0:
             sample_turns = np.concatenate(sample_turns)
@@ -804,7 +931,15 @@ class RayPPOTrainer(OPDTrainerMixin):
             list_b = result_b["reward_extra_infos_dict"].get(key, [])
             reward_extra_infos_dict[key] = list_a + list_b
 
-        return self._val_metrics_update(data_sources, sample_uids, reward_extra_infos_dict, sample_turns)
+        group_infos_dict: dict[str, dict[str, list]] = defaultdict(lambda: defaultdict(list))
+        for result in (result_a, result_b):
+            for data_source, var2vals in (result.get("group_infos_dict") or {}).items():
+                for var_name, vals in var2vals.items():
+                    group_infos_dict[data_source][var_name].extend(vals)
+
+        return self._val_metrics_update(
+            data_sources, sample_uids, reward_extra_infos_dict, sample_turns, group_infos_dict
+        )
 
     def init_workers(self):
         """Initialize distributed training workers using Ray backend.
@@ -1817,6 +1952,7 @@ class RayPPOTrainer(OPDTrainerMixin):
                 )
                 # collect metrics
                 metrics.update(compute_data_metrics(batch=batch, use_critic=self.use_critic))
+                metrics.update(self._compute_repetition_metrics(batch))
                 # GDPO per-component reward metrics
                 gdpo_reward_keys = self.config.algorithm.get("gdpo_reward_keys", None)
                 if gdpo_reward_keys and self.config.algorithm.adv_estimator in ("gdpo", AdvantageEstimator.GDPO):

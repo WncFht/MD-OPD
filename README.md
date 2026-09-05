@@ -110,8 +110,9 @@ VAL_ONLY=True bash recipe/opd.sh    # 用当前权重打分，然后退出
 日志（console/SwanLab）中的核心指标通常形如：
 
 - `val-core/<data_source>/acc/mean@16`：每个样本的准确率/通过率的 16 次采样平均值，即 README 里所说的 `avg@16`。数学、代码和函数调用的 verifier 都会将结果写入相应的 `acc` 或 `reward` 变量。
+- `val-core/<data_source>/acc/pass@16`：无偏 pass@k 估计（`1 - C(n-c,k)/C(n,k)`），即"k 次采样中至少一次满分"的跨 prompt 平均；reward 恰为 1.0 才算通过。它与 `best@N/mean` 不同：后者是对已采样本做有放回 bootstrap 的 `E[max]`，在 k=n 时会系统性低估前者。注意 `pass@1` 恒等于 `mean@N`，故不单独输出。
 - `val-aux/<data_source>/<变量>/mean@16`、`std@16`：辅助变量的均值和标准差。
-- `val-aux/.../best@N/mean`、`worst@N/mean`：对每个 prompt 的 N 次采样取最好/最差结果后，再跨 prompt 平均；若 verifier 提供 `pred`，还会有 `maj@N/mean`（多数投票）。N 会从 2、4、8 增长到 16。
+- `val-aux/.../pass@N`、`best@N/mean`、`worst@N/mean`：pass@k 与 best/worst 同口径计算（N 从 2、4、8 增长到 16，仅 `@16` 的核心变量进 `val-core`）；若 verifier 提供 `pred`，还会有 `maj@N/mean`（多数投票）。
 - 多轮数据还会有 `val-aux/num_turns/{min,max,mean}`；验证生成结果也可通过配置写入 JSONL。
 
 每次验证产生的是当前 checkpoint/当前内存权重的即时结果，并不会参与梯度更新。`VAL_ONLY=True` 只是把同一套验证逻辑放到训练前执行一次并退出，适合给已有 checkpoint 单独打分。

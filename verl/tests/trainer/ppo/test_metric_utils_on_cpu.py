@@ -568,6 +568,43 @@ class TestProcessValidationMetrics(unittest.TestCase):
         # For bootstrap with n=2, the majority vote could be either A or B
         # depending on the random sampling, so we don't check the exact value
 
+    def test_process_validation_metrics_pass_at_k(self):
+        """Test that pass@k uses the unbiased estimator and full-score semantics."""
+        # 3 prompts of 4 samples each: all correct, one correct, none correct
+        data_sources = ["src"] * 12
+        sample_uids = ["p1"] * 4 + ["p2"] * 4 + ["p3"] * 4
+        infos_dict = {
+            "acc": [1.0] * 4 + [1.0, 0.0, 0.0, 0.0] + [0.0] * 4,
+        }
+
+        result = process_validation_metrics(data_sources, sample_uids, infos_dict, seed=42)["src"]["acc"]
+
+        # ns for n_resps=4 is [2, 4]
+        self.assertIn("pass@2", result)
+        self.assertIn("pass@4", result)
+
+        # p1: n=4, c=4 -> pass@k = 1 for any k; p3: c=0 -> pass@k = 0
+        self.assertAlmostEqual(result["pass@2"], (1.0 + 0.5 + 0.0) / 3)
+        self.assertAlmostEqual(result["pass@4"], (1.0 + 1.0 + 0.0) / 3)
+
+        # p2 has c=1: unbiased estimator gives 1 - C(3,2)/C(4,2) = 0.5 for k=2
+        # (its bootstrap best@2 counterpart would be 1 - (3/4)^2 = 0.4375)
+        self.assertAlmostEqual(result["pass@2"], 0.5)
+
+    def test_process_validation_metrics_pass_at_k_fractional_rewards(self):
+        """Fractional rewards only count as a pass at exactly 1.0."""
+        data_sources = ["src"] * 4
+        sample_uids = ["p1"] * 4
+        infos_dict = {
+            "score": [0.5, 0.9, 1.0, 1.0],
+        }
+
+        result = process_validation_metrics(data_sources, sample_uids, infos_dict, seed=42)["src"]["score"]
+
+        # c=2 (only the exact 1.0 values), n=4, k=2: 1 - C(2,2)/C(4,2) = 5/6
+        self.assertAlmostEqual(result["pass@2"], 1.0 - 1 / 6)
+        self.assertAlmostEqual(result["pass@4"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

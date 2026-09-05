@@ -163,6 +163,32 @@ trainer:
   # Directory for logging validation data; no dump if null
   validation_data_dir: null
 
+  # Repetition and compression monitoring over decoded responses. A response
+  # is flagged when any overlapping character window reaches the zlib
+  # compression-ratio threshold. interval applies to training steps only;
+  # validation always computes the metrics when enabled.
+  repetition_metrics:
+    enabled: True
+    interval: 1
+    window_size: 1024
+    stride: 256
+    threshold: 10.0
+
+  # Group-level diversity metrics over validation responses, computed per
+  # prompt over the n=val_kwargs.n samples (meaningful only when
+  # val_kwargs.do_sample is true and n >= 2) and averaged per data_source.
+  # Jaccard truncates each response at relative positions of its own length
+  # (1.0 = full) plus one absolute-token anchor; "filtered" variants exclude
+  # responses flagged by repetition_metrics, whose loops inflate pairwise
+  # distances. Answer metrics summarize the extracted answers ("pred" from
+  # the reward function): valid ratio, unique ratio, majority share.
+  diversity_metrics:
+    enabled: True
+    n_gram: 4
+    relative_positions: [0.25, 0.5, 0.75, 1.0]
+    absolute_prefix_tokens: 1024
+    filter_repetition: true
+
   # Number of nodes used in the training
   nnodes: 1
 

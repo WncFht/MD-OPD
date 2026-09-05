@@ -905,6 +905,18 @@ def calc_maj_val(data: list[dict[str, Any]], vote_key: str, val_key: str) -> flo
     return maj_val
 
 
+def _pass_at_k(n: int, num_correct: int, k: int) -> float:
+    """Unbiased pass@k estimator (Chen et al., 2021): 1 - comb(n - c, k) / comb(n, k).
+
+    Uses the product form 1 - prod_{j=n-c+1}^{n} (1 - k/j) to avoid binomial overflow.
+    A sample counts as correct iff its value equals 1.0, so fractional rewards only
+    pass at full score.
+    """
+    if n - num_correct < k:
+        return 1.0
+    return 1.0 - float(np.prod(1.0 - k / np.arange(n - num_correct + 1, n + 1)))
+
+
 def process_validation_metrics(
     data_sources: list[str], sample_uids: list[str], infos_dict: dict[str, list[Any]], seed: int = 42
 ) -> dict[str, dict[str, dict[str, float]]]:
@@ -935,6 +947,8 @@ def process_validation_metrics(
         Where metric_name includes:
         - "mean@N": Mean value across N samples
         - "std@N": Standard deviation across N samples
+        - "pass@N": Unbiased pass@k estimate over N samples (probability that at least
+          one of N draws is fully correct, i.e. value == 1.0)
         - "best@N/mean": Mean of the best values in bootstrap samples of size N
         - "best@N/std": Standard deviation of the best values in bootstrap samples
         - "worst@N/mean": Mean of the worst values in bootstrap samples
@@ -1006,8 +1020,11 @@ def process_validation_metrics(
                         ns_cache[n_resps] = gen_ns(n_resps)
                     ns = ns_cache[n_resps]
 
-                    # compute best/worst metrics
+                    num_correct = sum(float(val) == 1.0 for val in var_vals)
                     for n in ns:
+                        # unbiased pass@k: probability that at least one of n samples is correct
+                        metric[f"pass@{n}"] = _pass_at_k(n_resps, num_correct, n)
+
                         # compute best/worst metrics
                         (bon_mean, bon_std), (won_mean, won_std) = bootstrap_metric(
                             data=var_vals,
