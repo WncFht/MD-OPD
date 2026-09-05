@@ -195,17 +195,19 @@ def compute_grouped_repetition_metrics(
     """Group per-response repetition values by uid for the validation channel.
 
     Returns ``{data_source: {metric: [one value per group]}}``; callers
-    aggregate by averaging over groups.  ``valid`` optionally masks out
-    aborted responses (empty texts) so they neither dilute the rates nor
-    count as clean samples, matching the train-side denominator.
+    aggregate by averaging over groups.  ``uids`` and ``data_sources`` are
+    required and aligned with the per-response values.  ``valid`` optionally
+    masks out aborted responses (empty texts) so they neither dilute the
+    rates nor count as clean samples, matching the train-side denominator.
     """
     if not per_response:
         return {}
     n = len(per_response["repetition"])
-    if uids is not None and len(uids) != n:
-        raise ValueError(f"uids has {len(uids)} entries for {n} per-response values.")
-    if data_sources is not None and len(data_sources) != n:
-        raise ValueError(f"data_sources has {len(data_sources)} entries for {n} per-response values.")
+    for name, seq in (("uids", uids), ("data_sources", data_sources)):
+        if seq is None:
+            raise ValueError(f"{name} is required to group repetition values by prompt and data_source.")
+        if len(seq) != n:
+            raise ValueError(f"{name} has {len(seq)} entries for {n} per-response values.")
     if valid is not None and len(valid) != n:
         raise ValueError(f"valid has {len(valid)} entries for {n} per-response values.")
 

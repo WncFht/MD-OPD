@@ -55,6 +55,11 @@ from verl.trainer.ppo.metric_utils import (
     process_validation_metrics,
 )
 from verl.trainer.ppo.opd_trainer_mixin import OPDTrainerMixin, opd_teacher_enabled, template_enabled
+from verl.trainer.ppo.reflection_metrics import (
+    analyze_reflection_responses,
+    compute_grouped_reflection_metrics,
+    compute_reflection_metrics,
+)
 from verl.trainer.ppo.repetition_metrics import (
     DEFAULT_STRIDE,
     DEFAULT_THRESHOLD,
@@ -649,6 +654,24 @@ class RayPPOTrainer(OPDTrainerMixin):
             "threshold": config.get("threshold", DEFAULT_THRESHOLD),
         }
 
+    def _text_metrics_interval(self, key: str) -> int | None:
+        """Train-step sampling interval of a decoded-text metrics block.
+
+        Returns None when the ``trainer.<key>`` block is absent or disabled
+        (the family never fires); otherwise the interval clamped to >= 1.
+        The interval applies to training steps only — validation always
+        computes enabled families.
+        """
+        config = self.config.trainer.get(key, None)
+        if config is None or not bool(config.get("enabled", False)):
+            return None
+        return max(1, int(config.get("interval", 1)))
+
+    def _reflection_metrics_enabled(self) -> bool:
+        """Whether the reflection-metrics block of trainer config is enabled."""
+        config = self.config.trainer.get("reflection_metrics", None)
+        return config is not None and bool(config.get("enabled", False))
+
     def _diversity_metrics_config(self) -> dict[str, Any] | None:
         """Diversity-metrics block of trainer config, or None when disabled."""
         config = self.config.trainer.get("diversity_metrics", None)
@@ -695,19 +718,30 @@ class RayPPOTrainer(OPDTrainerMixin):
             for var_name, value in var2vals.items():
                 group_infos_dict[data_source][var_name].append(value)
 
-    def _compute_repetition_metrics(self, batch: DataProto) -> dict[str, Any]:
-        """Repetition/compression metrics over decoded training responses."""
-        kwargs = self._repetition_metrics_config()
-        if kwargs is None:
-            return {}
-        interval = max(1, self.config.trainer.repetition_metrics.get("interval", 1))
-        if self.global_steps % interval != 0:
+    def _compute_train_text_metrics(self, batch: DataProto) -> dict[str, Any]:
+        """Decoded-text monitoring metrics (repetition + reflection) for one batch.
+
+        The response decode is shared between the two families; each family
+        additionally respects its own ``interval`` and is skipped entirely
+        when disabled.  Aborted (empty) responses are excluded so they cannot
+        dilute the means, mirroring the validation-side denominator.
+        """
+        repetition_interval = self._text_metrics_interval("repetition_metrics")
+        repetition_active = repetition_interval is not None and self.global_steps % repetition_interval == 0
+        reflection_interval = self._text_metrics_interval("reflection_metrics")
+        reflection_active = reflection_interval is not None and self.global_steps % reflection_interval == 0
+        if not repetition_active and not reflection_active:
             return {}
 
-        # Aborted responses are empty text; analyzing them only dilutes the means.
         non_aborted = batch.batch["response_mask"].sum(-1) > 0
         texts = self.tokenizer.batch_decode(batch.batch["responses"][non_aborted], skip_special_tokens=True)
-        return compute_repetition_metrics(texts, **kwargs)
+        metrics: dict[str, Any] = {}
+        repetition_kwargs = self._repetition_metrics_config() if repetition_active else None
+        if repetition_kwargs is not None:
+            metrics.update(compute_repetition_metrics(texts, **repetition_kwargs))
+        if reflection_active:
+            metrics.update(compute_reflection_metrics(texts))
+        return metrics
 
     def _validate(self, merged: bool = False):
         # Defensive: fit() already gates its two call sites, but _validate is a
@@ -788,6 +822,7 @@ class RayPPOTrainer(OPDTrainerMixin):
             # best@N bootstrap series would be pure noise.  Aborted (empty)
             # responses are excluded, matching the train-side denominator.
             repetition_kwargs = self._repetition_metrics_config()
+            reflection_enabled = self._reflection_metrics_enabled()
             repetition_flags: list[bool] | None = None
             if repetition_kwargs is not None:
                 per_response = analyze_responses(output_texts, **repetition_kwargs)
@@ -799,6 +834,30 @@ class RayPPOTrainer(OPDTrainerMixin):
                     valid=[bool(text) for text in output_texts],
                 )
                 for data_source, var2vals in batch_repetition.items():
+                    for var_name, value in var2vals.items():
+                        group_infos_dict[data_source][var_name].append(value)
+            elif reflection_enabled:
+                # Repetition metrics are disabled, but the reflection unflagged
+                # rates (and, through the shared flags below, diversity
+                # filtering) still need per-response flags: fall back to the
+                # default detector, whose constants are the offline analyses'.
+                repetition_flags = [bool(flagged) for flagged in analyze_responses(output_texts)["repetition"]]
+
+            # Lexical reflection metrics ride the same group-level channel
+            # with the same valid mask; per-response scalars are reused
+            # directly, so no extra decode is needed here.  The repetition
+            # flags additionally yield the unflagged rate variants, the ones
+            # directly comparable with the offline analysis (which excludes
+            # flagged rollouts before counting).
+            if reflection_enabled:
+                batch_reflection = compute_grouped_reflection_metrics(
+                    analyze_reflection_responses(output_texts),
+                    uids=test_batch.non_tensor_batch["uid"],
+                    data_sources=test_batch.non_tensor_batch.get("data_source", ["unknown"] * len(output_texts)),
+                    valid=[bool(text) for text in output_texts],
+                    repetition_flags=repetition_flags,
+                )
+                for data_source, var2vals in batch_reflection.items():
                     for var_name, value in var2vals.items():
                         group_infos_dict[data_source][var_name].append(value)
 
@@ -1960,7 +2019,7 @@ class RayPPOTrainer(OPDTrainerMixin):
                 )
                 # collect metrics
                 metrics.update(compute_data_metrics(batch=batch, use_critic=self.use_critic))
-                metrics.update(self._compute_repetition_metrics(batch))
+                metrics.update(self._compute_train_text_metrics(batch))
                 # GDPO per-component reward metrics
                 gdpo_reward_keys = self.config.algorithm.get("gdpo_reward_keys", None)
                 if gdpo_reward_keys and self.config.algorithm.adv_estimator in ("gdpo", AdvantageEstimator.GDPO):

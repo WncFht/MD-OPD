@@ -34,11 +34,11 @@ valid 侧（组级通道，`val-aux/{data_source}/...`，按 uid 分组、跨 pr
 
 ```yaml
 repetition_metrics:
-  enabled: True     # 总开关
-  interval: 1       # train 侧每 K 个 step 算一次；valid 不受 interval 影响
-  window_size: 1024
-  stride: 256
-  threshold: 10.0
+    enabled: True # 总开关
+    interval: 1 # train 侧每 K 个 step 算一次；valid 不受 interval 影响
+    window_size: 1024
+    stride: 256
+    threshold: 10.0
 ```
 
 ## 接入点

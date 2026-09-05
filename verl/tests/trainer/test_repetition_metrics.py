@@ -138,6 +138,14 @@ def test_alignment_errors_are_rejected():
         rm.compute_grouped_repetition_metrics(per_response, uids=["u1", "u1"], data_sources=["d", "d"], valid=[True])
 
 
+def test_grouping_inputs_are_required():
+    per_response = _per_response([1, 0], [11.0, 3.0], [0.1, 1.0], [0.9, 0.0], [20.0, 4.0])
+    with pytest.raises(ValueError):
+        rm.compute_grouped_repetition_metrics(per_response, None, ["d", "d"])
+    with pytest.raises(ValueError):
+        rm.compute_grouped_repetition_metrics(per_response, ["u1", "u1"], None)
+
+
 def test_end_to_end_with_analyze_responses():
     texts = ["blah" * 400, "A perfectly normal sentence about the weather.", "blah" * 400]
     per_response = rm.analyze_responses(texts)

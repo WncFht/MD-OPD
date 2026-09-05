@@ -174,6 +174,18 @@ trainer:
     stride: 256
     threshold: 10.0
 
+  # Lexical reflection markers over decoded responses: per-category and
+  # per-word rates (per 1k words) plus presence shares. Degeneration erases
+  # these markers ("wait", "hmm", ...) before the zlib repetition flags fire,
+  # so the rates act as an early-warning signal. Validation additionally
+  # reports *_unflagged rates over samples not flagged by repetition_metrics,
+  # the series directly comparable with the offline analysis (which excludes
+  # flagged rollouts). interval applies to training steps only; validation
+  # always computes the metrics when enabled.
+  reflection_metrics:
+    enabled: True
+    interval: 1
+
   # Group-level diversity metrics over validation responses, computed per
   # prompt over the n=val_kwargs.n samples (meaningful only when
   # val_kwargs.do_sample is true and n >= 2) and averaged per data_source.
