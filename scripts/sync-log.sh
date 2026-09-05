@@ -126,7 +126,8 @@ unpack_logs() {
     local prefix="${input%[0-9][0-9][0-9]}"; local -a parts=()
     shopt -s nullglob; parts=("${prefix}"[0-9][0-9][0-9]); shopt -u nullglob
     (( ${#parts[@]} )) || { echo "Error: archive parts not found" >&2; exit 1; }
-    temp_archive="$(mktemp "${TMPDIR:-/tmp}/opd_logs_unpack.XXXXXX.tar.gz")"; cat "${parts[@]}" > "$temp_archive"; archive="$temp_archive"
+    # macOS mktemp requires the XXXXXX template to be at the end of the path.
+    temp_archive="$(mktemp "${TMPDIR:-/tmp}/opd_logs_unpack.XXXXXX")"; cat "${parts[@]}" > "$temp_archive"; archive="$temp_archive"
   else archive="$input"; fi
   extract_dir="$(mktemp -d "${TMPDIR:-/tmp}/opd_logs_extract.XXXXXX")"
   trap 'rm -rf -- "$extract_dir" "$temp_archive"' EXIT
