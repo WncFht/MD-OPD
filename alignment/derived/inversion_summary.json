@@ -1,0 +1,221 @@
+[
+  {
+    "name": "ours_top16_kl",
+    "n_points": 250,
+    "ridge_chosen": 0.0,
+    "residual_log_rmse": 0.06818230739301065,
+    "lcurve": [
+      {
+        "ridge": 0.0,
+        "residual_log_rmse": 0.06818230739301065,
+        "c_l2": 0.022007795885712268
+      },
+      {
+        "ridge": 1e-06,
+        "residual_log_rmse": 0.06818235111221116,
+        "c_l2": 0.022006636110995962
+      },
+      {
+        "ridge": 0.0001,
+        "residual_log_rmse": 0.06818669935408006,
+        "c_l2": 0.021893668529110864
+      },
+      {
+        "ridge": 0.001,
+        "residual_log_rmse": 0.06822753965623152,
+        "c_l2": 0.021009382381257203
+      },
+      {
+        "ridge": 0.01,
+        "residual_log_rmse": 0.06862866406491269,
+        "c_l2": 0.017434102192691436
+      },
+      {
+        "ridge": 0.1,
+        "residual_log_rmse": 0.07129466418377299,
+        "c_l2": 0.01367038155628246
+      }
+    ],
+    "holdout": {
+      "t_split": 200.0,
+      "nnls_rmse_log": 0.055579039175202564,
+      "power_law_rmse_log": 0.09987930338015058
+    },
+    "density_loglog_slope": 0.41656522394266277,
+    "n_support_modes": 27,
+    "top_modes": [
+      {
+        "rho_per_step": 0.03603811875263918,
+        "c_k": 0.01079092370496838,
+        "lambda_kl_reading": 18019.05937631959
+      },
+      {
+        "rho_per_step": 0.03792486176153662,
+        "c_k": 0.010253372890693311,
+        "lambda_kl_reading": 18962.430880768312
+      },
+      {
+        "rho_per_step": 0.034245240269972714,
+        "c_k": 0.009288046816027502,
+        "lambda_kl_reading": 17122.62013498636
+      },
+      {
+        "rho_per_step": 0.03991038348877003,
+        "c_k": 0.007571662438414132,
+        "lambda_kl_reading": 19955.191744385018
+      },
+      {
+        "rho_per_step": 0.032541556600045304,
+        "c_k": 0.006852433794035938,
+        "lambda_kl_reading": 16270.778300022654
+      }
+    ],
+    "figure": "/Users/fanghaotian/Desktop/src/One-Shot-OPD/alignment/figures/spectrum__ours_top16_kl.png"
+  },
+  {
+    "name": "ours_sampled_token_kl",
+    "n_points": 250,
+    "ridge_chosen": 0.0,
+    "residual_log_rmse": 0.06434246278802958,
+    "lcurve": [
+      {
+        "ridge": 0.0,
+        "residual_log_rmse": 0.06434246278802958,
+        "c_l2": 0.02107158883690035
+      },
+      {
+        "ridge": 1e-06,
+        "residual_log_rmse": 0.06434248767428177,
+        "c_l2": 0.021070905773017803
+      },
+      {
+        "ridge": 0.0001,
+        "residual_log_rmse": 0.06434495847066901,
+        "c_l2": 0.021004019336466968
+      },
+      {
+        "ridge": 0.001,
+        "residual_log_rmse": 0.06436793205368947,
+        "c_l2": 0.020455787275702356
+      },
+      {
+        "ridge": 0.01,
+        "residual_log_rmse": 0.06460041740182884,
+        "c_l2": 0.017751555705308175
+      },
+      {
+        "ridge": 0.1,
+        "residual_log_rmse": 0.06621697681216465,
+        "c_l2": 0.014352540342414604
+      }
+    ],
+    "holdout": {
+      "t_split": 200.0,
+      "nnls_rmse_log": 0.055302930967717094,
+      "power_law_rmse_log": 0.054040845237161766
+    },
+    "density_loglog_slope": 0.5039455833430047,
+    "n_support_modes": 40,
+    "top_modes": [
+      {
+        "rho_per_step": 0.03603811875263918,
+        "c_k": 0.009442985884706535,
+        "lambda_kl_reading": 18019.05937631959
+      },
+      {
+        "rho_per_step": 0.034245240269972714,
+        "c_k": 0.00915304359141665,
+        "lambda_kl_reading": 17122.62013498636
+      },
+      {
+        "rho_per_step": 0.03792486176153662,
+        "c_k": 0.008214079756155974,
+        "lambda_kl_reading": 18962.430880768312
+      },
+      {
+        "rho_per_step": 0.032541556600045304,
+        "c_k": 0.007773435426695444,
+        "lambda_kl_reading": 16270.778300022654
+      },
+      {
+        "rho_per_step": 0.03092263034528843,
+        "c_k": 0.005987542124263139,
+        "lambda_kl_reading": 15461.315172644216
+      }
+    ],
+    "figure": "/Users/fanghaotian/Desktop/src/One-Shot-OPD/alignment/figures/spectrum__ours_sampled_token_kl.png"
+  },
+  {
+    "name": "paper_fulldata_l1",
+    "n_points": 268,
+    "ridge_chosen": 0.0,
+    "residual_log_rmse": 0.09294589594308768,
+    "lcurve": [
+      {
+        "ridge": 0.0,
+        "residual_log_rmse": 0.09294589594308768,
+        "c_l2": 0.5344808122642335
+      },
+      {
+        "ridge": 1e-06,
+        "residual_log_rmse": 0.09294591130944108,
+        "c_l2": 0.5344788221350697
+      },
+      {
+        "ridge": 0.0001,
+        "residual_log_rmse": 0.09294743316808059,
+        "c_l2": 0.5342821584066209
+      },
+      {
+        "ridge": 0.001,
+        "residual_log_rmse": 0.09296132050858384,
+        "c_l2": 0.5325256679760013
+      },
+      {
+        "ridge": 0.01,
+        "residual_log_rmse": 0.09310446124112005,
+        "c_l2": 0.5171556581387123
+      },
+      {
+        "ridge": 0.1,
+        "residual_log_rmse": 0.09459958975620157,
+        "c_l2": 0.4254545803653489
+      }
+    ],
+    "holdout": {
+      "t_split": 200.0,
+      "nnls_rmse_log": 0.1532886937963613,
+      "power_law_rmse_log": 0.06820852654844885
+    },
+    "density_loglog_slope": 1.2794016200910514,
+    "n_support_modes": 7,
+    "top_modes": [
+      {
+        "rho_per_step": 0.003703703703703704,
+        "c_k": 0.4776468811775383,
+        "lambda_kl_reading": 3703.703703703704
+      },
+      {
+        "rho_per_step": 0.048074985676913616,
+        "c_k": 0.16333509335540602,
+        "lambda_kl_reading": 48074.98567691362
+      },
+      {
+        "rho_per_step": 0.05065697162853116,
+        "c_k": 0.11738383848740414,
+        "lambda_kl_reading": 50656.97162853116
+      },
+      {
+        "rho_per_step": 0.045624603554740045,
+        "c_k": 0.10770931131551098,
+        "lambda_kl_reading": 45624.603554740046
+      },
+      {
+        "rho_per_step": 0.003902620267011369,
+        "c_k": 0.05114984483800354,
+        "lambda_kl_reading": 3902.6202670113694
+      }
+    ],
+    "figure": "/Users/fanghaotian/Desktop/src/One-Shot-OPD/alignment/figures/spectrum__paper_fulldata_l1.png"
+  }
+]

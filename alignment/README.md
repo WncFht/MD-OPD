@@ -13,10 +13,14 @@ $$
 ## 流水线
 
 ```
-pull_wandb_metrics.py   W&B -> alignment/runs/<run_id>__history.csv + __meta.json
-compute_alignment.py    CSV  -> alignment/derived/<run_id>__alignment.csv + summary.json
-plot_alignment.py       CSV  -> alignment/figures/*.png
-fit_tail.py             CSV  -> D1 尾部形态拟合（幂律 / 拉伸指数 / floor+指数）
+pull_wandb_metrics.py      W&B -> alignment/runs/<run_id>__history.csv + __meta.json
+compute_alignment.py       CSV  -> alignment/derived/<run_id>__alignment.csv + summary.json
+plot_alignment.py          CSV  -> alignment/figures/*.png
+fit_tail.py                CSV  -> D1 尾部形态拟合（幂律 / 拉伸指数 / floor+指数）
+extract_paper_figures.py   论文图 PDF -> paper_curves/*.csv（矢量逐点提取）
+analyze_paper_curves.py    paper_curves -> derived/paper_analysis.json（M1）
+plot_paper_analysis.py     M1 三图（tail fits / alpha 对比 / hump 判别）
+invert_spectrum.py         derived -> derived/spectrum__*.csv + figures（M2）
 ```
 
 拉取本仓库标准的两个 run（top16 vs sampled-token）：
@@ -90,3 +94,30 @@ $$
 - `distance_raw.png` -- 原始距离代理（nats/token）。
 - `absorption_estimators.png` -- 每个 run 的单步 `v_direct` vs 几何窗口 `v_geo` 对比。
 - `tail_fits__<run_id>.png` -- D1 三种尾部形态的拟合对比（log-log）。
+
+## M1：论文曲线数字化与判别（M1 完成，2026-09-06）
+
+输入是论文图 9 / §5.3 / 附录 C.2 的**矢量 PDF**（matplotlib 导出，曲线为逐点折线）：
+
+```bash
+.venv/bin/python alignment/extract_paper_figures.py \
+    --pdf /path/to/5_digestion_rate_v2.pdf --out alignment/paper_curves
+.venv/bin/python alignment/analyze_paper_curves.py
+.venv/bin/python alignment/plot_paper_analysis.py
+```
+
+提取器用黑色坐标框定位面板、灰色网格线 + 嵌入刻度文本标定坐标（支持 log 轴、
+科学计数法多词标签、同一 path 对象内的多条子路径）。产物：`paper_curves/*.csv`。
+分析产物：`derived/paper_analysis.json` 与三张图（tail fits / α(t) 对比 /
+hump 判别）。核心结果见文档 §4.1。
+
+## M2：谱反演（M2 完成，单 seed 版）
+
+```bash
+.venv/bin/python alignment/invert_spectrum.py
+```
+
+对数空间加权 NNLS（multiplicative updates）+ L-curve 脊选择 + hold-out 外推。
+产物：`derived/spectrum__*.csv`（每步速率 ρ 网格上的谱权重/密度）、
+`derived/inversion_summary.json`、`figures/spectrum__*.png`。
+注意口径：KL 代理的每步速率 ρ = 2ηλ（η=1e-6），论文 L1 的 ρ = ηλ。
