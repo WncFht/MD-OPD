@@ -376,39 +376,149 @@ $$
 读法（逐条对应 §2 的判据）：
 
 1. **$\alpha(t)$ 系统性上升**（0.7 → 1.3，两 run 一致）→ 按 §2.3 的分类学是"带边/对数正态型谱"或"优化器效应"的形状；$v_{50}/v_{200}<4$ 由恒等式 $v_{50}/v_{200}=4\,(\alpha_{50}/\alpha_{200})$ 完全解释（用滑窗 $\alpha$ 代入得 2.2–2.4，与 2.5–3.1 的实测在估计器误差内一致）。**纯"幂律谱×幂律振幅"模型在这个窗口被排除**（§2.3 的 boxed 推论）。
-2. **无底**：floor+指数是三种形态里唯一明确被拒的（对数空间 rmse 0.19–0.23 vs 0.07–0.08），$v_{199}$ 仍在降——279 步内前沿尚未触及 $\lambda_{\mathrm{crit}}$ 底。 KL 谱方差读数：$-\dot v/\eta^2$ 给出相对谱宽 $\sqrt{\kappa_2}/\kappa_1\approx0.7\text{–}0.9$——$O(1)$ 宽谱，$v$ 远未走平。 **$v_t$ 凸起**（step ~55→80，1.5%→2.7–3.5%，原始单步 $v$ 里也在）：违反 $\dot\kappa_1\le0$，是谱模型之外机制的现场（§2.7 三选一；最便宜的判别是把论文 §5.3 off-policy run 的 $v_t$ 画出来）。 **损失几何无关**：top16 与 sampled-token 的 $d/d_{30}$、$v_t$ 曲线几乎重合（$d_{end}/d_{30}$ 0.053 vs 0.061）——论文"数据量无关"的推广：**token 子集/损失截断也不改变节奏**，进一步支持"节奏是 OPD×架构 的属性"。 **与论文读数的差异**：$\alpha$（全局）1.31–1.36 vs 论文 $\approx0.72$；$v_{50}/v_{200}$ 方向相反。候选解释按 §2.8：KL vs L1 的速率加倍与 $\lambda$-加权、熵污染（0.81→0.64→0.73）、窗口/估计器差异（median-端点 vs OLS）、吃得更深（94% vs 78–84%）。全部可被 M3 拆开。
+2. **无底**：floor+指数是三种形态里唯一明确被拒的（对数空间 rmse 0.19–0.23 vs 0.07–0.08），$v_{199}$ 仍在降——279 步内前沿尚未触及 $\lambda_{\mathrm{crit}}$ 底。 KL 谱方差读数：$-\dot v/\eta^2$ 给出相对谱宽 $\sqrt{\kappa_2}/\kappa_1\approx0.7\text{–}0.9$——$O(1)$ 宽谱，$v$ 远未走平。 **$v_t$ 凸起**（step ~55→80，1.5%→2.7–3.5%，原始单步 $v$ 里也在）：违反 $\dot\kappa_1\le0$，是谱模型之外机制的现场（§2.7 三选一；最便宜的判别是把论文 §5.3 off-policy run 的 $v_t$ 画出来）。 **损失几何无关**：top16 与 sampled-token 的 $d/d_{30}$、$v_t$ 曲线几乎重合（$d_{end}/d_{30}$ 0.053 vs 0.061）——论文"数据量无关"的推广：**token 子集/损失截断也不改变节奏**，进一步支持"节奏是 OPD×架构 的属性"。 **与论文读数的差异**：$\alpha$（全局）1.31–1.36 vs 论文 $\approx0.72$；$v_{50}/v_{200}$ 方向相反。候选解释按 §2.8：KL vs L1 的速率加倍与 $\lambda$-加权、熵污染（0.81→0.64→0.73）、窗口/估计器差异（median-端点 vs OLS）、吃得更深（94% vs 78–84%）。全部可被 M3 拆开。**事后补记（本轮已量化，M3 动机的核心证据）**：CE $=-\texttt{opd/teacher\_logp\_mean}$（teacher 交叉熵）从 0.896（step 30）降到 0.646（step 199）后**回升**到 0.735（step 279，随学生熵同步回升），两个 run 一致（top16：0.964→0.656→0.748）；而 KL 代理同一区间"干净地"降了 ~15×。也就是说 KL $=$ CE $-\,H$ 的衰减里相当一部分是两个慢变量相减的产物——§4 的 $\alpha$、$v_{50}/v_{200}$ 全部属 KL 口径，M3 的双口径拆解因此从"锦上添花"升级为"必做"。
 
 ---
 
-## 5. 待检验假设汇总
+## 5. 待检验假设：精确预言、setting 与判据
 
-| #   | 假设                                  | 关键预言                                             | 检验                                     |
-| --- | ------------------------------------- | ---------------------------------------------------- | ---------------------------------------- |
-| H1  | 尾部是幂律/拉伸指数（谱混合）         | $v\propto\alpha(t)/t$；$v_{50}/v_{200}=4\,(\alpha_{50}/\alpha_{200})$ | 论文数据支持；M1/M2 分辨形态             |
-| H2  | 存在噪声底：KL 底 $=\frac{\eta}{4B}\sum\sigma_i^2$+表示缺口 | off-policy run 平台随 $\eta$ 降、随 $B$ 升而降，L1 底标度不同 | D2（按 §2.5 的两种标度分别检验）         |
-| H3  | AdamW 软底 + sign 动力学              | $\beta_2=0.95$ 或末期换优化器 → 尾巴变陡、凸起变化    | M4                                       |
-| H3' | $v_t$ 凸起的三种机制                  | lr 折叠移动凸起（Adam）/冻结状态消除凸起（漂移）/sharpness 同步上升（锐化） | 论文 §5.3 曲线复查 + M4 + sharpness 日志 |
-| H4  | 残差质量随训练迁向低频 token          | 逐 token 残差按频率分层的质心下移，速率与 $\kappa_1$ 下降一致 | M3                                       |
-| H5  | 谱可测且可预测 run                    | step-30 谱（NNLS 反演 + Lanczos 验证）预测整条 $v_t$ | M2 → M5                                  |
-| H6  | 指数是"优化器×架构"性质               | 换 Muon/SOAP 后 $\alpha$ 与 $v_{50}/v_{200}$ 改变     | M6                                       |
-| H7  | $\alpha(t)$ 上升 = 带边/对数正态谱    | NNLS 反演出有限带边或对数正态型的加权谱              | M2                                       |
+> 每条假设给出三件事：**精确预言**（可证伪的公式/数字）、**判别 setting**（指向 §6 的 M 项与具体 arms）、**判据**（什么结果算命中/排除）。共享基线配置见 §6.0，各 M 项只写相对基线的 delta。
+
+**H1（尾部形态 = 谱混合的指纹）。**
+- 精确预言：恒等式 $\alpha(t)=t\cdot v_t^{\mathrm{inst}}$（免拟合，直接检验）；$v_{50}/v_{200}=4\,(\alpha_{50}/\alpha_{200})$；三种形态（幂律 / 拉伸指数 / floor+指数）分别对应"幂律谱+振幅衰减 / 宽谱带边（玻璃态）/ 单一主模式+底"（§2.3）。
+- setting：M1（现有日志 + 论文曲线数据），无需新 run。
+- 判据：$t\cdot v_t$ 曲线与滑窗 $\alpha(t)$ 重合（自洽）；floor+exp 的对数空间 rmse 显著最差 → 本窗口无底；$\alpha(t)$ 漂移方向定形态。**已部分完成**：我们的两个 run 拒绝 floor+exp、$\alpha(t)$ 上升（§4）；论文四个 run 的 $v_{50}/v_{200}=4.2\text{–}6.4$ 暗示其 L1 口径 $\alpha(t)$ 下降，两种口径是否真方向相反由 M3 裁决。
+
+**H2（噪声底的精确标度）。**
+- 精确预言：off-policy 平台 $d_\infty^{\mathrm{KL}}=\frac{\eta}{4B}\sum_i\sigma_i^2+\text{表示缺口}$（§2.5，逐模式曲率消掉）；L1 口径 $d_\infty^{L1}\propto\sqrt{\eta/B}$ 且由平坦模式主导。
+- setting：D2（off-policy 冻结状态 run，$\eta\times B$ 双扫，§6）。
+- 判据：$\log d_\infty$ 对 $\log(\eta/B)$ 的斜率 $=1$（KL）/ $=0.5$（L1）；不随 $(\eta,B)$ 变的残差 = 表示缺口（应与 $\eta$ 无关、只与教师/温度/tokenizer 相关）。
+
+**H3（AdamW 软底 + sign 动力学）。**
+- 精确预言：$\beta_2=0.95$（EMA 记忆 1000→20 步）使尾部变陡、$v$ 尾值升高；$\epsilon$ 增大等效 damping，尾底抬高；sign 封顶使噪声主导方向的收缩率与 $\lambda_i$ 脱钩。
+- setting：M4 arms (a)(b)(d)。
+- 判据：M1 口径下 $\beta_2$ 两臂的尾部斜率与 $v_{200}$ 差异超出 seed 噪声；$\epsilon$ 臂的底按预测方向移动。
+
+**H3'（$v_t$ 凸起的三种机制，三选一可分辨）。**
+- 精确预言与判别：
+  - H3a（Adam 二阶矩 warmup 瞬态）：凸起位置 $t^\ast\propto1/\mathrm{lr}$（lr 折叠后按 $u=\eta t$ 对齐）；
+  - H3b（on-policy 状态漂移注入）：冻结状态 run 的凸起消失/显著减弱；
+  - H3c（progressive sharpening，谱本身在漂移）：凸起窗口内 $\lambda_{\max}(H)$ 同步上升，且 $\beta_2$ 扫描不影响凸起。
+- setting：H3b 零成本（论文 §5.3 曲线复查）；H3a = M4 arm (c)；H3c = M4 的 sharpness 探针。
+- 判据：三者互斥的读数组合见 §2.7；允许多机制并存，但要求各自份额可分离。
+
+**H4（残差质量迁向低频 token）。**
+- 精确预言：逐 token 残差按**教师侧 unigram 频率**分层的衰减率有序（F-Principle/LFP，§3.3）；频率质心 $\sum_f f\,w_f(t)$ 单调下移，其速率是 $\kappa_1(t)$ 下降率在 token 域的投影（同量级、同拐点）。
+- setting：M3（一次标准 run + 逐 token 日志）。
+- 判据：十分位轨迹的排序在 ≥2 个 decade 的 $t$ 上保持；质心轨迹与 $\kappa_1(t)$ 的相关系数与拐点对齐（凸起应同时在两个域出现，若凸起是真实的谱事件）。
+
+**H5（谱可测且可预测 run；决定性）。**
+- 精确预言：step-30 测得的 $\{\hat\lambda_i,\hat x_i^2\}$ 经 $d^{\mathrm{KL}}(t)=\frac12\sum_i\hat\lambda_i\hat x_i^2e^{-2\eta\hat\lambda_i(t-30)}$ 预测整条吸收曲线（KL 口径；L1 经 §2.8 换算）。
+- setting：M2（NNLS 反演）→ M5（Lanczos 验证 + 零训练预测）。
+- 判据：预测曲线在对数空间 ±误差带内跟踪实测 ≥1 个 decade，$v_{50}/v_{200}$ 命中；step {100, 200} 复测谱漂移量化"准静态假设"的失效速度（连 H3c）。
+
+**H6（指数是"优化器×架构"性质）。**
+- 精确预言：白化类优化器（Muon/SOAP）压缩 $\{\eta\lambda_i^{\mathrm{eff}}\}$ 动态范围 → $v_t$ 变平、$\alpha$ 变小；$\lambda_{\mathrm{crit}}$ 与信噪比底不动（"预条件子赢不了平坦方向"）。
+- setting：M6（AdamW / Muon / SOAP 三臂，其余全同基线）。
+- 判据：M1+M2 读数（$\alpha$、$v_{50}/v_{200}$、反演谱变形、尾底）跨优化器比较；若 $\alpha$ 不变 → 指数是损失几何性质，P3 的预期收益要下调。
+
+**H7（$\alpha(t)$ 上升 = 带边/对数正态谱）。**
+- 精确预言：NNLS 反演出的加权谱在 log-log 下呈有限带边或对数正态弯曲，而非直线幂律；带边位置 $\lambda_{\max}$ 与 $\alpha(t)$ 开始加速的 $t$ 满足 $\eta\lambda_{\max}t\sim1$。
+- setting：M2（反演）+ M5（独立验证）。
+- 判据：M2 谱形态 + 带边自洽性检验；M5 的前 10 个 Ritz 模式落在反演谱的高曲率端。
 
 ---
 
-## 6. 测量程序（理论优先的判别实验，按成本排序）
+## 6. 测量程序：可执行 setting
 
-> 原则：先钉死谱的形态与测度论口径，再谈干预。每一项都写明它判别哪个假设、预期读数是什么。
+> 原则：先钉死谱的形态与测度论口径，再谈干预。每个 M 项写明：目标假设、相对 §6.0 基线的 setting delta、日志与分析口径、判据、成本、坑。
 
-- **M1 尾部形态与 $\alpha(t)$ 诊断（零成本，已完成一半）**：对 $d(t)$（同时拟合 $d^2$/KL 两种口径）拟合 $t^{-\alpha}$、$e^{-(t/\tau)^\gamma}$、$d_\infty+Ae^{-t/\tau}$ 并画 $\alpha(t)=t\cdot v_t$；三种形态分别对应幂律谱+振幅衰减 / 宽谱带边（玻璃态）/ 单一主模式+底。已实现：`alignment/fit_tail.py`。**最便宜且被低估的一步：把论文 §5.3 的 off-policy run 与 C.2 的 lr 折叠 run 的 $v_t$ 按 §2.7 的判据复查**（凸起是否消失/移动）——只需要论文的曲线数据。
-- **M2 谱反演（零训练成本，新增）**：对现有 run 做 §2.9 的 NNLS 反演，多 seed 平均；判别 H7（带边/对数正态 vs 幂律）与 H5 前半。分辨率极限 $\sim1/(\eta T)$，279 步只够反演谱的上半段——要分辨尾部需 ≥10³ 步的 run 或加正则化。
-- **M3 逐 token 日志（一次 run 的边际成本）**：rollout 时存逐 token $|A_i|$ 与 token id（可仿照 `repetition/analyze_and_plot.py` 的离线分析模式）。一次解决：H4（残差按频率分层的质心轨迹）；§2.8 的 $R(t)=\mathbb{E}|A|/\ |\mathbb{E}A|$ 与 CE/熵分解（修代理）；L1 与 KL 双口径的 $\alpha$ 对比（拆解 §4.6 的差异）。
-- **M4 Adam 消融（单旋钮）**：$\beta_2\in\{0.95,0.999\}$、$\epsilon$ 扫描、末期切 SGD-with-decay；同时记 sharpness 估计（H3/H3'/M4 三合一）。lr 折叠复跑一次以读凸起位置按 $u=\eta t$ 的移动（H3a）。
-- **M5 谱普查 + 零训练预测（决定性）**：冻结 64 轨迹目标上（batch 小，Hessian-vector 便宜），step 30 处用随机 Lanczos / 幂迭代测 $\{\lambda_i\}$ 与 $\{c_i\}$，与 M2 的反演谱对照；训练前用 $d(t)=\sum_i c_i^2e^{-2\eta\lambda_i t}$（KL 口径，§2.8）预测整条吸收曲线。命中 = 现象被解释，run 长度在初始化时预报。
-- **M6 优化器消融**：AdamW vs Muon vs SOAP（§3.4 的机制预期：白化 → $v_t$ 变平、$\alpha$ 变小；$\lambda_{\mathrm{crit}}$ 不动 → 尾底不变），同样 300 步，读 $\alpha$、$v_{50}/v_{200}$ 与 M2 谱的变形。直接检验 H6/"节奏是 OPD 算法性质"里"算法"指哪一层。
+### 6.0 共享基线 setting（全部实测口径）
 
-### D2（保留，按 §2.5 的精确标度执行）
+来源：`be00rj9e`/`mdxt04lm` 的 config（`alignment/runs/*__meta.json`）与论文 §3.1/表 3。**除写明的 delta 外，所有 M 项沿用本表。**
 
-off-policy run 扫 $\eta\in\{\tfrac12,1,2\}\times10^{-6}$ 与 $B\in\{64,256\}$：KL 平台应 $\propto\eta/B$（§2.5 的精确形式），L1 平台 $\propto\sqrt{\eta/B}$ 且平坦模式主导；不随 $\eta$ 动的那部分是表示缺口（查温度、tokenizer、top-$k$ 截断）。
+| 项 | 值 |
+| --- | --- |
+| 实现 | 本仓库 veRL（`verl/`，OPDTrainerMixin；教师 worker `fsdp_teacher_worker.py`） |
+| 学生 | DeepSeek-R1-Distill-Qwen-1.5B |
+| 教师 | JustRL-DeepSeek-1.5B（bf16，FSDP，`param_offload=True`） |
+| 数据 | DAPO-Math-17k（`data/math/DAPO/train.parquet`），full-data；论文对照用 1/4/16-query 子集 |
+| rollout | vLLM，温度 1.0，每步 64 个序列（`train_batch_size=64`、`rollout.n=1`） |
+| on-policy 约束 | `ppo_epochs=1`、`ppo_mini_batch_size=64`（严格一步一更新） |
+| 优化器 | AdamW（torch），lr $=10^{-6}$，betas $(0.9,0.999)$，wd $=0.01$，grad-norm clip $=1.0$，constant、无 warmup |
+| 损失几何 | sampled-token（`log_prob_top_k=0`、`kl_estimator=k1`、`adv_estimator=token_reward_direct`）；top-16 臂（`log_prob_top_k=16`、`top_k_strategy=only_stu`、reward 模式） |
+| 步数 | 300 步（论文口径；我们的历史 run 为 279；`total_epochs=1`） |
+| 硬件/耗时参照 | 8×GPU 单机，实测 $\approx160$ s/step → $\approx13.5$ h/300 步；响应长度均值实测 $\approx5761$ token/序列（→ 每步 $\approx3.7\times10^5$ 响应 token） |
+| 度量口径 | $t\ge30$ 起；L1（论文 $d_t$）与 KL（日志代理 $-\texttt{opd/token\_reward\_mean}$）**双口径**；$v_t$ 几何窗口 $[t/1.4,1.4t]$（论文=端点 median，我们的实现=窗口 OLS，两者都报）；归一化 $d/d_{30}$；cumulant/α 读数按 §2.2/§2.3 |
+| seeds | 结论性数字 ≥3 seeds；探索性 1 seed；**只有同 config 才跨 seed 平均**（top16 与 sampled-token 分开处理） |
+| 日志基线 | `alignment/pull_wandb_metrics.py` 的 24 键（`DEFAULT_KEYS`），逐 run 存 CSV + 完整 config |
+
+### M1 尾部形态与 $\alpha(t)$ 诊断（零 GPU）
+
+- **目标假设**：H1、H3a/b（零成本部分）。
+- **setting**：纯日志，无新 run。输入 A：我们的两个 run（279 步，已拉取，`alignment/runs/`）。输入 B：**论文数据**——图 9 曲线数字化（WebPlotDigitizer）或作者代码/数据（[thunlp/OPD](https://github.com/thunlp/OPD)），需要 §5.3 off-policy run、C.2 三个 lr 的逐步 $d_t$（L1 口径）。
+- **分析口径**：$t\ge30$；三形态 log-space 拟合（`alignment/fit_tail.py`：幂律精确 OLS、拉伸指数 γ∈[0.2,2] 网格、floor+exp (τ,d∞) 双网格）；$\alpha(t)$ 滑窗 log-log 回归（±0.12 dex，≥8 点）；$t\cdot v_t$ 与 $\alpha(t)$ 叠画做恒等式自检；论文数据是 L1 口径，换算按 §2.8。
+- **判据**：见 H1/H3'。特别地：论文 off-policy run 的 $v_t$ 在 30–100 步**有无凸起**直接判 H3b；C.2 折叠 run 的凸起位置是否按 $u=\eta t$ 对齐直接判 H3a。
+- **成本**：0 GPU；论文曲线数字化约半天。
+- **坑**：数字化曲线只有 O(100) 个点，滑窗 $\alpha(t)$ 的自由度要相应放宽；论文 median-端点估计器与我们的 OLS 在小窗口有偏差，对比时统一成一种。
+
+### M2 谱反演（零 GPU）
+
+- **目标假设**：H7、H5 前半。
+- **setting**：输入 = 同 config 的 $d^{\mathrm{proxy}}(t)$（当前每 variant 各 1 个 run；多 seed 到位后升级为平均版）。速率网格 $r\equiv\eta\lambda$ 对数均匀 64 点，$r\in[1/T,\ r_{\max}]$：$T=279$ → $r_{\min}\approx3.6\times10^{-3}$/步；$r_{\max}$ 由数据首窗斜率定（$\sim0.03\text{–}0.05$/步）。KL 口径的模式速率是 $2r$、振幅带 $\lambda$ 权重（§2.8）——反演一律在"每步速率 × 振幅"参数化下做，报告时再换算。
+- **方法**：log-space NNLS（Lawson–Hanson）+ 对 $c_k$ 的 Tikhonov/平滑正则（L-curve 选强度）；报告 resolution kernel；hold-out 检验：用 $[30,200]$ 拟合、外推 $[200,279]$。
+- **判据**：反演谱在 log-log 下的形态（直线幂律 / 带边 / 对数正态弯曲）判 H7；hold-out 外推 rmse < 幂律全窗拟合的 rmse 判谱非平凡。
+- **坑**：$1/T$ 分辨率极限——279 步只够反演谱上半段，尾段读数仅作方向参考；单 seed 单步噪声会伪造谱细结构，正则化不可省。
+- **成本**：0 GPU，数小时 CPU。
+
+### M3 逐 token 日志（1 个 run）
+
+- **目标假设**：H4；§2.8 口径统一（$R(t)$、CE/熵分解）。
+- **setting**：下一次标准 full-data 300 步 run（基线原样；sampled-token 为主 arm，可选 top-16 臂复验几何无关）。trainer 在 rollout 后、advantage 计算处加一次 hook：每步存 $\{A_i$（带符号，fp16）$,\ \text{token id}$（int32）$,\ \text{rollout id},\ \text{响应内位置}\}$，按 step 分区存 parquet/zstd。
+- **存储估算（实测口径）**：64 序列 × 5761 token ≈ $3.7\times10^5$ token/步 × 300 步 ≈ $1.1\times10^8$ 条记录 × 8 B ≈ 0.9 GB 原始 / ~300 MB 压缩。降级方案：在线聚合十分位（KB/步），但会失去 $R(t)$ 与重分析能力，不推荐。
+- **频率轴**：token 频率用**教师侧** unigram 频率——固定 query 集上教师一次性离线生成解（~17k×1 采样）统计；备选：训练 rollout 池化频率（内源性，需标注偏差）。十分位分层。
+- **分析与判据**：(i) 十分位 × 步数的 $\mathbb{E}|A|$ 矩阵——H4 预言分层衰减率按频率有序、质心单调下移且拐点与 $\kappa_1(t)$ 对齐；(ii) $R(t)=\mathbb{E}|A|/|\mathbb{E}A|$；(iii) **同 run 内 L1 与 KL 双口径的 $\alpha$、$v_{50}/v_{200}$**——直接裁决 §4.6 与论文的方向差；(iv) CE/熵分解（CE $=-\texttt{opd/teacher\_logp\_mean}$，$H=$ `actor/entropy`，现有键即可）：**旧 run 上已经看到 CE 只降 28% 且尾部回升（0.896→0.646→0.735），KL 的 15× 衰减大部分是 CE−H 相减的产物**（§4 补记）——M3 用逐 token 数据把 $d^{L1}$、$d^{\mathrm{KL}}$、$d^{\mathrm{CE}}$ 三条曲线分开，确定"距离"到底该用哪个口径，然后回头修订 §4 的全部谱读数。
+- **成本**：1 run（~13.5 h @ 8 GPU）+ 日志开销 <5%；教师频率表离线一次。
+- **坑**：熵在尾部回升 → 任何以 $H$ 为隐含成分的口径（KL）在尾部都不可信；L1 对长尾 token 的重尾噪声敏感，分层统计要配 bootstrap 置信带。
+
+### M4 Adam 消融（4–6 个 run）
+
+- **目标假设**：H3、H3a/c。
+- **setting**（delta vs §6.0）：(a) $\beta_2=0.95$；(b) $\epsilon\in\{10^{-8}$(默认)$,\,10^{-6},\,10^{-4}\}$ 两臂；(c) lr 折叠 $\{0.5,1,2\}\times10^{-6}$（兼作 H1 的折叠复验）；(d) 可选：step-150 切 SGD-with-decay。**sharpness 探针**：每 10 步在当前 batch 上用幂迭代（20 次 HVP，对 OPD 损失双反向）估 $\lambda_{\max}(H)$，≈ +3–5% 步时；若实现允许同时记录 Adam 二阶矩 $\|\hat v\|$ 的分布统计。
+- **判据**：H3 = β₂ 两臂尾部形态差异（M1 口径）；H3a = 凸起位置 $t^\ast\propto1/\mathrm{lr}$；H3c = 凸起窗口内 $\lambda_{\max}(H)$ 上升且与 β₂ 无关。
+- **坑**：β₂ 改变等效 lr 的时间结构——β₂ 臂必须配 lr 折叠对照，否则"更慢的 warmup"会被误读成"更低的底"。
+- **成本**：4–6 × 13.5 h @ 8 GPU。
+
+### M5 谱普查 + 零训练预测（1 个 run + 探针；决定性）
+
+- **目标假设**：H5（+ 量化 H3c 的谱漂移）。
+- **setting**：off-policy 冻结状态 run（论文 §5.3 协议：初始学生采 64 条轨迹全程复用，300 步，其余基线不动——固定目标使 Hessian 良定义）。探针：在 step-{30, 100, 200} 检查点对固定目标 $J(\theta)=\frac{1}{64}\sum_{\text{traj}}\sum_i\mathrm{KL}(\pi_\theta\|\pi_T)$ 做 Fisher/GGN-vector 积（对该损失双反向；一次 HVP ≈ 64×5.7k token 的 1.5B 前向 + 两次反向，无 rollout）；随机 Lanczos m≈150 → 前 ~10 个 Ritz 对 $(\hat\lambda_i,\hat v_i)$ + 谱密度（Ghorbani et al. 2019 口径）。
+- **振幅**：$\hat x_i^2=(\hat v_i\cdot\delta\theta)^2$，$\delta\theta=\theta_{30}-\theta_{\mathrm{init}}$。
+- **预测协议**：$d^{\mathrm{KL}}(t)=\frac12\sum_i\hat\lambda_i\hat x_i^2\,e^{-2\eta\hat\lambda_i(t-30)}$ 预测 $[30,300]$ 全曲线（L1 口径按 §2.8 换算），与同 run 实测 $d/d_{30}$、$v_t$ 比；step-100/200 的复测谱给出 $\lambda_i(t)$ 漂移速率——准静态假设（§2.7）的直接定量。
+- **判据**：H5 命中 = 预测在对数空间 ±误差带内跟踪实测 ≥1 decade 且 $v_{50}/v_{200}$ 命中；前 10 模式命中而尾部系统性偏离 → 尾部由底/未分辨模式主导（连 D2/M4）；与 M2 反演谱对照（高曲率端应一致）。
+- **成本**：3 检查点 × 150 HVP ≈ 450 次 HVP ≈ 450 步的 actor 计算（无 rollout），约 1 天；训练 run 本身 1 个。
+- **坑**：on-policy 状态下 Hessian 随 batch 抖动——探针固定在冻结轨迹上正是为了消除它；HVP 的数值精度（bf16）要用 fp32 残差累积校验。
+
+### M6 优化器消融（2–4 个 run）
+
+- **目标假设**：H6。
+- **setting**（delta vs §6.0）：三臂 AdamW（=基线对照）/ Muon / SOAP。Muon：隐层矩阵正交化，embedding/head 留 AdamW（Muon 惯例），update-RMS 按 Liu et al. 2025 Eq. 4 匹配 AdamW 的 0.2–0.4，跑 2 个 lr 做折叠；SOAP：Vyas et al. 2024 默认超参，预条件频率 10。其余全同基线。
+- **读数与判据**：M1 口径的 $\alpha$、$v_{50}/v_{200}$、凸起；M2 口径的反演谱变形；尾底（D2 口径）。H6 命中 = Muon/SOAP 显著拉平 $v_t$/改变 $\alpha$ 而尾底不动（白化改"每方向速率"、不改信噪比底）；若 $\alpha$ 跨优化器不变 → 指数是损失几何性质，"节奏是 OPD 算法性质"里"算法"指损失几何而非优化器。
+- **成本**：2–4 × 13.5 h @ 8 GPU。
+
+### D2 底的标度（6 个 run；可复用 M4/M5 的 arms）
+
+- **目标假设**：H2（精确标度版）。
+- **setting**：off-policy 冻结状态 run（同 M5 vehicle）；$\eta\in\{0.5,1,2\}\times10^{-6}\times B\in\{64,256\}$。$B=256$ 每 step 的 rollout/教师成本 ×4——优先真 $B=256$；用"$B=64$ 跑 4 倍步数"替代只在折叠轴一阶等价，σ 与底都显式依赖 $B$，不推荐。平台判据：末 100 步斜率 < 初始斜率的 5%，$d_\infty$ = 末 50 步均值。
+- **判据**：KL 口径 $d_\infty\propto\eta/B$（§2.5 精确式；$\sum_i\sigma_i^2$ 用批内逐 token advantage 方差在线估计——M3 日志或 trainer 加 variance 键）；L1 口径 $\propto\sqrt{\eta/B}$ 且由平坦十分位主导（M3 分层）；不随 $(\eta,B)$ 动的残差 = 表示缺口（逐项查温度、tokenizer、top-$k$ 截断）。
+- **成本**：6 run（$B=256$ 两臂 ×4 时长）。
+
+### 建议执行顺序与预算汇总
+
+1. **现在就做（0 GPU）**：M1 的论文曲线数字化（判 H3a/b）+ M2 单 run 反演（判 H7 方向）。
+2. **下一个训练 run（1 run）**：M3 逐 token 日志 run——它是 H4 与全部口径问题的源头修复，边际成本最低、信息密度最高。
+3. **第二批（4–8 run）**：M4（β₂+折叠+sharpness）与 M5 的 off-policy vehicle（M5 探针搭 M4 的车）；D2 的 6 臂视前两批结果裁剪。
+4. **第三批（2–4 run）**：M6 优化器消融——在谱形态（M2/M5）和口径（M3）钉死之后做，否则读数没有共同语言。
 
 ---
 
