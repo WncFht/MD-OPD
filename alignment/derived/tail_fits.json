@@ -1,0 +1,74 @@
+[
+  {
+    "run_id": "be00rj9e",
+    "n_points": 250,
+    "fits": [
+      {
+        "model": "power_law",
+        "params": {
+          "C": 8.384133329627105,
+          "alpha": 1.356770834074679
+        },
+        "rmse_log": 0.08354012496042923
+      },
+      {
+        "model": "stretched_exp",
+        "params": {
+          "C": 12.741893336414744,
+          "tau": 0.007869605227362998,
+          "gamma": 0.2
+        },
+        "rmse_log": 0.10504511287170133,
+        "at_grid_boundary": true
+      },
+      {
+        "model": "floor_exp",
+        "params": {
+          "d_inf": 0.0008100622013858,
+          "A": 0.05552336301299123,
+          "tau": 5.0
+        },
+        "rmse_log": 0.22654052497444332
+      }
+    ],
+    "best_model": "power_law",
+    "local_alpha_at_50": 0.7188524410634018,
+    "local_alpha_at_200": 1.2098971520009874
+  },
+  {
+    "run_id": "mdxt04lm",
+    "n_points": 250,
+    "fits": [
+      {
+        "model": "power_law",
+        "params": {
+          "C": 8.46966776447032,
+          "alpha": 1.3131502985210786
+        },
+        "rmse_log": 0.07231991879836647
+      },
+      {
+        "model": "stretched_exp",
+        "params": {
+          "C": 12.883235680890884,
+          "tau": 0.009169896241016974,
+          "gamma": 0.2
+        },
+        "rmse_log": 0.08145369533068764,
+        "at_grid_boundary": true
+      },
+      {
+        "model": "floor_exp",
+        "params": {
+          "d_inf": 0.00099612822130922,
+          "A": 0.06704607895102727,
+          "tau": 5.0
+        },
+        "rmse_log": 0.19282207831876996
+      }
+    ],
+    "best_model": "power_law",
+    "local_alpha_at_50": 0.6647871959061901,
+    "local_alpha_at_200": 1.3217331844570848
+  }
+]
