@@ -65,6 +65,25 @@ def annotate_clipping(ax, styles: dict, style) -> None:
     )
 
 
+def plot_with_baseline(
+    ax,
+    frame: pd.DataFrame,
+    column: str,
+    color: str,
+    baseline_step: int = CLIPPING_STEP,
+    **kwargs,
+) -> None:
+    """Plot the full series, fading points before the analysis baseline."""
+    before = frame[frame["step"] < baseline_step]
+    after = frame[frame["step"] >= baseline_step]
+    if not before.empty:
+        before_kwargs = {**kwargs, "label": "_nolegend_"}
+        ax.plot(
+            before["step"], before[column], color=color, alpha=0.25, **before_kwargs
+        )
+    ax.plot(after["step"], after[column], color=color, **kwargs)
+
+
 def plot_fig9(
     frames: dict[str, pd.DataFrame], labels: dict[str, str], figures_dir: Path, style
 ) -> None:
@@ -74,19 +93,20 @@ def plot_fig9(
 
     fig, (ax_d, ax_v) = plt.subplots(1, 2, figsize=(9.6, 3.8))
     for idx, (run_id, df) in enumerate(frames.items()):
-        df = df[df["step"] >= CLIPPING_STEP]
-        ax_d.plot(
-            df["step"],
-            df["d_rel"],
-            color=colors[idx],
+        plot_with_baseline(
+            ax_d,
+            df,
+            "d_rel",
+            colors[idx],
             linewidth=1.8,
             linestyle=styles["primary"],
             label=labels[run_id],
         )
-        ax_v.plot(
-            df["step"],
-            df["v_geo"] * 100,
-            color=colors[idx],
+        plot_with_baseline(
+            ax_v,
+            df.assign(v_geo=df["v_geo"] * 100),
+            "v_geo",
+            colors[idx],
             linewidth=1.8,
             linestyle=styles["primary"],
             label=labels[run_id],
@@ -127,11 +147,11 @@ def plot_distance_raw(
 
     fig, ax = plt.subplots(figsize=(7.2, 4.4))
     for idx, (run_id, df) in enumerate(frames.items()):
-        df = df[df["step"] >= CLIPPING_STEP]
-        ax.plot(
-            df["step"],
-            df["d_nats"],
-            color=colors[idx],
+        plot_with_baseline(
+            ax,
+            df,
+            "d_nats",
+            colors[idx],
             linewidth=1.8,
             linestyle=styles["primary"],
             label=f"{labels[run_id]}  $-\\overline{{A}}_t$",
@@ -163,7 +183,7 @@ def plot_absorption_estimators(
     )
     for idx, (run_id, df_all) in enumerate(frames.items()):
         ax = axes[0][idx]
-        df = df_all[df_all["step"] >= CLIPPING_STEP]
+        df = df_all
         ax.plot(
             df["step"],
             df["v_direct"] * 100,
