@@ -198,6 +198,44 @@ class OPDTrainerMixin:
         batch.batch["teacher_log_probs"] = teacher_output.batch["teacher_log_probs"].to(response_mask.device)
 
         n_tokens = max(int(response_mask.sum().item()), 1)
+        # Keep the diagnostic statistics on the plain sampled-token advantage,
+        # even when top-K reward mode is enabled.  This makes the metrics
+        # comparable across metric-only and top-K training runs.
+        teacher_log_probs = batch.batch["teacher_log_probs"]
+        student_log_probs = batch.batch["old_log_probs"].to(teacher_log_probs.device)
+        token_mask = response_mask.to(teacher_log_probs.dtype)
+        advantage = teacher_log_probs - student_log_probs
+        denom = token_mask.sum().clamp_min(1.0)
+        adv_mean = (advantage * token_mask).sum() / denom
+        adv_second = (advantage.square() * token_mask).sum() / denom
+        adv_abs_mean = (advantage.abs() * token_mask).sum() / denom
+        adv_pos_mean = (advantage.clamp_min(0) * token_mask).sum() / denom
+        adv_neg_abs_mean = (advantage.clamp_max(0).abs() * token_mask).sum() / denom
+        metrics["opd/adv_mean"] = float(adv_mean.item())
+        metrics["opd/adv_abs_mean"] = float(adv_abs_mean.item())
+        metrics["opd/adv_rms"] = float(adv_second.clamp_min(0).sqrt().item())
+        metrics["opd/adv_std"] = float((adv_second - adv_mean.square()).clamp_min(0).sqrt().item())
+        metrics["opd/adv_pos_mean"] = float(adv_pos_mean.item())
+        metrics["opd/adv_neg_abs_mean"] = float(adv_neg_abs_mean.item())
+        metrics["opd/adv_pos_frac"] = float(
+            ((advantage > 0).to(token_mask.dtype) * token_mask).sum().item() / denom.item()
+        )
+
+        # These are strict same-batch sampled-token aggregates: all terms use
+        # the response mask from this exact teacher-scoring batch.  The CE term
+        # is the teacher NLL on sampled student tokens; it is deliberately
+        # named explicitly rather than presented as a full-vocabulary KL.
+        metrics["opd/teacher_nll_mean"] = float(((-teacher_log_probs) * token_mask).sum().item() / denom.item())
+        metrics["opd/student_nll_mean"] = float(((-student_log_probs) * token_mask).sum().item() / denom.item())
+        entropys = batch.batch.get("entropys")
+        if entropys is not None:
+            entropys = entropys.to(teacher_log_probs.device, dtype=teacher_log_probs.dtype)
+            student_entropy_mean = (entropys * token_mask).sum() / denom
+            metrics["opd/student_entropy_mean"] = float(student_entropy_mean.item())
+            metrics["opd/ce_minus_entropy_proxy"] = float(
+                metrics["opd/teacher_nll_mean"] - metrics["opd/student_entropy_mean"]
+            )
+
         # rm_scores may be (B, T) or (B, T, K) when top-K is on; broadcast the mask.
         mask = response_mask if rm_scores.dim() == 2 else response_mask.unsqueeze(-1)
         metrics["opd/token_reward_mean"] = float((rm_scores * mask).sum().item()) / n_tokens

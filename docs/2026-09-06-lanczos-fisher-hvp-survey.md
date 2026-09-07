@@ -1,5 +1,34 @@
 # OPD 中如何计算 Fisher/Hessian 谱：HVP、FVP 与 Lanczos
 
+> 更新：2026-09-07。本版只保留对 OPD 决策真正有用的论文、代码和资源预算；其余工作列为简短参考。
+
+## 0. 先给结论：现在不要把 HVP 接进训练
+
+HVP/Lanczos 是**定期冻结态探针**，不是每步训练指标。对当前 1--2B 级模型，推荐在 step 30/50 保存 checkpoint，用固定的 4--16 条 rollout、每条 128--512 个 response token 做 10--20 步 Lanczos。第一次探针的计算预算大致是 10--20 次二阶 matvec；在 activation checkpointing 和 microbatch 下，峰值显存通常约为同一 probe batch 一次训练 forward+backward 的 1.5--3 倍，而不是参数平方级增长。显式 Hessian 仍然不可行。
+
+### 对我们最重要的三个选择
+
+1. **第一版测 GGN/Fisher，不测 full reverse-KL Hessian。** GGN 是半正定，Lanczos 更稳定，且正好对应我们理论中的 (A=J_z^\top F_zJ_z)。
+2. **第一版只求 top-10 主方向。** 不要一开始做完整谱密度；我们当前问题是“EffOPD 更新方向是否落在 OPD 任务曲率主空间”，不是估计全模型 Hessian density。
+3. **必须保存任务投影。** 仅有 (lambda_i) 没有意义；同时保存梯度投影 (b_i)、更新投影 (u_i)、误差投影 (x_i) 和跨 microbatch 方差。
+
+## 0.1 显存预算（按我们当前 OPD 实现）
+
+当前 actor 的 `_compute_old_log_prob` 已经执行 `calculate_entropy=True`，并把逐 token entropy 存在 `batch.batch["entropys"]`；teacher worker 已经同时保存 `old_log_probs` 和 `teacher_log_probs`。因此新增的 OPD diagnostics 只做 `(B,T)` 张量上的减法、绝对值、平方和 mask-reduction：不会保存 logits，也不会建立词表矩阵。额外显存是少量 (B\times T) 临时 buffer，训练时间主要是几次轻量 reduction，预期远小于 1%。
+
+严格同批次的 `teacher_nll_mean`、`student_nll_mean` 和 `student_entropy_mean` 也复用已有张量，不触发 forward。只有 full-vocabulary KL、GGN-HVP 和 Hessian-HVP 会显著增加成本：前者需要保留或重算 vocab logits，后两者需要二阶 autograd 或有限差分的重复 forward/backward。
+
+对 1--2B 模型，保守地按一次训练 microbatch 的峰值显存记账：
+
+| 探针 | 额外显存（相对一次普通 forward+backward） | 计算代价 |
+|---|---:|---:|
+| 10 步 GGN/Fisher Lanczos | 约 0.5--2 倍，取决于 checkpoint 和 probe token 数 | 10 次 matvec |
+| 20 步 GGN/Fisher Lanczos | 约 0.5--2 倍 | 20 次 matvec |
+| full reverse-KL Hessian-HVP | 约 1.5--3 倍 | 每次需保留一阶反传图并再反传一次 |
+| 有限差分 HVP | 约 1 倍峰值显存 | 每次 matvec 两次梯度计算 |
+
+这些倍数取决于 FSDP shard、序列长度、microbatch 和是否保存 Ritz 向量；不是硬件保证。第一版应把 probe 限制为 4--16 条序列、每条 128--512 个 response token，并在独立 checkpoint 脚本中运行。
+
 本文回答一个具体问题：如果要验证 OPD 的谱吸收理论，怎样实际估计
 
 $$
@@ -433,7 +462,7 @@ HessFormer测的是经验 Hessian，而不是 OPD 理论中的任务加权谱。
 
 ### 11.2 Foundation-scale Hessian Spectral Analysis：FSDP 下的有限差分 HVP
 
-2026 年的 *Hessian Spectral Analysis at Foundation Model Scale*（arXiv:2602.00816）进一步把谱测量推进到最高约 100B 参数，并针对 FSDP 提出 shard-local central finite-difference HVP[^foundationhessian26]。它不依赖二阶 autograd，而是用
+2026 年的 _Hessian Spectral Analysis at Foundation Model Scale_（arXiv:2602.00816）进一步把谱测量推进到最高约 100B 参数，并针对 FSDP 提出 shard-local central finite-difference HVP[^foundationhessian26]。它不依赖二阶 autograd，而是用
 
 $$
 Hv\approx
@@ -451,7 +480,7 @@ $$
 
 ### 11.3 Full Gauss--Newton for LLMs：理想二阶上限
 
-*The Potential of Second-Order Optimization for LLMs: A Study with Full Gauss--Newton*（2025，arXiv:2510.09378）在最多约 150M 参数的 Transformer 上直接研究 full Gauss--Newton 预条件，并将其视为现有优化器的迭代复杂度上限探针[^fullgn25]。论文报告：相对于 SOAP 等强基线，full GN 在其设置下可达到约 5.4 倍的迭代减少；只忽略跨层信息的 layerwise GN 已接近 full GN。
+_The Potential of Second-Order Optimization for LLMs: A Study with Full Gauss--Newton_（2025，arXiv:2510.09378）在最多约 150M 参数的 Transformer 上直接研究 full Gauss--Newton 预条件，并将其视为现有优化器的迭代复杂度上限探针[^fullgn25]。论文报告：相对于 SOAP 等强基线，full GN 在其设置下可达到约 5.4 倍的迭代减少；只忽略跨层信息的 layerwise GN 已接近 full GN。
 
 这项工作的含义不是“应该立刻用 full GN 训练 1.5B OPD”，而是提供两个可检验假设：
 
@@ -462,7 +491,7 @@ $$
 
 ### 11.4 Why Transformers Need Adam：block heterogeneity
 
-*Why Transformers Need Adam: A Hessian Perspective*（arXiv:2402.16788，NeurIPS 2024）使用 SLQ 比较 Transformer 和 CNN 的 Hessian block 谱[^transformeradam24]。论文的核心概念是 **block heterogeneity**：不同参数块的 Hessian 谱差异很大。单一全局 learning rate 的 GD 在这种情况下受到最坏条件数限制，而 Adam 的坐标/块级尺度调整可以缓解这一问题。
+_Why Transformers Need Adam: A Hessian Perspective_（arXiv:2402.16788，NeurIPS 2024）使用 SLQ 比较 Transformer 和 CNN 的 Hessian block 谱[^transformeradam24]。论文的核心概念是 **block heterogeneity**：不同参数块的 Hessian 谱差异很大。单一全局 learning rate 的 GD 在这种情况下受到最坏条件数限制，而 Adam 的坐标/块级尺度调整可以缓解这一问题。
 
 这与我们的模型形成一个非常直接的对应：
 
@@ -476,7 +505,7 @@ $$
 
 ### 11.5 结构化 Fisher 优化器与低秩扩展
 
-ICLR 2026 的 *Towards Efficient Optimizer Design for LLM via Structured Fisher Approximation with a Low-Rank Extension* 直接从结构化 Fisher 近似出发设计 LLM 优化器[^structuredfisher26]。这条路线与我们提出的低秩谱更新非常接近，但目标不同：该工作重点是以可控内存和计算代价近似 Fisher 预条件器；我们的目标是用少量主方向解释 OPD 的吸收率和 checkpoint 外推。
+ICLR 2026 的 _Towards Efficient Optimizer Design for LLM via Structured Fisher Approximation with a Low-Rank Extension_ 直接从结构化 Fisher 近似出发设计 LLM 优化器[^structuredfisher26]。这条路线与我们提出的低秩谱更新非常接近，但目标不同：该工作重点是以可控内存和计算代价近似 Fisher 预条件器；我们的目标是用少量主方向解释 OPD 的吸收率和 checkpoint 外推。
 
 从方法上可以借鉴两点：
 
@@ -505,24 +534,24 @@ $$
 
 ### 参考文献
 
-[^pearlmutter94]: B. A. Pearlmutter. *Fast Exact Multiplication by the Hessian*. Neural Computation 6(1):147--160, 1994. [doi:10.1162/neco.1994.6.1.147](https://doi.org/10.1162/neco.1994.6.1.147)
+[^pearlmutter94]: B. A. Pearlmutter. _Fast Exact Multiplication by the Hessian_. Neural Computation 6(1):147--160, 1994. [doi:10.1162/neco.1994.6.1.147](https://doi.org/10.1162/neco.1994.6.1.147)
 
-[^martens14]: J. Martens. *New Insights and Perspectives on the Natural Gradient Method*. JMLR 21(232), 2020. [arXiv:1412.1193](https://arxiv.org/abs/1412.1193)
+[^martens14]: J. Martens. _New Insights and Perspectives on the Natural Gradient Method_. JMLR 21(232), 2020. [arXiv:1412.1193](https://arxiv.org/abs/1412.1193)
 
-[^ghorbani19]: B. Ghorbani, S. Krishnan, Y. Xiao. *An Investigation into Neural Net Optimization via Hessian Eigenvalue Density*. ICML 2019. [arXiv:1901.10159](https://arxiv.org/abs/1901.10159)
+[^ghorbani19]: B. Ghorbani, S. Krishnan, Y. Xiao. _An Investigation into Neural Net Optimization via Hessian Eigenvalue Density_. ICML 2019. [arXiv:1901.10159](https://arxiv.org/abs/1901.10159)
 
-[^papyan20]: V. Papyan. *The Full Spectrum of Deepnet Hessians at Scale: Dynamics with SGD Training*. IEEE Transactions on Information Theory, 2020.
+[^papyan20]: V. Papyan. _The Full Spectrum of Deepnet Hessians at Scale: Dynamics with SGD Training_. IEEE Transactions on Information Theory, 2020.
 
-[^martens-grosse-15]: J. Martens, R. Grosse. *Optimizing Neural Networks with Kronecker-factored Approximate Curvature*. ICML 2015. [arXiv:1503.05671](https://arxiv.org/abs/1503.05671)
+[^martens-grosse-15]: J. Martens, R. Grosse. _Optimizing Neural Networks with Kronecker-factored Approximate Curvature_. ICML 2015. [arXiv:1503.05671](https://arxiv.org/abs/1503.05671)
 
-[^kunstner19]: F. Kunstner, P. Hennig, L. Balles. *Limitations of the Empirical Fisher Approximation for Natural Gradient Descent*. NeurIPS 2019. [arXiv:1905.12558](https://arxiv.org/abs/1905.12558)
+[^kunstner19]: F. Kunstner, P. Hennig, L. Balles. _Limitations of the Empirical Fisher Approximation for Natural Gradient Descent_. NeurIPS 2019. [arXiv:1905.12558](https://arxiv.org/abs/1905.12558)
 
-[^hessformer25]: D. Granziol. *HessFormer: Hessians at Foundation Scale*. arXiv 2025. [arXiv:2505.11564](https://arxiv.org/abs/2505.11564)
+[^hessformer25]: D. Granziol. _HessFormer: Hessians at Foundation Scale_. arXiv 2025. [arXiv:2505.11564](https://arxiv.org/abs/2505.11564)
 
-[^foundationhessian26]: *Hessian Spectral Analysis at Foundation Model Scale*. arXiv 2026. [arXiv:2602.00816](https://arxiv.org/abs/2602.00816)
+[^foundationhessian26]: _Hessian Spectral Analysis at Foundation Model Scale_. arXiv 2026. [arXiv:2602.00816](https://arxiv.org/abs/2602.00816)
 
-[^fullgn25]: *The Potential of Second-Order Optimization for LLMs: A Study with Full Gauss--Newton*. arXiv 2025. [arXiv:2510.09378](https://arxiv.org/abs/2510.09378)
+[^fullgn25]: _The Potential of Second-Order Optimization for LLMs: A Study with Full Gauss--Newton_. arXiv 2025. [arXiv:2510.09378](https://arxiv.org/abs/2510.09378)
 
-[^transformeradam24]: *Why Transformers Need Adam: A Hessian Perspective*. arXiv 2024. [arXiv:2402.16788](https://arxiv.org/abs/2402.16788)
+[^transformeradam24]: _Why Transformers Need Adam: A Hessian Perspective_. arXiv 2024. [arXiv:2402.16788](https://arxiv.org/abs/2402.16788)
 
-[^structuredfisher26]: W. Gong, M. Scetbon, C. Ma. *Towards Efficient Optimizer Design for LLM via Structured Fisher Approximation with a Low-Rank Extension*. ICLR 2026. [OpenReview](https://openreview.net/forum?id=KUFZXdem5R)
+[^structuredfisher26]: W. Gong, M. Scetbon, C. Ma. _Towards Efficient Optimizer Design for LLM via Structured Fisher Approximation with a Low-Rank Extension_. ICLR 2026. [OpenReview](https://openreview.net/forum?id=KUFZXdem5R)

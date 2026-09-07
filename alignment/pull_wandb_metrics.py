@@ -26,7 +26,18 @@ from pathlib import Path
 DEFAULT_KEYS = [
     # OPD alignment signal (per-token teacher-student log-prob gap statistics)
     "opd/token_reward_mean",
+    "opd/adv_mean",
+    "opd/adv_abs_mean",
+    "opd/adv_rms",
+    "opd/adv_std",
+    "opd/adv_pos_mean",
+    "opd/adv_neg_abs_mean",
+    "opd/adv_pos_frac",
     "opd/teacher_logp_mean",
+    "opd/teacher_nll_mean",
+    "opd/student_nll_mean",
+    "opd/student_entropy_mean",
+    "opd/ce_minus_entropy_proxy",
     "opd/top_k_reward_mean",
     "opd/top_k_overlap_ratio",
     "opd/top_k_student_mass",
