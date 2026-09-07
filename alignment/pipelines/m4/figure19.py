@@ -4,6 +4,7 @@
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+
 from alignment.config.runs import M4_RUNS
 from alignment.core.data import load_run_history
 from alignment.core.metrics import compute_alignment_metrics, validation_mean
@@ -26,9 +27,7 @@ for rid, label, scale, color in spec:
     dist = metrics["d_nats"].to_numpy()
     ax[1].plot(t, dist, color=color, lw=1.7, label=label)
     ax[2].plot(scale * t, dist, color=color, lw=1.7, label=label)
-    valcols = [
-        c for c in d.columns if c.startswith("val-core/") and c.endswith("/acc/mean@16")
-    ]
+    valcols = [c for c in d.columns if c.startswith("val-core/") and c.endswith("/acc/mean@16")]
     if valcols:
         vv = validation_mean(d)
         m = vv.notna()
@@ -48,7 +47,7 @@ for a in ax:
     a.grid(True, axis="y", alpha=0.25)
     a.spines[["top", "right"]].set_visible(False)
 handles, labels = ax[1].get_legend_handles_labels()
-fig.legend(handles, labels, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.05))
+fig.legend(handles, labels, loc="upper center", ncol=5, bbox_to_anchor=(0.5, 1.05))
 fig.tight_layout()
 if __name__ == "__main__":
     fig.savefig(OUT, dpi=300, bbox_inches="tight")

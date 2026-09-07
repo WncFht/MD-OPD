@@ -70,7 +70,7 @@
         "lambda_kl_reading": 16270.778300022654
       }
     ],
-    "figure": "/Users/fanghaotian/Desktop/src/One-Shot-OPD/alignment/figures/spectrum__ours_top16_kl.png"
+    "figure": "/Users/fanghaotian/Desktop/src/One-Shot-OPD/alignment/figures/paper/spectrum-density_vs_rate__metric-ours_top16_kl.png"
   },
   {
     "name": "ours_sampled_token_kl",
@@ -143,7 +143,7 @@
         "lambda_kl_reading": 15461.315172644216
       }
     ],
-    "figure": "/Users/fanghaotian/Desktop/src/One-Shot-OPD/alignment/figures/spectrum__ours_sampled_token_kl.png"
+    "figure": "/Users/fanghaotian/Desktop/src/One-Shot-OPD/alignment/figures/paper/spectrum-density_vs_rate__metric-ours_sampled_token_kl.png"
   },
   {
     "name": "paper_fulldata_l1",
@@ -216,6 +216,6 @@
         "lambda_kl_reading": 3902.6202670113694
       }
     ],
-    "figure": "/Users/fanghaotian/Desktop/src/One-Shot-OPD/alignment/figures/spectrum__paper_fulldata_l1.png"
+    "figure": "/Users/fanghaotian/Desktop/src/One-Shot-OPD/alignment/figures/paper/spectrum-density_vs_rate__metric-paper_fulldata_l1.png"
   }
 ]
