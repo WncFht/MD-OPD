@@ -2062,9 +2062,17 @@ class RayPPOTrainer(OPDTrainerMixin):
                     and (is_last_step or self.global_steps % self.config.trainer.test_freq == 0)
                 ):
                     with marked_timer("testing", timing_raw, color="green"):
-                        val_metrics: dict = self._validate()
-                        if is_last_step:
-                            last_val_metrics = val_metrics
+                        try:
+                            val_metrics: dict = self._validate()
+                            if is_last_step:
+                                last_val_metrics = val_metrics
+                        finally:
+                            # Frozen training does not generate another rollout after
+                            # validation.  The sync immediately before validation wakes
+                            # vLLM to use the latest actor weights, so release its weights
+                            # and KV cache before the next actor forward pass.
+                            if self.frozen_rollout:
+                                self.checkpoint_manager.sleep_replicas()
                     metrics.update(val_metrics)
 
                 with marked_timer("stop_profile", timing_raw):
