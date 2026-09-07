@@ -4,11 +4,11 @@
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from config.runs import M4_RUNS
-from core.data import load_run_history
-from core.metrics import compute_alignment_metrics, validation_mean
+from alignment.config.runs import M4_RUNS
+from alignment.core.data import load_run_history
+from alignment.core.metrics import compute_alignment_metrics, validation_mean
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 RUNS = ROOT / "alignment/runs"
 OUT = ROOT / "alignment/figures/figure19_m4.png"
 spec = [
@@ -25,7 +25,9 @@ for rid, label, scale, color in spec:
     dist = metrics["d_nats"].to_numpy()
     ax[1].plot(t, dist, color=color, lw=1.7, label=label)
     ax[2].plot(scale * t, dist, color=color, lw=1.7, label=label)
-    valcols = [c for c in d.columns if c.startswith("val-core/") and c.endswith("/acc/mean@16")]
+    valcols = [
+        c for c in d.columns if c.startswith("val-core/") and c.endswith("/acc/mean@16")
+    ]
     if valcols:
         vv = validation_mean(d)
         m = vv.notna()

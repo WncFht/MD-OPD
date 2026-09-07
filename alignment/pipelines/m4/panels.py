@@ -2,14 +2,20 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from config.runs import M4_RUNS
-from core.data import load_run_history
-from core.metrics import compute_alignment_metrics, effective_step, validation_mean
+from alignment.config.runs import M4_RUNS
+from alignment.core.data import load_run_history
+from alignment.core.metrics import (
+    compute_alignment_metrics,
+    effective_step,
+    validation_mean,
+)
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 RUNS = ROOT / "alignment/runs"
 OUT = ROOT / "alignment/figures"
-RUNSPEC = [(rid, spec["label"], spec["scale"], spec["color"]) for rid, spec in M4_RUNS.items()]
+RUNSPEC = [
+    (rid, spec["label"], spec["scale"], spec["color"]) for rid, spec in M4_RUNS.items()
+]
 
 
 def load(rid):
@@ -65,11 +71,17 @@ def main():
         )
     axs[2, 0].set_xlabel("training step $t$ (dimensionless)")
     axs[2, 1].set_xlabel(r"effective time $u=(lr/10^{-6})t$ (dimensionless)")
-    axs[0, 0].text(30, axs[0, 0].get_ylim()[1] * 0.7, "30", rotation=90, fontsize=8, color="grey")
-    axs[0, 0].text(60, axs[0, 0].get_ylim()[1] * 0.7, "60", rotation=90, fontsize=8, color="grey")
+    axs[0, 0].text(
+        30, axs[0, 0].get_ylim()[1] * 0.7, "30", rotation=90, fontsize=8, color="grey"
+    )
+    axs[0, 0].text(
+        60, axs[0, 0].get_ylim()[1] * 0.7, "60", rotation=90, fontsize=8, color="grey"
+    )
     handles, labels = axs[0, 0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=4, bbox_to_anchor=(0.5, 1.01))
-    fig.suptitle("M4 distance diagnostics: absolute and two normalisation baselines", y=1.03)
+    fig.suptitle(
+        "M4 distance diagnostics: absolute and two normalisation baselines", y=1.03
+    )
     fig.tight_layout()
     fig.savefig(OUT / "metric/m4_distance_six_panel.png", dpi=250, bbox_inches="tight")
     plt.close(fig)
@@ -79,12 +91,16 @@ def accuracy():
     fig, ax = plt.subplots(figsize=(9, 4.8))
     for rid, label, scale, color in RUNSPEC:
         d, _ = load(rid)
-        cols = [c for c in d if c.startswith("val-core/") and c.endswith("/acc/mean@16")]
+        cols = [
+            c for c in d if c.startswith("val-core/") and c.endswith("/acc/mean@16")
+        ]
         if not cols:
             continue
         v = validation_mean(d)
         m = v.notna()
-        ax.plot(d.loc[m, "_step"], v[m] * 100, "-s", ms=3, lw=1.4, color=color, label=label)
+        ax.plot(
+            d.loc[m, "_step"], v[m] * 100, "-s", ms=3, lw=1.4, color=color, label=label
+        )
     ax.set_xlabel("training step $t$ (dimensionless)")
     ax.set_ylabel("validation accuracy (%, 3-task mean@16)")
     ax.set_title("M4 validation accuracy")

@@ -15,7 +15,11 @@ GEO_FACTOR = 1.4
 
 def validation_mean(frame: pd.DataFrame) -> pd.Series:
     """Return the mean available validation accuracy across val-core tasks."""
-    columns = [column for column in frame if column.startswith("val-core/") and column.endswith("/acc/mean@16")]
+    columns = [
+        column
+        for column in frame
+        if column.startswith("val-core/") and column.endswith("/acc/mean@16")
+    ]
     if not columns:
         return pd.Series(index=frame.index, dtype=float)
     return frame[columns].mean(axis=1)
@@ -50,7 +54,9 @@ def distance_proxy(history: RunHistory) -> np.ndarray:
     return -history.frame[DISTANCE_COLUMN].to_numpy(dtype=float)
 
 
-def geometric_absorption(steps: np.ndarray, distance: np.ndarray, factor: float = GEO_FACTOR) -> np.ndarray:
+def geometric_absorption(
+    steps: np.ndarray, distance: np.ndarray, factor: float = GEO_FACTOR
+) -> np.ndarray:
     """Estimate absorption from the log-distance slope in a geometric window."""
     values = np.full(steps.shape, np.nan)
     log_distance = np.log(distance)
@@ -114,5 +120,7 @@ def alignment_summary(metrics: pd.DataFrame, run_id: str, t_start: int = 30) -> 
         "v_geo_at_50": v50,
         "v_geo_at_200": v200,
         "v50_over_v200": v50 / v200,
-        "power_law_alpha": power_law_exponent(metrics["step"].to_numpy(float), metrics["d_nats"].to_numpy(float)),
+        "power_law_alpha": power_law_exponent(
+            metrics["step"].to_numpy(float), metrics["d_nats"].to_numpy(float)
+        ),
     }

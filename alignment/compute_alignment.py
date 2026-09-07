@@ -33,8 +33,8 @@ import json
 import sys
 from pathlib import Path
 
-from core.data import load_run_history
-from core.metrics import alignment_summary, compute_alignment_metrics
+from alignment.core.data import load_run_history
+from alignment.core.metrics import alignment_summary, compute_alignment_metrics
 
 
 def run_label(meta: dict) -> str:
@@ -52,7 +52,9 @@ def run_label(meta: dict) -> str:
         return "sampled-token (discounted, seed 2)"
     if "discounted" in name:
         return "sampled-token (discounted)"
-    top_k = meta.get("config_flat", {}).get("distillation.fsdp_teacher.log_prob_top_k", 0)
+    top_k = meta.get("config_flat", {}).get(
+        "distillation.fsdp_teacher.log_prob_top_k", 0
+    )
     return f"top{int(top_k)}" if top_k else "sampled-token"
 
 
@@ -68,22 +70,34 @@ def analyze_run(history_csv: Path, t_start: int, v_target_step: int) -> dict | N
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--runs-dir", type=Path, default=Path(__file__).resolve().parent / "runs")
-    parser.add_argument("--out-dir", type=Path, default=Path(__file__).resolve().parent / "derived")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--runs-dir", type=Path, default=Path(__file__).resolve().parent / "runs"
+    )
+    parser.add_argument(
+        "--out-dir", type=Path, default=Path(__file__).resolve().parent / "derived"
+    )
     parser.add_argument(
         "--t-start",
         type=int,
         default=30,
         help="First step counted (clip active before this)",
     )
-    parser.add_argument("--v-target-step", type=int, default=50, help="Step for the headline v readout")
+    parser.add_argument(
+        "--v-target-step", type=int, default=50, help="Step for the headline v readout"
+    )
     args = parser.parse_args()
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     # Main comparison excludes Qwen3 and discounted-reward diagnostics.
     include_ids = {"mdxt04lm", "tjjxnvw9", "yj2w13fq", "ybi7q89v"}
-    histories = [p for p in sorted(args.runs_dir.glob("*__history.csv")) if p.name.split("__")[0] in include_ids]
+    histories = [
+        p
+        for p in sorted(args.runs_dir.glob("*__history.csv"))
+        if p.name.split("__")[0] in include_ids
+    ]
     if not histories:
         print(
             f"error: no *__history.csv under {args.runs_dir} (run pull_wandb_metrics.py first)",
@@ -107,7 +121,9 @@ def main() -> int:
         print(f"[compute] {run_id} -> {out_csv}")
 
     summary_path = args.out_dir / "summary.json"
-    summary_path.write_text(json.dumps({"labels": labels, "runs": all_summaries}, indent=2))
+    summary_path.write_text(
+        json.dumps({"labels": labels, "runs": all_summaries}, indent=2)
+    )
     print(f"[compute] summary -> {summary_path}")
 
     header = f"{'run':<14} {'label':<14} {'d_end/d30':>10} {'v50':>8} {'v200':>8} {'v50/v200':>9} {'alpha':>7}"

@@ -18,13 +18,13 @@
 
 指标层输出表格或 JSON，而不是直接输出图片。当前 alignment 的标准逐步表为：
 
-| 列 | 含义 |
-| --- | --- |
-| `step` | 训练步 |
-| `d_nats` | 正的 reverse-KL distance proxy，即 `-opd/token_reward_mean` |
-| `d_rel` | 相对于分析 baseline（默认 step 30）的距离 |
-| `v_direct` | 原始单步吸收率 |
-| `v_geo` | 几何窗口平滑吸收率 |
+| 列         | 含义                                                        |
+| ---------- | ----------------------------------------------------------- |
+| `step`     | 训练步                                                      |
+| `d_nats`   | 正的 reverse-KL distance proxy，即 `-opd/token_reward_mean` |
+| `d_rel`    | 相对于分析 baseline（默认 step 30）的距离                   |
+| `v_direct` | 原始单步吸收率                                              |
+| `v_geo`    | 几何窗口平滑吸收率                                          |
 
 指标计算保留完整 step 范围。是否从 step 0 展示、哪个 baseline 用于归一化、baseline 前如何淡化，属于绘图层的决定。
 

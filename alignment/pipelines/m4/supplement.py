@@ -1,14 +1,20 @@
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from config.runs import M4_RUNS
-from core.data import load_run_history
-from core.metrics import ce_entropy_kl, compute_alignment_metrics, effective_step
+from alignment.config.runs import M4_RUNS
+from alignment.core.data import load_run_history
+from alignment.core.metrics import (
+    ce_entropy_kl,
+    compute_alignment_metrics,
+    effective_step,
+)
 
-R = Path(__file__).resolve().parent / "runs"
+R = Path(__file__).resolve().parents[3] / "alignment" / "runs"
 OUTPUT_DIR = Path(__file__).resolve().parent / "figures" / "metric"
 OUTPUT_DIR.mkdir(exist_ok=True)
-RUNS = [(rid, spec["label"], spec["color"], spec["scale"]) for rid, spec in M4_RUNS.items()]
+RUNS = [
+    (rid, spec["label"], spec["color"], spec["scale"]) for rid, spec in M4_RUNS.items()
+]
 
 
 def load(r):

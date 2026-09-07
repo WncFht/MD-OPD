@@ -11,7 +11,12 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from core.tail import fit_floor_exp, fit_power_law, fit_stretched_exp, local_alpha
+from alignment.core.tail import (
+    fit_floor_exp,
+    fit_power_law,
+    fit_stretched_exp,
+    local_alpha,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 STYLE_PATH = ROOT / ".agents/skills/plot-skill/scripts/style_presets.py"
@@ -52,7 +57,11 @@ def analyze_run(csv_path: Path, t_start: int, plot: bool) -> dict:
         "n_points": int(steps.size),
         "fits": [
             {k: fit[k] for k in ("model", "params", "rmse_log") if k in fit}
-            | ({"at_grid_boundary": fit["at_grid_boundary"]} if fit.get("at_grid_boundary") else {})
+            | (
+                {"at_grid_boundary": fit["at_grid_boundary"]}
+                if fit.get("at_grid_boundary")
+                else {}
+            )
             for fit in fits
         ],
         "best_model": fits[0]["model"],

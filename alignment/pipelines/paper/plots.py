@@ -10,12 +10,14 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-HERE = Path(__file__).resolve().parent
+from alignment.core.plotting import figure_path
+
+HERE = Path(__file__).resolve().parents[2]
 ROOT = HERE.parent
 sys.path.insert(0, HERE)
 
-from core.metrics import geometric_absorption  # noqa: E402
-from core.tail import (  # noqa: E402
+from alignment.core.metrics import geometric_absorption  # noqa: E402
+from alignment.core.tail import (  # noqa: E402
     fit_floor_exp,
     fit_power_law,
     fit_stretched_exp,
@@ -120,7 +122,7 @@ def paper_tail_fits(style) -> None:
         y=0.995,
     )
     fig.tight_layout()
-    out = HERE / "figures" / "paper_tail_fits.png"
+    out = figure_path("paper", "tail-distance", "step", "source-paper", "fits")
     fig.savefig(out, dpi=300, bbox_inches="tight")
     plt.close(fig)
     print(f"[plot] {out}")
@@ -162,7 +164,7 @@ def alpha_comparison(style) -> None:
     style.apply_grid(ax, theme.grid, axis="y")
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=3, fontsize=7.5)
     fig.tight_layout()
-    out = HERE / "figures" / "alpha_comparison.png"
+    out = figure_path("paper", "local-alpha", "step", "source-paper-vs-ours")
     fig.savefig(out, dpi=300, bbox_inches="tight")
     plt.close(fig)
     print(f"[plot] {out}")
@@ -183,7 +185,9 @@ def hump_check(style) -> None:
     ):
         d = load_main_branch(f"5A_lr_collapse_v2__panel1__{hexc}*.csv")
         rc = rate_curve(d)
-        ax1.plot(rc["step"], rc["v"] * 100, color=colors[k], linewidth=1.6, label=f"lr={lr}")
+        ax1.plot(
+            rc["step"], rc["v"] * 100, color=colors[k], linewidth=1.6, label=f"lr={lr}"
+        )
     ax1.set_yscale("log")
     ax1.set_xlabel("Training Step")
     ax1.set_ylabel(r"$v_t$ (%)")
@@ -194,7 +198,9 @@ def hump_check(style) -> None:
 
     # (b) online vs off-policy (H3b)
     colors = style.series_colors("tableau-paper", 4)
-    for k, (hexc, label) in enumerate((("00-3e-75", "On-Policy"), ("a6-18-2d", "Off-Policy"))):
+    for k, (hexc, label) in enumerate(
+        (("00-3e-75", "On-Policy"), ("a6-18-2d", "Off-Policy"))
+    ):
         a = load_main_branch(f"5_online_offline__panel2__{hexc}*.csv")
         a["value"] = -a["value"]
         rc = rate_curve(a)
@@ -228,7 +234,7 @@ def hump_check(style) -> None:
     style.apply_grid(ax2, theme.grid, axis="y")
 
     fig.tight_layout()
-    out = HERE / "figures" / "hump_check.png"
+    out = figure_path("paper", "absorption", "step", "source-paper", "hump-check")
     fig.savefig(out, dpi=300, bbox_inches="tight")
     plt.close(fig)
     print(f"[plot] {out}")

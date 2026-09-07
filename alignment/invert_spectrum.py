@@ -26,10 +26,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from alignment.core.plotting import figure_path
+
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, HERE)
 
-from core.tail import fit_power_law  # noqa: E402
+from alignment.core.tail import fit_power_law  # noqa: E402
 
 T0 = 30
 ETA = 1e-6
@@ -39,7 +41,9 @@ N_GRID = 64
 N_ITER = 4000
 
 
-def nnls_weighted(A: np.ndarray, y: np.ndarray, w: np.ndarray, ridge: float, iters: int = N_ITER) -> np.ndarray:
+def nnls_weighted(
+    A: np.ndarray, y: np.ndarray, w: np.ndarray, ridge: float, iters: int = N_ITER
+) -> np.ndarray:
     """min_c || sqrt(w) (A c - y) ||^2 + ridge*||c||^2, c >= 0 (multiplicative updates)."""
     Aw = A * w[:, None]
     AtA = Aw.T @ A + ridge * np.eye(A.shape[1])
@@ -65,8 +69,12 @@ def invert(name: str, df: pd.DataFrame, rate_factor: float, t_split: float) -> d
     lcurve = []
     for ridge in (0.0, 1e-6, 1e-4, 1e-3, 1e-2, 1e-1):
         c = nnls_weighted(A, y, w, ridge * w.mean())
-        res = float(np.sqrt(np.mean((np.log(np.maximum(A @ c, 1e-300)) - np.log(y)) ** 2)))
-        lcurve.append({"ridge": ridge, "residual_log_rmse": res, "c_l2": float(np.linalg.norm(c))})
+        res = float(
+            np.sqrt(np.mean((np.log(np.maximum(A @ c, 1e-300)) - np.log(y)) ** 2))
+        )
+        lcurve.append(
+            {"ridge": ridge, "residual_log_rmse": res, "c_l2": float(np.linalg.norm(c))}
+        )
     # pick the smallest ridge whose residual is within 10% of the unregularized one
     res0 = lcurve[0]["residual_log_rmse"]
     chosen = next(
@@ -81,7 +89,9 @@ def invert(name: str, df: pd.DataFrame, rate_factor: float, t_split: float) -> d
     c_tr = nnls_weighted(A_tr, y_tr, w_tr, chosen["ridge"] * w_tr.mean())
     tail = ~train
     pred_tail = A[tail] @ c_tr
-    rmse_tail = float(np.sqrt(np.mean((np.log(np.maximum(pred_tail, 1e-300)) - np.log(y[tail])) ** 2)))
+    rmse_tail = float(
+        np.sqrt(np.mean((np.log(np.maximum(pred_tail, 1e-300)) - np.log(y[tail])) ** 2))
+    )
     pl = fit_power_law(t[train], y[train])
     pred_pl = pl["params"]["C"] * t[tail] ** (-pl["params"]["alpha"])
     rmse_tail_pl = float(np.sqrt(np.mean((np.log(pred_pl) - np.log(y[tail])) ** 2)))
@@ -203,7 +213,7 @@ def plot(name, t, y, recon, t_split, rho, c, density, support):
     ax2.legend(fontsize=8)
 
     fig.tight_layout()
-    out = HERE / "figures" / f"spectrum__{name}.png"
+    out = figure_path("paper", "spectrum-density", "rate", f"metric-{name}")
     fig.savefig(out, dpi=300, bbox_inches="tight")
     plt.close(fig)
     return out
@@ -217,7 +227,9 @@ def main() -> int:
         ("mdxt04lm", "ours_sampled_token_kl"),
     ):
         df = pd.read_csv(HERE / "derived" / f"{run_id}__alignment.csv")
-        targets.append((label, df[["step", "d_nats"]].rename(columns={"d_nats": "value"}), 2.0))
+        targets.append(
+            (label, df[["step", "d_nats"]].rename(columns={"d_nats": "value"}), 2.0)
+        )
     # the paper's Full-Data L1 curve (digitized): rate = eta*lambda
     paper = load_paper_full_data()
     if paper is not None:
@@ -240,7 +252,9 @@ def main() -> int:
 
 
 def load_paper_full_data() -> pd.DataFrame | None:
-    dfs = list((HERE / "paper_curves").glob("5_digestion_rate_v2__panel0__00-3e-75*.csv"))
+    dfs = list(
+        (HERE / "paper_curves").glob("5_digestion_rate_v2__panel0__00-3e-75*.csv")
+    )
     if not dfs:
         return None
     df = pd.concat([pd.read_csv(p) for p in dfs]).sort_values("step")

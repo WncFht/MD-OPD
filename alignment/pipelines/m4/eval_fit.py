@@ -4,11 +4,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from config.runs import M4_RUNS
-from core.data import load_run_history
-from core.metrics import cumulative_absorption, distance_proxy
+from alignment.config.runs import M4_RUNS
+from alignment.core.data import load_run_history
+from alignment.core.metrics import cumulative_absorption, distance_proxy
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 RUNS = ROOT / "alignment/runs"
 OUT = ROOT / "alignment/figures/multirun_eval_vs_logd.png"
 runs = [(rid, spec["label"], spec["color"]) for rid, spec in M4_RUNS.items()]

@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_RUNS_DIR = REPO_ROOT / "alignment" / "runs"
 DEFAULT_FIG_DIR = REPO_ROOT / "alignment" / "figures" / "qwen3"
 
@@ -61,7 +61,9 @@ MODEL_LABELS = {
 }
 
 
-def per_problem_pass(model: str, task: str, eval_dir: Path, opd_eval_dir: Path) -> dict[str, int]:
+def per_problem_pass(
+    model: str, task: str, eval_dir: Path, opd_eval_dir: Path
+) -> dict[str, int]:
     """逐题 pass@16（example_id 与 prompt 已验证一一对应）。"""
     sys.path.insert(0, str(opd_eval_dir))
     from utils import grade_answer_verl
@@ -79,7 +81,9 @@ def per_problem_pass(model: str, task: str, eval_dir: Path, opd_eval_dir: Path) 
 
 # ---------------------------------------------------------------- fig1: eval 成绩
 def fig1(passes: dict[str, dict[str, dict[str, int]]]) -> None:
-    means = {m: [np.mean(list(passes[m][t].values())) / 16 for t in TASKS] for m in MODELS}
+    means = {
+        m: [np.mean(list(passes[m][t].values())) / 16 for t in TASKS] for m in MODELS
+    }
     apply_rc(THEME)
     colors = series_colors(THEME, len(MODELS))
     fig, ax = plt.subplots(figsize=(7.2, 4.4))
@@ -108,7 +112,9 @@ def fig1(passes: dict[str, dict[str, dict[str, int]]]) -> None:
     ax.set_xticks(x, [TASK_LABELS[t] for t in TASKS])
     ax.set_ylabel("mean@16 准确率")
     ax.set_ylim(0, 1.0)
-    ax.set_title("Qwen3 三档模型解题成绩（justrl eval：T=0.7, top_p=0.95, n=16, thinking）")
+    ax.set_title(
+        "Qwen3 三档模型解题成绩（justrl eval：T=0.7, top_p=0.95, n=16, thinking）"
+    )
     apply_frame(ax, "closed")
     apply_grid(ax, "y-only")
     ax.legend(loc="upper left", fontsize=9)
@@ -330,7 +336,9 @@ def fig4() -> None:
     ):
         for i, task in enumerate(["MATH-500", "AMC23", "AIME25"]):
             steps, vals = VAL[rid][task]
-            ax.plot(steps, vals, color=colors[i], marker=marks[i], ms=4, lw=1.6, label=task)
+            ax.plot(
+                steps, vals, color=colors[i], marker=marks[i], ms=4, lw=1.6, label=task
+            )
         ax.set_xlabel("训练步")
         ax.set_title(title, fontsize=10.5)
         apply_frame(ax, "closed")
@@ -365,7 +373,10 @@ def main() -> None:
     else:
         raw = {}
         for m in MODELS:
-            raw[m] = {t: per_problem_pass(m, t, args.eval_dir, args.opd_eval_dir) for t in TASKS}
+            raw[m] = {
+                t: per_problem_pass(m, t, args.eval_dir, args.opd_eval_dir)
+                for t in TASKS
+            }
         cache.write_text(json.dumps(raw, indent=1))
         print(f"[cache] per-problem pass -> {cache}")
     passes = raw

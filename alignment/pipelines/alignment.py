@@ -18,6 +18,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from alignment.core.plotting import figure_path
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STYLE_PATH = REPO_ROOT / ".agents/skills/plot-skill/scripts/style_presets.py"
 
@@ -132,7 +134,9 @@ def plot_fig9(
         handles, names, loc="upper center", ncol=len(frames), bbox_to_anchor=(0.5, 1.06)
     )
     fig.tight_layout()
-    out = figures_dir / "fig9_style.png"
+    out = figure_path(
+        "alignment", "distance", "step", "runs-alignment", "norm-d30", figures_dir
+    )
     fig.savefig(out, dpi=300, bbox_inches="tight")
     plt.close(fig)
     print(f"[plot] {out}")
@@ -165,7 +169,9 @@ def plot_distance_raw(
     style.apply_grid(ax, theme.grid, axis="y")
     ax.legend(loc="upper right")
     fig.tight_layout()
-    out = figures_dir / "distance_raw.png"
+    out = figure_path(
+        "alignment", "distance", "step", "runs-alignment", "absolute", figures_dir
+    )
     fig.savefig(out, dpi=300, bbox_inches="tight")
     plt.close(fig)
     print(f"[plot] {out}")
@@ -214,7 +220,14 @@ def plot_absorption_estimators(
         r"Absorption Rate $v_t$: one-step ratio vs geometric-window estimate", y=1.0
     )
     fig.tight_layout()
-    out = figures_dir / "absorption_estimators.png"
+    out = figure_path(
+        "alignment",
+        "absorption",
+        "step",
+        "runs-alignment",
+        "estimators-direct-geo",
+        figures_dir,
+    )
     fig.savefig(out, dpi=300, bbox_inches="tight")
     plt.close(fig)
     print(f"[plot] {out}")
