@@ -3,7 +3,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from config.runs import M4_RUNS
 from core.data import load_run_history
-from core.metrics import compute_alignment_metrics
+from core.metrics import ce_entropy_kl, compute_alignment_metrics, effective_step
 
 R = Path(__file__).resolve().parent / "runs"
 OUTPUT_DIR = Path(__file__).resolve().parent / "figures" / "metric"
@@ -21,9 +21,11 @@ def d1():
     for rid, label, color, scale in RUNS:
         x, metrics = load(rid)
         t = metrics["step"]
-        ce = -x["opd/teacher_logp_mean"]
-        h = x["actor/entropy"]
-        k = metrics["d_nats"]
+        decomposition = ce_entropy_kl(x)
+        t = metrics["step"]
+        ce = decomposition["ce"]
+        h = decomposition["entropy"]
+        k = decomposition["kl_proxy"]
         for y, ls, lw in [(ce, "-", 1.5), (h, ":", 1.0), (k, "--", 1.7)]:
             axs[0].plot(t[t < 60], y[t < 60], color=color, lw=lw, ls=ls, alpha=0.25)
             axs[0].plot(t[t >= 60], y[t >= 60], color=color, lw=lw, ls=ls)
@@ -93,7 +95,13 @@ def d5():
         t = metrics["step"].to_numpy()
         k = metrics["d_nats"].to_numpy()
         axs[0].plot(t, k / k[0], color=color, lw=1.7, label=label)
-        axs[1].plot(scale * t, k / k[0], color=color, lw=1.7, label=label)
+        axs[1].plot(
+            effective_step(t.to_numpy(), scale),
+            k / k[0],
+            color=color,
+            lw=1.7,
+            label=label,
+        )
         axs[0].axvline(t[-1], color=color, ls="--", lw=0.8, alpha=0.6)
         axs[1].axvline(scale * t[-1], color=color, ls="--", lw=0.8, alpha=0.6)
     axs[0].set_yscale("log")
@@ -112,6 +120,7 @@ def d5():
     plt.close(fig)
 
 
-d1()
-d2()
-d5()
+if __name__ == "__main__":
+    d1()
+    d2()
+    d5()

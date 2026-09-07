@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from config.runs import M4_RUNS
 from core.data import load_run_history
-from core.metrics import compute_alignment_metrics
+from core.metrics import compute_alignment_metrics, validation_mean
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "alignment/runs"
@@ -27,7 +27,7 @@ for rid, label, scale, color in spec:
     ax[2].plot(scale * t, dist, color=color, lw=1.7, label=label)
     valcols = [c for c in d.columns if c.startswith("val-core/") and c.endswith("/acc/mean@16")]
     if valcols:
-        vv = d[valcols].mean(axis=1)
+        vv = validation_mean(d)
         m = vv.notna()
         ax[0].plot(t[m], vv[m], color=color, marker="s", ms=3, lw=1.4, label=label)
 ax[0].set_title("Average Validation Accuracy")
@@ -47,5 +47,6 @@ for a in ax:
 handles, labels = ax[1].get_legend_handles_labels()
 fig.legend(handles, labels, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.05))
 fig.tight_layout()
-fig.savefig(OUT, dpi=300, bbox_inches="tight")
-print(OUT)
+if __name__ == "__main__":
+    fig.savefig(OUT, dpi=300, bbox_inches="tight")
+    print(OUT)

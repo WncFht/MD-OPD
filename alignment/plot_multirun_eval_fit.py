@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from config.runs import M4_RUNS
 from core.data import load_run_history
-from core.metrics import distance_proxy
+from core.metrics import cumulative_absorption, distance_proxy
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "alignment/runs"
@@ -19,7 +19,7 @@ for rid, label, color in runs:
     history = load_run_history(rid, RUNS)
     d = history.frame
     d = d[d["_step"] >= 30]
-    x = -np.log(distance_proxy(history)[d.index.to_numpy()])
+    x = cumulative_absorption(distance_proxy(history)[d.index.to_numpy()])
     for j, (short, name) in enumerate(benches):
         c = f"val-core/{short}/acc/mean@16"
         m = d[c].notna() if c in d else pd.Series(False, index=d.index)
@@ -51,5 +51,6 @@ handles, labels = axs[0].get_legend_handles_labels()
 fig.legend(handles, labels, loc="upper center", ncol=4, bbox_to_anchor=(0.5, 1.02))
 fig.suptitle("Validation accuracy vs cumulative absorption across M4 runs", y=1.07)
 fig.tight_layout()
-fig.savefig(OUT, dpi=300, bbox_inches="tight")
-print(OUT)
+if __name__ == "__main__":
+    fig.savefig(OUT, dpi=300, bbox_inches="tight")
+    print(OUT)

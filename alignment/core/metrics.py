@@ -13,6 +13,36 @@ DISTANCE_COLUMN = "opd/token_reward_mean"
 GEO_FACTOR = 1.4
 
 
+def validation_mean(frame: pd.DataFrame) -> pd.Series:
+    """Return the mean available validation accuracy across val-core tasks."""
+    columns = [column for column in frame if column.startswith("val-core/") and column.endswith("/acc/mean@16")]
+    if not columns:
+        return pd.Series(index=frame.index, dtype=float)
+    return frame[columns].mean(axis=1)
+
+
+def ce_entropy_kl(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return CE, entropy, and their KL-proxy decomposition."""
+    return pd.DataFrame(
+        {
+            "ce": -frame["opd/teacher_logp_mean"],
+            "entropy": frame["actor/entropy"],
+            "kl_proxy": -frame[DISTANCE_COLUMN],
+        },
+        index=frame.index,
+    )
+
+
+def cumulative_absorption(distance: np.ndarray) -> np.ndarray:
+    """Return cumulative absorption ``-log(d)`` for positive distance values."""
+    return -np.log(distance)
+
+
+def effective_step(step: np.ndarray, scale: float) -> np.ndarray:
+    """Map training steps to the M4 effective-time axis."""
+    return scale * step
+
+
 def distance_proxy(history: RunHistory) -> np.ndarray:
     """Return the positive reverse-KL distance proxy from a W&B history."""
     if DISTANCE_COLUMN not in history.frame.columns:

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from config.runs import M4_RUNS
 from core.data import load_run_history
-from core.metrics import compute_alignment_metrics
+from core.metrics import compute_alignment_metrics, effective_step, validation_mean
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "alignment/runs"
@@ -29,7 +29,7 @@ def main():
         d, metrics = load(rid)
         t = metrics["step"].to_numpy(float)
         dist = metrics["d_nats"].to_numpy(float)
-        u = scale * t
+        u = effective_step(t, scale)
         vals = [dist, dist / np.interp(30, t, dist), dist / np.interp(60, t, dist)]
         for row, y in enumerate(vals):
             if row == 0:
@@ -82,7 +82,7 @@ def accuracy():
         cols = [c for c in d if c.startswith("val-core/") and c.endswith("/acc/mean@16")]
         if not cols:
             continue
-        v = d[cols].mean(axis=1)
+        v = validation_mean(d)
         m = v.notna()
         ax.plot(d.loc[m, "_step"], v[m] * 100, "-s", ms=3, lw=1.4, color=color, label=label)
     ax.set_xlabel("training step $t$ (dimensionless)")
@@ -96,5 +96,6 @@ def accuracy():
     plt.close(fig)
 
 
-main()
-accuracy()
+if __name__ == "__main__":
+    main()
+    accuracy()

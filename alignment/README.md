@@ -37,9 +37,6 @@ alignment/
 │   └── metrics.py    # distance / absorption / summary
 ├── config/
 │   └── runs.py       # M4 run 的 label、颜色、effective-time scale
-├── data.py           # 兼容旧脚本的转发入口
-├── metrics.py        # 兼容旧脚本的转发入口
-├── run_config.py     # 兼容旧脚本的转发入口
 ├── pull_wandb_metrics.py
 ├── compute_alignment.py
 ├── plot_alignment.py
@@ -61,7 +58,7 @@ alignment/
 └── figures/          # 绘图输出
 ```
 
-`core/` 是以后优先复用和扩展的代码。根目录的三个同名文件暂时保留，是为了让现有“从 alignment 目录直接运行”的脚本继续工作；新代码应优先从 `core` 和 `config` 导入。
+`core/` 是可复用的数据和指标代码，`config/` 是实验组配置；根目录脚本是面向研究流程的可执行入口。新代码应从 `core` 和 `config` 导入，不在脚本之间复制指标实现。
 
 ## 常用流程
 
@@ -134,7 +131,7 @@ Qwen3 eval JSONL + W&B history → plot_qwen3_diagnosis.py
 ### 优先级高
 
 - 把剩余 M4 图中的 `step >= 30` / `step >= 60` 处理统一到绘图辅助函数，全面遵守 step 0 + baseline 淡化约定。
-- 把 `fit_tail.py` 的拟合函数迁入 `core/metrics.py`，让论文曲线和本地 run 共用同一套 tail API。
+- 把 `fit_tail.py` 的拟合函数迁入 `core/tail.py`，让论文曲线和本地 run 共用同一套 tail API。
 - 把 `plot_qwen3_diagnosis.py` 中的绝对路径改成命令行参数或项目配置。
 - 给 `core.metrics` 增加少量端到端检查：输入已有 CSV，确认标准列、baseline 和 summary 数值稳定。
 

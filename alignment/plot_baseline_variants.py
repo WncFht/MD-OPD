@@ -3,7 +3,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from config.runs import M4_RUNS
 from core.data import load_run_history
-from core.metrics import compute_alignment_metrics
+from core.metrics import compute_alignment_metrics, effective_step, validation_mean
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "alignment/runs"
@@ -26,10 +26,10 @@ def figure19(t0):
         t = series.step.to_numpy()
         dist = series.d_nats.to_numpy()
         ax[1].plot(t, dist, color=color, lw=1.6, label=label)
-        ax[2].plot(scale * t, dist / dist[0], color=color, lw=1.6, label=label)
+        ax[2].plot(effective_step(t, scale), dist / dist[0], color=color, lw=1.6, label=label)
         cols = [c for c in d if c.startswith("val-core/") and c.endswith("/acc/mean@16")]
         if cols:
-            v = d[cols].mean(axis=1)
+            v = validation_mean(d)
             m = v.notna()
             ax[0].plot(t[m], v[m], "-s", ms=3, lw=1.2, color=color, label=label)
         ax[1].axvline(t[-1], color=color, ls="--", lw=0.8, alpha=0.65)
@@ -83,7 +83,7 @@ def d5(t0):
         t = series.step.to_numpy()
         dist = series.d_nats.to_numpy()
         ax[0].plot(t, dist / dist[0], color=color, lw=1.7, label=label)
-        ax[1].plot(scale * t, dist / dist[0], color=color, lw=1.7, label=label)
+        ax[1].plot(effective_step(t, scale), dist / dist[0], color=color, lw=1.7, label=label)
         ax[0].axvline(t[-1], color=color, ls="--", lw=0.8, alpha=0.65)
         ax[1].axvline(scale * t[-1], color=color, ls="--", lw=0.8, alpha=0.65)
     ax[0].axvline(t0, color="black", ls=":", lw=1.2)

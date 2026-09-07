@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from collections import defaultdict
@@ -26,12 +27,9 @@ import numpy as np
 import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-RUNS_DIR = REPO_ROOT / "alignment" / "runs"
-FIG_DIR = REPO_ROOT / "alignment" / "figures" / "qwen3"
-OPD_EVAL = Path("/Users/fanghaotian/Desktop/src/OPD/scripts/val/eval")
-JUSTR_L_DIR = Path("/Users/fanghaotian/Desktop/src/OPD/justrl_eval_outputs/thinking")
+DEFAULT_RUNS_DIR = REPO_ROOT / "alignment" / "runs"
+DEFAULT_FIG_DIR = REPO_ROOT / "alignment" / "figures" / "qwen3"
 
-sys.path.insert(0, str(OPD_EVAL))
 sys.path.insert(0, str(REPO_ROOT / ".agents" / "skills" / "plot-skill" / "scripts"))
 
 from style_presets import (  # noqa: E402
@@ -63,11 +61,12 @@ MODEL_LABELS = {
 }
 
 
-def per_problem_pass(model: str, task: str) -> dict[str, int]:
+def per_problem_pass(model: str, task: str, eval_dir: Path, opd_eval_dir: Path) -> dict[str, int]:
     """逐题 pass@16（example_id 与 prompt 已验证一一对应）。"""
+    sys.path.insert(0, str(opd_eval_dir))
     from utils import grade_answer_verl
 
-    path = JUSTR_L_DIR / model / f"{task}_t0.7_p0.95_n16-MNT31744.jsonl"
+    path = eval_dir / model / f"{task}_t0.7_p0.95_n16-MNT31744.jsonl"
     per: dict[str, int] = defaultdict(int)
     tot: dict[str, int] = defaultdict(int)
     for line in open(path):
@@ -80,9 +79,7 @@ def per_problem_pass(model: str, task: str) -> dict[str, int]:
 
 # ---------------------------------------------------------------- fig1: eval 成绩
 def fig1(passes: dict[str, dict[str, dict[str, int]]]) -> None:
-    means = {
-        m: [np.mean(list(passes[m][t].values())) / 16 for t in TASKS] for m in MODELS
-    }
+    means = {m: [np.mean(list(passes[m][t].values())) / 16 for t in TASKS] for m in MODELS}
     apply_rc(THEME)
     colors = series_colors(THEME, len(MODELS))
     fig, ax = plt.subplots(figsize=(7.2, 4.4))
@@ -111,9 +108,7 @@ def fig1(passes: dict[str, dict[str, dict[str, int]]]) -> None:
     ax.set_xticks(x, [TASK_LABELS[t] for t in TASKS])
     ax.set_ylabel("mean@16 准确率")
     ax.set_ylim(0, 1.0)
-    ax.set_title(
-        "Qwen3 三档模型解题成绩（justrl eval：T=0.7, top_p=0.95, n=16, thinking）"
-    )
+    ax.set_title("Qwen3 三档模型解题成绩（justrl eval：T=0.7, top_p=0.95, n=16, thinking）")
     apply_frame(ax, "closed")
     apply_grid(ax, "y-only")
     ax.legend(loc="upper left", fontsize=9)
@@ -335,9 +330,7 @@ def fig4() -> None:
     ):
         for i, task in enumerate(["MATH-500", "AMC23", "AIME25"]):
             steps, vals = VAL[rid][task]
-            ax.plot(
-                steps, vals, color=colors[i], marker=marks[i], ms=4, lw=1.6, label=task
-            )
+            ax.plot(steps, vals, color=colors[i], marker=marks[i], ms=4, lw=1.6, label=task)
         ax.set_xlabel("训练步")
         ax.set_title(title, fontsize=10.5)
         apply_frame(ax, "closed")
@@ -356,14 +349,23 @@ def fig4() -> None:
 
 
 def main() -> None:
-    FIG_DIR.mkdir(parents=True, exist_ok=True)
-    cache = FIG_DIR / "per_problem_pass_cache.json"
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--runs-dir", type=Path, default=DEFAULT_RUNS_DIR)
+    parser.add_argument("--fig-dir", type=Path, default=DEFAULT_FIG_DIR)
+    parser.add_argument("--eval-dir", type=Path, required=True)
+    parser.add_argument("--opd-eval-dir", type=Path, required=True)
+    args = parser.parse_args()
+    fig_dir = args.fig_dir
+    fig_dir.mkdir(parents=True, exist_ok=True)
+    global FIG_DIR, RUNS_DIR
+    FIG_DIR, RUNS_DIR = fig_dir, args.runs_dir
+    cache = fig_dir / "per_problem_pass_cache.json"
     if cache.exists():
         raw = json.loads(cache.read_text())
     else:
         raw = {}
         for m in MODELS:
-            raw[m] = {t: per_problem_pass(m, t) for t in TASKS}
+            raw[m] = {t: per_problem_pass(m, t, args.eval_dir, args.opd_eval_dir) for t in TASKS}
         cache.write_text(json.dumps(raw, indent=1))
         print(f"[cache] per-problem pass -> {cache}")
     passes = raw
