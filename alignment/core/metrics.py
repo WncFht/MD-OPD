@@ -55,9 +55,13 @@ def distance_proxy(history: RunHistory) -> np.ndarray:
 
 
 def geometric_absorption(
-    steps: np.ndarray, distance: np.ndarray, factor: float = GEO_FACTOR
+    steps: np.ndarray,
+    distance: np.ndarray,
+    t_start: int | None = None,
+    factor: float = GEO_FACTOR,
 ) -> np.ndarray:
     """Estimate absorption from the log-distance slope in a geometric window."""
+    del t_start
     values = np.full(steps.shape, np.nan)
     log_distance = np.log(distance)
     for index, step in enumerate(steps):

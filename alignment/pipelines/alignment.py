@@ -20,7 +20,7 @@ import pandas as pd
 
 from alignment.core.plotting import figure_path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 STYLE_PATH = REPO_ROOT / ".agents/skills/plot-skill/scripts/style_presets.py"
 
 CLIPPING_STEP = 30  # metrics before this are under active gradient clipping

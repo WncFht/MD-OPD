@@ -405,19 +405,19 @@ $$
 
 **图（`alignment/figures/`，由 `plot_paper_analysis.py` / `invert_spectrum.py` 生成）：**
 
-![论文图9四条L1曲线的尾部形态拟合](../alignment/figures/paper_tail_fits.png)
+![论文图9四条L1曲线的尾部形态拟合](../alignment/figures/paper/tail-distance_vs_step__source-paper__fits.png)
 
 _图 M1-a：数字化的论文图 9 距离曲线（L1 口径，log-log）与三种尾部形态拟合。四个 run 全部幂律最优（括号内为对数空间 rmse），floor+exp 被拒——L1 口径下"幂律谱×幂律振幅"仍是可用近似。_
 
-![alpha(t) 对比：论文 L1 vs 我们的 KL 代理](../alignment/figures/alpha_comparison.png)
+![alpha(t) 对比：论文 L1 vs 我们的 KL 代理](../alignment/figures/paper/local-alpha_vs_step__source-paper-vs-ours.png)
 
 _图 M1-b：局部指数 α(t) 对比。实线为论文四个 run（L1 口径，0.44–0.67、无系统漂移），虚线为我们的两个 run（KL 代理，0.7→1.3 系统上升）。两条虚线的上升是当前所有"偏离纯幂律"读数的唯一来源，其口径归属由 M3 裁决。_
 
-![H3a/H3b 凸起判别](../alignment/figures/hump_check.png)
+![H3a/H3b 凸起判别](../alignment/figures/paper/absorption_vs_step__source-paper__hump-check.png)
 
 _图 M1-c：左——三个 lr 臂的 v_t（实时轴），凸起位置 {63, 40, 42} 不随 1/lr 缩放 → 凸起锚定在优化器步数（支持 H3a）；右——论文 v_t 与 §5.3 advantage 率读数，论文 L1 口径的凸起几乎不存在（rise≈1.0）。_
 
-![top16 run 的 NNLS 谱反演](../alignment/figures/spectrum__ours_top16_kl.png)
+![top16 run 的 NNLS 谱反演](../alignment/figures/paper/spectrum-density_vs_rate__metric-ours_top16_kl.png)
 
 _图 M2-a：top16 run 的谱反演。左：测量 d_t 与 NNLS 重构（竖线右侧为 hold-out 外推区）；右：反演出的谱密度 μ'(ρ)（对数-对数），斜率 ≈ −0.42。sampled-token 与论文 Full-Data 的同款图见 `figures/spectrum__ours_sampled_token_kl.png` / `figures/spectrum__paper_fulldata_l1.png`。_
 

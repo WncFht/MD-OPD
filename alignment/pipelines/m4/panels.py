@@ -9,6 +9,7 @@ from alignment.core.metrics import (
     effective_step,
     validation_mean,
 )
+from alignment.core.plotting import figure_path
 
 ROOT = Path(__file__).resolve().parents[3]
 RUNS = ROOT / "alignment/runs"
@@ -83,7 +84,13 @@ def main():
         "M4 distance diagnostics: absolute and two normalisation baselines", y=1.03
     )
     fig.tight_layout()
-    fig.savefig(OUT / "metric/m4_distance_six_panel.png", dpi=250, bbox_inches="tight")
+    fig.savefig(
+        figure_path(
+            "m4", "distance", "step-and-effective-step", "runs-m4", "six-panel"
+        ),
+        dpi=250,
+        bbox_inches="tight",
+    )
     plt.close(fig)
 
 
@@ -108,7 +115,11 @@ def accuracy():
     ax.spines[["top", "right"]].set_visible(False)
     ax.legend(ncol=2, fontsize=8)
     fig.tight_layout()
-    fig.savefig(OUT / "metric/m4_validation_accuracy.png", dpi=250, bbox_inches="tight")
+    fig.savefig(
+        figure_path("m4", "validation-accuracy", "step", "runs-m4", "mean16"),
+        dpi=250,
+        bbox_inches="tight",
+    )
     plt.close(fig)
 
 

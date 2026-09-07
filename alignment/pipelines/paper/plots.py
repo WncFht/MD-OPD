@@ -131,7 +131,7 @@ def paper_tail_fits(style) -> None:
 def alpha_comparison(style) -> None:
     theme = style.apply_rc("tableau-paper")
     fig, ax = plt.subplots(figsize=(7.6, 4.6))
-    colors = style.series_colors("tableau-paper", 6)
+    colors = style.series_colors("tableau-paper", 12)
     idx = 0
     for hexc, label in FIG9.items():
         d = load_concat(f"5_digestion_rate_v2__panel0__{hexc}*.csv")

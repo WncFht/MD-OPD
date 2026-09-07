@@ -7,10 +7,11 @@ import pandas as pd
 from alignment.config.runs import M4_RUNS
 from alignment.core.data import load_run_history
 from alignment.core.metrics import cumulative_absorption, distance_proxy
+from alignment.core.plotting import figure_path
 
 ROOT = Path(__file__).resolve().parents[3]
 RUNS = ROOT / "alignment/runs"
-OUT = ROOT / "alignment/figures/multirun_eval_vs_logd.png"
+OUT = figure_path("m4", "validation", "cumulative-absorption", "runs-m4", "eval-fit")
 runs = [(rid, spec["label"], spec["color"]) for rid, spec in M4_RUNS.items()]
 benches = [("AIME25", "AIME25"), ("AMC23", "AMC23"), ("MATH-500", "MATH-500")]
 fig, axs = plt.subplots(2, 2, figsize=(10, 7), sharex=False)
@@ -25,7 +26,7 @@ for rid, label, color in runs:
         m = d[c].notna() if c in d else pd.Series(False, index=d.index)
         if m.sum() < 3:
             continue
-        xx = x[m].to_numpy()
+        xx = x[m]
         yy = d.loc[m, c].to_numpy() * 100
         axs[j].plot(xx, yy, "o-", ms=3, lw=1.1, color=color, label=label)
         co = np.polyfit(xx, yy, 1)

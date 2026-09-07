@@ -7,10 +7,11 @@ import matplotlib.pyplot as plt
 from alignment.config.runs import M4_RUNS
 from alignment.core.data import load_run_history
 from alignment.core.metrics import compute_alignment_metrics, validation_mean
+from alignment.core.plotting import figure_path
 
 ROOT = Path(__file__).resolve().parents[3]
 RUNS = ROOT / "alignment/runs"
-OUT = ROOT / "alignment/figures/figure19_m4.png"
+OUT = figure_path("m4", "validation-distance-collapse", "step", "runs-m4", "figure19")
 spec = [
     (rid, settings["label"], settings["scale"], settings["color"])
     for rid, settings in M4_RUNS.items()

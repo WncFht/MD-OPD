@@ -8,7 +8,7 @@
 2. 正确的升级不是换指标,而是**把"吸收状态"的可观测代理从一个标量升级为一组正交量**:位置(多口径)、形状(分位数/吸收分数)、移动(每步策略 KL)、以及两个派生读数(跨口径斜率比 $S(t)$、效率 $\Delta d/m$),外加两个定期探针(floor、教师侧)。全部是 `rm_scores` 同一个向量的聚合统计,KB/步量级。
 3. $d_t$(多口径版)保留为位置头牌:实测下游准确率对 $\ln d$ 近似线性(R² 0.74–0.87),即 $\ln d$ 已经是能力转移的近似充分统计量;升级的目的是让它可信、完整、可判停,而不是推翻它。
 
-本文是 `2026-09-06-absorption-rate-spectral-theory*.md` 的姊妹篇:那边回答"吸收率为什么下降",本文回答"怎么把'吸收'本身测对"。理论图与实测图由 `alignment/plot_metric_theory.py` 生成;本轮 M4 分析只纳入标准 sampled-token 基线、$\beta_2=0.95$ 和两个 lr 臂。
+本文是 `2026-09-06-absorption-rate-spectral-theory*.md` 的姊妹篇:那边回答"吸收率为什么下降",本文回答"怎么把'吸收'本身测对"。理论图与实测图由 `alignment/pipelines/theory.py` 生成;本轮 M4 分析只纳入标准 sampled-token 基线、$\beta_2=0.95$ 和两个 lr 臂。
 
 ---
 
@@ -49,7 +49,7 @@ $b_j\approx0$ 的模式**永远不可见**:学生采样分布不激励的模式(
 
 $d(t)=\int e^{-\rho t}\,\nu_0(\mathrm d\rho)$ 只是 $\nu_0$ 的 Laplace 变换。单条有限窗口、带噪声的曲线反演 $\nu_0$ 是经典病态问题;下图是它的合成版:谱 A(离散幂律级联)与谱 B(连续 Γ 密度、有限带边)结构上毫无关系,但 $d(t)/d(30)$ 在整个可测区间吻合到 log-rmse **0.0015**——而单 run 的步间噪声约 ±2%(灰带),是两条曲线差异的 13 倍。
 
-![单观测简并:两个无关的谱,一条 d(t) 曲线](../alignment/figures/metric/T1_single_microphone.png)
+![单观测简并:两个无关的谱,一条 d(t) 曲线](../alignment/figures/theory/T1_single_microphone_vs_synthetic-or-run__metric-theory.png)
 
 _图 T1:左——两个无关谱的归一化距离曲线在可测区间内不可区分;右——两个底层加权谱 $\nu_0(\rho)$ 形状完全不同。$d(t)$ 的形状最多确定 $\nu_0$ 的逐时刻矩(局部对数斜率),确定不了 $\nu_0$ 本身;族假设必须来自别处的直接测量(如固定状态上的 Lanczos/GGN 探针[^ghorbani19]),不能靠拟合自举。_
 
@@ -111,7 +111,7 @@ $$S(t)\;=\;\frac{\dot{\ln d^{\mathrm{KL}}}}{\dot{\ln d^{\mathrm{L1}}}}\;=\;\frac
 
 **第二,零假设便宜且精确。** 单模式(剩余质量集中在一个 $\lambda$ 上)时 $S\equiv2$ 严格成立、免参数:KL 口径的速率恰好是 L1 的两倍。偏离 2 的幅度与方向由谱形状决定,不需要任何谱族假设。要诚实说明:$S-2$ 的**方向不固定**——$u$ 的倾斜因子 $\rho e^{-\rho t}$ 一项向前沿集中、一项向前沿外扩散,合成宽谱上 $S$ 从 2.21 穿过 2 降到 1.85 再回到 1.96(下图右),这条轨迹本身就是读数,而不是某个单调判据。
 
-![口径即观测向量;跨口径斜率比](../alignment/figures/metric/T2_caliber_ratio.png)
+![口径即观测向量;跨口径斜率比](../alignment/figures/theory/T2_caliber_ratio_vs_synthetic-or-run__metric-theory.png)
 
 _图 T2:左——同一宽谱下三个口径的归一化距离曲线($\mathbb E|A|$ 速率 $\eta\lambda$;$\sqrt{\mathbb EA^2}$ 速率 $2\eta\lambda$;$\mathbb E[A]$ 的 KL 型速率 $2\eta\lambda$ 且 $\lambda$ 加权);右——斜率比 $S(t)$:单模式恒为 2(灰虚线),宽谱系统性偏离。_
 
@@ -123,7 +123,7 @@ _图 T2:左——同一宽谱下三个口径的归一化距离曲线($\mathbb E|
 
 "d 平了"在模型里有三种不相干的原因:**到达噪声底**(位置停在 $d_\infty$,移动停在 OU 扩散水平)、**旋转**(巨大的正交参数移动,$d$ 不动)、**哑火**(没有信号到达任何模式,移动 $\approx0$)。位置永远分不开三者;配上移动 $m_t=\mathrm{KL}(\pi_t\|\pi_{t+1})$ 与每步下降 $\Delta d_t=d_t-d_{t+1}$,三者特征分明,而 $\Delta d_t/m_t\to0$ 就是"停止吸收"的判据——它也是 P1 吸收率闭环控制器真正需要的反馈信号(姊妹文档 §7)。
 
-![位置-移动-每步下降三元组](../alignment/figures/metric/T3_position_movement_efficiency.png)
+![位置-移动-每步下降三元组](../alignment/figures/theory/T3_position_movement_efficiency_vs_synthetic-or-run__metric-theory.png)
 
 _图 T3:合成三情景(单模式 + OU 梯度噪声)。收敛:位置衰减 ~4×10⁴ 倍、移动衰减 ~400 倍到扩散水平、每步下降归零;旋转:位置停在底、移动大且恒定;哑火:位置停在高处、移动近零。_
 
@@ -146,11 +146,11 @@ $v_t$ 用几何窗口估计(窗口 $[t/1.4,\,1.4t]$ 必须完整落在 $[30,T]$ 
 
 `mdxt04lm` 上 step 30→278:CE($-\texttt{opd/teacher\_logp\_mean}$)只降到 ×0.82,$H$(`actor/entropy`)只降到 ×0.90,而相减出的 KL 代理降到 ×0.077。末段 KL 仅占 CE 的 **0.78%**(step 30 时为 9.3%)——operand 有 1% 的口径误差,读数错 100%。这是 R1/R2 被当前日志口径违反的直接实证,也是"直接测 $\mathbb E|A|$、$\mathbb EA^2$,不做减法"的依据。
 
-![CE/熵/KL 分解](../alignment/figures/metric/D1_ce_h_kl_decomposition.png)
+![CE/熵/KL 分解](../alignment/figures/theory/D1_ce_h_kl_decomposition_vs_synthetic-or-run__metric-theory.png)
 
 _图 D1:左——CE、学生熵、KL 代理三条曲线(KL 是两条慢变量的差);右——KL 代理占 CE 的百分比,末段 <1%。_
 
-![四个有效 run 的 CE/熵/KL 分解](../alignment/figures/metric/D1_multirun_ce_entropy_kl.png)
+![四个有效 run 的 CE/熵/KL 分解](../alignment/figures/m4/ce-entropy-kl_vs_step__runs-m4__decomposition.png)
 
 _图 D1b：实线为 CE，点线为学生熵，虚线为 KL 代理；右图显示 KL/CE。四个 run 都在训练后段进入百分比级 KL，说明相减病理是共同结构。_
 
@@ -169,11 +169,11 @@ _图 D1b：实线为 CE，点线为学生熵，虚线为 KL 代理；右图显�
 
 $\mathbb E[A]$ 降 15.6× 的同时,批内极值 $|A_i|$ 恒在 4–24 nats,极值/均值比从 164(step 30)涨到 2449(step 278,末帧尖峰 4844)。单个均值对"还剩什么没吸收"失去表达能力——吸收分数 $P(|A|<\varepsilon)$ 与分位数补的正是这一块。
 
-![均值坍缩与重尾](../alignment/figures/metric/D2_mean_collapse_heavy_tail.png)
+![均值坍缩与重尾](../alignment/figures/theory/D2_mean_collapse_heavy_tail_vs_synthetic-or-run__metric-theory.png)
 
 _图 D2:左——均值衰减 15.6×,极值带(21 步中位数)不降;右——极值/均值比的两个数量级爬升。_
 
-![四个有效 run 的均值坍缩](../alignment/figures/metric/D2_multirun_mean_collapse.png)
+![四个有效 run 的均值坍缩](../alignment/figures/m4/distance_vs_step__runs-m4__norm-d60-and-absolute.png)
 
 _图 D2b：左图统一以 step 60 的 $d_{60}$ 归一化，但完整显示 step 0–末步；step 30/60 用竖线标出，左侧浅色仅表示“未纳入主拟合区间”。右图为从 step 0 开始的绝对 KL 代理。lr=5e-7 的下降最慢；β₂=0.95 与 lr=2e-6 的末端均值接近，但这仍然不是逐 token 重尾证据。\_
 
@@ -183,7 +183,7 @@ _图 D2b：左图统一以 step 60 的 $d_{60}$ 归一化，但完整显示 step
 
 `mdxt04lm` 每 20 步测了下游 eval(`val-core`,mean@16;缓存于 `alignment/runs/mdxt04lm__eval.csv`)。对 $-\ln d_t$ 线性回归:AIME25 $R^2=0.87$、AMC23 $R^2=0.74$、MATH-500 $R^2=0.36$;每 1 e-fold 吸收对应 AIME +2.8 分、AMC +3.3 分、MATH-500 +0.8 分。即:**在还有 headroom 的任务上,$\ln d$(累计吸收)是能力的近似充分统计量;近天花板处脱钩**(MATH-500 在 step 60 已达 0.867,终值 0.877,其后 $d$ 再降 8 倍只换 1 分)。这是保留 $d$ 为位置头牌的依据,也是不能只看 $d$ 判停的依据。
 
-![eval vs ln d 校准](../alignment/figures/metric/D3_eval_vs_logd.png)
+![eval vs ln d 校准](../alignment/figures/theory/D3_eval_vs_logd_vs_synthetic-or-run__metric-theory.png)
 
 _图 D3:三个 benchmark 的准确率对 $-\ln d$ 散点与线性拟合。_
 
@@ -196,7 +196,7 @@ _图 D3:三个 benchmark 的准确率对 $-\ln d$ 散点与线性拟合。_
 | lr $2\times10^{-6}$          |          0.37 / 1.76 |         0.73 / 3.51 |            0.58 / 1.20 |
 | lr $5\times10^{-7}$          |          0.52 / 2.37 |         0.31 / 1.74 |           0.00 / −0.05 |
 
-![多 run 的 eval–ln d 拟合](../alignment/figures/multirun_eval_vs_logd.png)
+![多 run 的 eval–ln d 拟合](../alignment/figures/m4/validation_vs_cumulative-absorption__runs-m4__eval-fit.png)
 
 _图 D3b：四个 run 的逐 benchmark 拟合。AIME25/AMC23 在基线与 β₂ 臂上仍有较强线性关系；lr=5e-7 的 MATH-500 基本处于平台，说明接近任务天花板时 $d_t$ 不是能力的充分统计量。_
 
@@ -204,43 +204,43 @@ _图 D3b：四个 run 的逐 benchmark 拟合。AIME25/AMC23 在基线与 β₂ 
 
 M4 三臂的最新 history 给出更清晰但仍属探索性的信号。其一,$\beta_2=0.95$ 臂的 $v_{50}/v_{100}/v_{150}=1.77/1.40/1.11\%$,相对基线 `mdxt04lm` 的 1.59/1.22/0.82% 均更高,支持“更短二阶矩记忆 → 更少软底/更快尾部衰减”的 H3 方向。其二,lr 臂在原始步轴上呈现预期的速度差:$2\times10^{-6}$ 在 step 50 的 $v=2.51\%$,基线为 1.59%,而 $5\times10^{-7}$ 仅 0.98%。在折叠轴 $u=(\mathrm{lr}/10^{-6})t$ 上,旧有的局部比例仍近似成立,但由于 C1 只有 224 步且尾部 $v_t$ 噪声较大,不能把单点比值升级为定量定律。换优化器会移动整个 $\{\eta\lambda^{\mathrm{eff}}\}$ 谱(H6/M6),所以吸收指标必须定义在跨优化器可比的口径上——这是本文主张“多口径聚合量”而非“某个论文标量”的又一理由。
 
-![优化器敏感性](../alignment/figures/metric/D5_optimizer_sensitivity.png)
+![优化器敏感性](../alignment/figures/theory/D5_optimizer_sensitivity_vs_synthetic-or-run__metric-theory.png)
 
-![M4 四个 run 的距离与学习率折叠](../alignment/figures/metric/D5_m4_distance_collapse.png)
+![M4 四个 run 的距离与学习率折叠](../alignment/figures/m4/distance_vs_effective-step__runs-m4__norm-d30.png)
 
 _图 D5b：加入基线、β₂=0.95、lr=2e-6、lr=5e-7 四条实际 run。原始步轴上学习率决定早期下降速度；折叠到 $u=(lr/10^{-6})t$ 后，早期差异收窄但没有全程重合，低 lr 臂尾部偏离最明显。β₂=0.95 的曲线整体接近快速吸收组，提示 Adam 二阶矩记忆也会改变有效时间尺度。_
 
 ### 3.7 Figure 19 风格的 M4 图
 
-![Figure 19 风格 M4 对比](../alignment/figures/figure19_m4.png)
+![Figure 19 风格 M4 对比](../alignment/figures/m4/validation-distance-collapse_vs_step__runs-m4__figure19.png)
 
 这张图沿用 Figure 19 的三栏布局。左栏单独显示三任务平均 validation accuracy；中栏显示从 step 0 开始的原始距离 $d_t$；右栏同样显示从 step 0 开始的绝对距离，只把横轴换成 $u=(lr/10^{-6})t$。因此右栏不是归一化距离，不能与 D5b 的 $d_t/d_{30}$ 或 $d_t/d_{60}$ 直接比较。折叠后早期曲线明显更接近，说明 lr 主要改变有效时间尺度；但尾部仍有可见分叉，尤其是 $5\times10^{-7}$ 臂，表明 Adam 的状态记忆、噪声底和有限 run 长度不能被单一 lr 缩放完全消除。因此这里支持“近似 lr 折叠”，不宣称严格普适坍缩。
 
 ### 3.8 clipping 基准的敏感性
 
-![M4 gradient norm](../alignment/figures/metric/grad_norm_m4.png)
+![M4 gradient norm](../alignment/figures/m4/gradient-norm_vs_step__runs-m4__optimizer-clipping.png)
 
 _图 D6：`actor/grad_norm` 是裁剪前梯度范数，虚线为配置中的阈值 $||g||_2=1$。四个 run 最后一次超过阈值的 step 分别为 baseline=31、$\beta_2=0.95$=31、lr=$2\times10^{-6}$=12、lr=$5\times10^{-7}$=58；因此 step 60 是四臂共同的保守无 gradient-clipping 起点。_
 
 为检查这个选择是否改变结论，分别以 step 30 与 step 60 作为归一化和折叠起点重画了两套图。图中的彩色竖向虚线标出每条 run 的实际截断位置，并直接标注 step 或折叠后的 $u$ 数值；黑色点虚线标出共同分析起点。
 
-![Figure 19 风格 M4（step 30 基准）](../alignment/figures/figure19_m4_step30.png)
+![Figure 19 风格 M4（step 30 基准）](../alignment/figures/m4/validation-distance-collapse_vs_step__runs-m4__norm-d30.png)
 
-![Figure 19 风格 M4（step 60 基准）](../alignment/figures/figure19_m4_step60.png)
+![Figure 19 风格 M4（step 60 基准）](../alignment/figures/m4/validation-distance-collapse_vs_step__runs-m4__norm-d60.png)
 
-![D5 M4 折叠图（step 30 基准）](../alignment/figures/metric/D5_m4_distance_collapse_step30.png)
+![D5 M4 折叠图（step 30 基准）](../alignment/figures/m4/distance_vs_effective-step__runs-m4__norm-d30.png)
 
-![D5 M4 折叠图（step 60 基准）](../alignment/figures/metric/D5_m4_distance_collapse_step60.png)
+![D5 M4 折叠图（step 60 基准）](../alignment/figures/m4/distance_vs_effective-step__runs-m4__norm-d60.png)
 
 step 60 会缩短可用尾部窗口，但不改变主要排序：lr=$2\times10^{-6}$ 早期下降最快，lr=$5\times10^{-7}$ 最慢，$\beta_2=0.95$ 接近快速吸收组；折叠后早期趋同、尾部仍分叉。后续跨 run 的定量比较优先采用 step 60，step 30 版本保留用于与历史结果对照。
 
 ### 3.9 统一的六面板距离图
 
-![M4 六面板距离图](../alignment/figures/metric/m4_distance_six_panel.png)
+![M4 六面板距离图](../alignment/figures/m4/distance_vs_step-and-effective-step__runs-m4__six-panel.png)
 
 左列使用原始训练步 $t$，右列使用折叠时间 $u=(lr/10^{-6})t$；三行分别是绝对距离 $d_t$、以 step 30 归一化的 $d_t/d_{30}$、以及以 step 60 归一化的 $d_t/d_{60}$。每个面板都从 step 0 开始显示：step 30（灰色虚线）与 step 60（灰色点线）只是分析基准，不再截断曲线；基准左侧用浅色表示，避免把“展示范围”和“拟合范围”混为一谈。
 
-![M4 validation accuracy](../alignment/figures/metric/m4_validation_accuracy.png)
+![M4 validation accuracy](../alignment/figures/m4/validation-accuracy_vs_step__runs-m4__mean16.png)
 
 验证准确率单独绘制，不与距离的三种纵轴口径混在同一图中。这样可以分别回答“模型实际距离是多少”“相对吸收进度如何”“折叠后动力学是否接近”以及“下游能力是否同步变化”。
 

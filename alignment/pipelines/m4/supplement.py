@@ -8,10 +8,11 @@ from alignment.core.metrics import (
     compute_alignment_metrics,
     effective_step,
 )
+from alignment.core.plotting import figure_path
 
 R = Path(__file__).resolve().parents[3] / "alignment" / "runs"
 OUTPUT_DIR = Path(__file__).resolve().parent / "figures" / "metric"
-OUTPUT_DIR.mkdir(exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 RUNS = [
     (rid, spec["label"], spec["color"], spec["scale"]) for rid, spec in M4_RUNS.items()
 ]
@@ -61,7 +62,9 @@ def d1():
         a.grid(axis="y", alpha=0.25)
         a.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
-    fig.savefig(OUTPUT_DIR / "D1_multirun_ce_entropy_kl.png", dpi=250)
+    fig.savefig(
+        figure_path("m4", "ce-entropy-kl", "step", "runs-m4", "decomposition"), dpi=250
+    )
     plt.close(fig)
 
 
@@ -90,7 +93,10 @@ def d2():
         a.spines[["top", "right"]].set_visible(False)
     axs[1].legend(fontsize=8)
     fig.tight_layout()
-    fig.savefig(OUTPUT_DIR / "D2_multirun_mean_collapse.png", dpi=250)
+    fig.savefig(
+        figure_path("m4", "distance", "step", "runs-m4", "norm-d60-and-absolute"),
+        dpi=250,
+    )
     plt.close(fig)
 
 
@@ -102,7 +108,7 @@ def d5():
         k = metrics["d_nats"].to_numpy()
         axs[0].plot(t, k / k[0], color=color, lw=1.7, label=label)
         axs[1].plot(
-            effective_step(t.to_numpy(), scale),
+            effective_step(t, scale),
             k / k[0],
             color=color,
             lw=1.7,
@@ -122,7 +128,9 @@ def d5():
         a.spines[["top", "right"]].set_visible(False)
     axs[1].legend(fontsize=8)
     fig.tight_layout()
-    fig.savefig(OUTPUT_DIR / "D5_m4_distance_collapse.png", dpi=250)
+    fig.savefig(
+        figure_path("m4", "distance", "effective-step", "runs-m4", "norm-d30"), dpi=250
+    )
     plt.close(fig)
 
 

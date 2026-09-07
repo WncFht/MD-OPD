@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUNS_DIR = REPO_ROOT / "alignment" / "runs"
 DEFAULT_FIG_DIR = REPO_ROOT / "alignment" / "figures" / "qwen3"
 
@@ -119,7 +119,7 @@ def fig1(passes: dict[str, dict[str, dict[str, int]]]) -> None:
     apply_grid(ax, "y-only")
     ax.legend(loc="upper left", fontsize=9)
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "fig1_eval_scores.png", dpi=200)
+    fig.savefig(FIG_DIR / "eval_score_vs_task__models-qwen3.png", dpi=200)
     plt.close(fig)
 
 
@@ -178,7 +178,11 @@ def fig2(passes: dict[str, dict[str, dict[str, int]]]) -> None:
     apply_grid(ax, "full-dotted")
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.10), ncol=2, fontsize=9)
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "fig2_per_problem_scatter.png", dpi=200, bbox_inches="tight")
+    fig.savefig(
+        FIG_DIR / "problem_pass_student_vs_teacher__models-qwen3.png",
+        dpi=200,
+        bbox_inches="tight",
+    )
     plt.close(fig)
 
 
@@ -235,7 +239,11 @@ def fig3() -> None:
         y=1.02,
     )
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "fig3_opd_training_curves.png", dpi=200, bbox_inches="tight")
+    fig.savefig(
+        FIG_DIR / "opd_metrics_vs_step__pair-qwen3-deepseek.png",
+        dpi=200,
+        bbox_inches="tight",
+    )
     plt.close(fig)
 
 
@@ -352,7 +360,11 @@ def fig4() -> None:
         y=1.02,
     )
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "fig4_val_curves.png", dpi=200, bbox_inches="tight")
+    fig.savefig(
+        FIG_DIR / "validation_vs_step__pair-qwen3-deepseek.png",
+        dpi=200,
+        bbox_inches="tight",
+    )
     plt.close(fig)
 
 

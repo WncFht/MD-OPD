@@ -39,19 +39,17 @@ alignment/
 │   └── runs.py       # M4 run 的 label、颜色、effective-time scale
 ├── pull_wandb_metrics.py
 ├── compute_alignment.py
-├── plot_alignment.py
 ├── fit_tail.py
 ├── extract_paper_figures.py
 ├── analyze_paper_curves.py
 ├── plot_paper_analysis.py
 ├── invert_spectrum.py
-├── plot_metric_theory.py
-├── plot_qwen3_diagnosis.py
-├── plot_figure19_m4.py
-├── plot_baseline_variants.py
-├── plot_m4_six_panel.py
-├── plot_m4_supplement.py
-├── plot_multirun_eval_fit.py
+├── pipelines/
+│   ├── alignment.py
+│   ├── theory.py
+│   ├── qwen3.py
+│   ├── paper/plots.py
+│   └── m4/{figure19,baselines,panels,supplement,eval_fit}.py
 ├── runs/             # W&B 原始 history 和 metadata
 ├── derived/          # 指标表、拟合参数、谱反演结果
 ├── paper_curves/     # 从论文 PDF 提取的 tidy 曲线
@@ -84,7 +82,7 @@ alignment/
 ### 3. 画基础 alignment 图
 
 ```bash
-.venv/bin/python alignment/plot_alignment.py \
+.venv/bin/python -m alignment.pipelines.alignment \
   --derived-dir alignment/derived --figures-dir alignment/figures
 ```
 
@@ -103,9 +101,9 @@ alignment/
 M4 图共享 `config/runs.py` 的 run 配置，并通过 `core.data` 和 `core.metrics` 取得数据和 distance：
 
 ```bash
-.venv/bin/python alignment/plot_figure19_m4.py
-.venv/bin/python alignment/plot_m4_supplement.py
-.venv/bin/python alignment/plot_m4_six_panel.py
+.venv/bin/python -m alignment.pipelines.m4.figure19
+.venv/bin/python -m alignment.pipelines.m4.supplement
+.venv/bin/python -m alignment.pipelines.m4.panels
 ```
 
 论文曲线和 Qwen3 诊断有独立数据源，不为了形式统一而强行塞进同一种 history schema：

@@ -29,7 +29,7 @@ import pandas as pd
 from alignment.core.plotting import figure_path
 
 SKILL_SCRIPTS = (
-    Path(__file__).resolve().parents[1]
+    Path(__file__).resolve().parents[2]
     / ".agents"
     / "skills"
     / "plot-skill"
@@ -47,7 +47,7 @@ from style_presets import (  # noqa: E402
     series_colors,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 RUNS = ROOT / "alignment" / "runs"
 OUT = ROOT / "alignment" / "figures" / "metric"
 OUT.mkdir(parents=True, exist_ok=True)

@@ -8,6 +8,7 @@ from alignment.core.metrics import (
     effective_step,
     validation_mean,
 )
+from alignment.core.plotting import figure_path
 
 ROOT = Path(__file__).resolve().parents[3]
 RUNS = ROOT / "alignment/runs"
@@ -82,7 +83,13 @@ def figure19(t0):
     handles, labels = ax[1].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=4, bbox_to_anchor=(0.5, 1.05))
     fig.tight_layout()
-    fig.savefig(OUT / f"figure19_m4_step{t0}.png", dpi=300, bbox_inches="tight")
+    fig.savefig(
+        figure_path(
+            "m4", "validation-distance-collapse", "step", "runs-m4", f"norm-d{t0}"
+        ),
+        dpi=300,
+        bbox_inches="tight",
+    )
     plt.close(fig)
 
 
@@ -130,7 +137,10 @@ def d5(t0):
     ax[1].set_xlabel(r"effective time $u=(lr/10^{-6})t$ (dimensionless)")
     ax[1].legend(fontsize=8)
     fig.tight_layout()
-    fig.savefig(OUT / f"metric/D5_m4_distance_collapse_step{t0}.png", dpi=250)
+    fig.savefig(
+        figure_path("m4", "distance", "effective-step", "runs-m4", f"norm-d{t0}"),
+        dpi=250,
+    )
     plt.close(fig)
 
 
@@ -151,7 +161,10 @@ def grad():
     ax.spines[["top", "right"]].set_visible(False)
     ax.legend(ncol=2, fontsize=8)
     fig.tight_layout()
-    fig.savefig(OUT / "metric/grad_norm_m4.png", dpi=250)
+    fig.savefig(
+        figure_path("m4", "gradient-norm", "step", "runs-m4", "optimizer-clipping"),
+        dpi=250,
+    )
     plt.close(fig)
 
 
