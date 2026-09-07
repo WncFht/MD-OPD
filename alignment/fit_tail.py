@@ -120,7 +120,9 @@ def fit_floor_exp(t: np.ndarray, d: np.ndarray) -> dict:
     return best
 
 
-def local_alpha(t: np.ndarray, d: np.ndarray, half_width: float = 0.12, min_points: int = 8) -> np.ndarray:
+def local_alpha(
+    t: np.ndarray, d: np.ndarray, half_width: float = 0.12, min_points: int = 8
+) -> np.ndarray:
     """Sliding local exponent: -d ln d / d ln t over a +-half_width window in log10 t."""
     log_t, log_d = np.log10(t), np.log10(d)
     out = np.full(t.shape, np.nan)
@@ -155,7 +157,11 @@ def analyze_run(csv_path: Path, t_start: int, plot: bool) -> dict:
         "n_points": int(t.size),
         "fits": [
             {k: f[k] for k in ("model", "params", "rmse_log") if k in f}
-            | ({"at_grid_boundary": f["at_grid_boundary"]} if f.get("at_grid_boundary") else {})
+            | (
+                {"at_grid_boundary": f["at_grid_boundary"]}
+                if f.get("at_grid_boundary")
+                else {}
+            )
             for f in fits
         ],
         "best_model": fits[0]["model"],
@@ -203,10 +209,16 @@ def plot_fits(run_id: str, t: np.ndarray, d: np.ndarray, fits: list[dict]) -> No
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--derived-dir", type=Path, default=Path(__file__).resolve().parent / "derived")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--derived-dir", type=Path, default=Path(__file__).resolve().parent / "derived"
+    )
     parser.add_argument("--t-start", type=int, default=30)
-    parser.add_argument("--plot", action="store_true", help="Render tail_fits__<run>.png")
+    parser.add_argument(
+        "--plot", action="store_true", help="Render tail_fits__<run>.png"
+    )
     args = parser.parse_args()
 
     histories = sorted(args.derived_dir.glob("*__alignment.csv"))

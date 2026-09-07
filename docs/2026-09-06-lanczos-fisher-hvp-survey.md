@@ -20,12 +20,12 @@ HVP/Lanczos 是**定期冻结态探针**，不是每步训练指标。对当前 
 
 对 1--2B 模型，保守地按一次训练 microbatch 的峰值显存记账：
 
-| 探针 | 额外显存（相对一次普通 forward+backward） | 计算代价 |
-|---|---:|---:|
-| 10 步 GGN/Fisher Lanczos | 约 0.5--2 倍，取决于 checkpoint 和 probe token 数 | 10 次 matvec |
-| 20 步 GGN/Fisher Lanczos | 约 0.5--2 倍 | 20 次 matvec |
-| full reverse-KL Hessian-HVP | 约 1.5--3 倍 | 每次需保留一阶反传图并再反传一次 |
-| 有限差分 HVP | 约 1 倍峰值显存 | 每次 matvec 两次梯度计算 |
+| 探针                        |         额外显存（相对一次普通 forward+backward） |                         计算代价 |
+| --------------------------- | ------------------------------------------------: | -------------------------------: |
+| 10 步 GGN/Fisher Lanczos    | 约 0.5--2 倍，取决于 checkpoint 和 probe token 数 |                     10 次 matvec |
+| 20 步 GGN/Fisher Lanczos    |                                      约 0.5--2 倍 |                     20 次 matvec |
+| full reverse-KL Hessian-HVP |                                      约 1.5--3 倍 | 每次需保留一阶反传图并再反传一次 |
+| 有限差分 HVP                |                                   约 1 倍峰值显存 |         每次 matvec 两次梯度计算 |
 
 这些倍数取决于 FSDP shard、序列长度、microbatch 和是否保存 Ritz 向量；不是硬件保证。第一版应把 probe 限制为 4--16 条序列、每条 128--512 个 response token，并在独立 checkpoint 脚本中运行。
 

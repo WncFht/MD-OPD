@@ -1,21 +1,11 @@
 {
   "labels": {
-    "be00rj9e": "top16",
-    "mdxt04lm": "sampled-token"
+    "mdxt04lm": "sampled-token",
+    "tjjxnvw9": "M4: $\\beta_2=0.95$",
+    "ybi7q89v": "M4: lr $5\\times10^{-7}$",
+    "yj2w13fq": "M4: lr $2\\times10^{-6}$"
   },
   "runs": [
-    {
-      "run_id": "be00rj9e",
-      "n_steps": 279,
-      "d_start_nats": 0.0823292519634103,
-      "d_end_nats": 0.0043631237704842,
-      "d_end_over_d_start": 0.05299603320121636,
-      "v_geo_at_50": 0.017905492411433244,
-      "v_geo_at_200": 0.005867197363053189,
-      "v50_over_v200": 3.0517965058048655,
-      "power_law_alpha": 1.356770834074679,
-      "label": "top16"
-    },
     {
       "run_id": "mdxt04lm",
       "n_steps": 279,
@@ -27,6 +17,42 @@
       "v50_over_v200": 2.537413427201557,
       "power_law_alpha": 1.3131502985210788,
       "label": "sampled-token"
+    },
+    {
+      "run_id": "tjjxnvw9",
+      "n_steps": 277,
+      "d_start_nats": 0.0847078605858957,
+      "d_end_nats": 0.00383508415340802,
+      "d_end_over_d_start": 0.04527424169235342,
+      "v_geo_at_50": 0.01766433916561727,
+      "v_geo_at_200": 0.008170804759676131,
+      "v50_over_v200": 2.1618848675460747,
+      "power_law_alpha": 1.5462561977349165,
+      "label": "M4: $\\beta_2=0.95$"
+    },
+    {
+      "run_id": "ybi7q89v",
+      "n_steps": 279,
+      "d_start_nats": 0.103325091431754,
+      "d_end_nats": 0.01297330721555944,
+      "d_end_over_d_start": 0.12555814890450187,
+      "v_geo_at_50": 0.009793035006235518,
+      "v_geo_at_200": 0.00612782259376321,
+      "v50_over_v200": 1.5981263909635204,
+      "power_law_alpha": 1.1098992921929558,
+      "label": "M4: lr $5\\times10^{-7}$"
+    },
+    {
+      "run_id": "yj2w13fq",
+      "n_steps": 279,
+      "d_start_nats": 0.0482702962482834,
+      "d_end_nats": 0.0025437130675289603,
+      "d_end_over_d_start": 0.05269727483015853,
+      "v_geo_at_50": 0.025140804683626894,
+      "v_geo_at_200": 0.005164756913187074,
+      "v50_over_v200": 4.867761466069267,
+      "power_law_alpha": 1.2529539416974436,
+      "label": "M4: lr $2\\times10^{-6}$"
     }
   ]
 }

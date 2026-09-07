@@ -33,7 +33,9 @@ def is_gray(color) -> bool:
     if color is None:
         return False
     r, g, b = color
-    return abs(r - 0.8) < GRID_TOL and abs(g - 0.8) < GRID_TOL and abs(b - 0.8) < GRID_TOL
+    return (
+        abs(r - 0.8) < GRID_TOL and abs(g - 0.8) < GRID_TOL and abs(b - 0.8) < GRID_TOL
+    )
 
 
 def parse_label(text: str) -> float | None:
@@ -131,9 +133,13 @@ def cluster_1d(values: list[float], tol: float = 2.0) -> list[float]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--pdf", type=Path, required=True)
-    parser.add_argument("--out", type=Path, default=Path(__file__).resolve().parent / "paper_curves")
+    parser.add_argument(
+        "--out", type=Path, default=Path(__file__).resolve().parent / "paper_curves"
+    )
     parser.add_argument("--inspect", action="store_true", help="Print diagnostics only")
     args = parser.parse_args()
 
@@ -179,13 +185,21 @@ def main() -> int:
     panels: list[dict] = []
     for x, y0, y1 in black_v:
         # a left spine must be the *start* of its top/bottom horizontal partners
-        partner_top = [h for h in black_h if abs(h[0] - y0) < 1 and abs(min(h[1], h[2]) - x) < 1]
-        partner_bot = [h for h in black_h if abs(h[0] - y1) < 1 and abs(min(h[1], h[2]) - x) < 1]
+        partner_top = [
+            h for h in black_h if abs(h[0] - y0) < 1 and abs(min(h[1], h[2]) - x) < 1
+        ]
+        partner_bot = [
+            h for h in black_h if abs(h[0] - y1) < 1 and abs(min(h[1], h[2]) - x) < 1
+        ]
         if not partner_top or not partner_bot:
             continue
         x_right = max(max(h[1], h[2]) for h in partner_top + partner_bot)
         entry = {"x0": x, "x1": x_right, "top": y0, "bottom": y1}
-        if panels and abs(entry["x0"] - panels[-1]["x1"]) < 1 and abs(entry["top"] - panels[-1]["top"]) < 1:
+        if (
+            panels
+            and abs(entry["x0"] - panels[-1]["x1"]) < 1
+            and abs(entry["top"] - panels[-1]["top"]) < 1
+        ):
             panels[-1]["x1"] = entry["x1"]
         else:
             panels.append(entry)
@@ -198,7 +212,9 @@ def main() -> int:
         print(f"vertical gridline xs: {[round(x, 1) for x in v_xs]}")
         print(f"horizontal gridline ys: {[round(y, 1) for y in h_ys_all]}")
         for i, p in enumerate(panels):
-            print(f"panel {i}: x0={p['x0']:.1f} x1={p['x1']:.1f} gridline xs={[round(x, 1) for x in p['xs']]}")
+            print(
+                f"panel {i}: x0={p['x0']:.1f} x1={p['x1']:.1f} gridline xs={[round(x, 1) for x in p['xs']]}"
+            )
         colors = defaultdict(int)
         for d in drawings:
             if d["type"] == "s" and not is_gray(d.get("color")):
@@ -232,7 +248,13 @@ def main() -> int:
             if abs(gx - cx) < 12:
                 x_labels[gx] = val
         # y labels: left of panel; group multi-word scientific labels by row
-        h_ys = sorted({y for y, x0, x1 in h_grid if left - 2 <= x0 and x1 <= right + 2 and top - 5 <= y <= bottom + 5})
+        h_ys = sorted(
+            {
+                y
+                for y, x0, x1 in h_grid
+                if left - 2 <= x0 and x1 <= right + 2 and top - 5 <= y <= bottom + 5
+            }
+        )
         cand = [w for w in words if left - 170 < (w[0] + w[2]) / 2 < left - 2]
         y_labels: dict[float, float] = {}
         for gy in h_ys:  # gridline-anchored: merge all label words near this line
@@ -246,7 +268,9 @@ def main() -> int:
             if val is not None:
                 y_labels[gy] = val
         if len(x_labels) < 2 or len(y_labels) < 2:
-            print(f"[warn] panel {pi}: calibration weak (x_labels={x_labels}, y_labels={y_labels})")
+            print(
+                f"[warn] panel {pi}: calibration weak (x_labels={x_labels}, y_labels={y_labels})"
+            )
             continue
 
         # calibration maps
@@ -263,11 +287,16 @@ def main() -> int:
             sxx = sum((a - mt) ** 2 for a in t)
             sxy = sum((a - mt) * (b - my) for a, b in zip(t, ypos, strict=False))
             slope = sxy / sxx if sxx else 0.0
-            ss_res = sum((b - (my + slope * (a - mt))) ** 2 for a, b in zip(t, ypos, strict=False))
+            ss_res = sum(
+                (b - (my + slope * (a - mt))) ** 2
+                for a, b in zip(t, ypos, strict=False)
+            )
             ss_tot = sum((b - my) ** 2 for b in ypos)
             return 1 - ss_res / ss_tot if ss_tot else 0.0
 
-        log_scale = min(vals_desc) > 0 and _r2(ys, vals_desc, True) > _r2(ys, vals_desc, False)
+        log_scale = min(vals_desc) > 0 and _r2(ys, vals_desc, True) > _r2(
+            ys, vals_desc, False
+        )
 
         def map_x(px: float, xs=xs, x_labels=x_labels) -> float:
             import bisect
@@ -312,7 +341,11 @@ def main() -> int:
             for sub in flatten_points(d):
                 if len(sub) < 5:
                     continue
-                inside = [pt for pt in sub if left - 2 <= pt[0] <= right + 2 and top - 2 <= pt[1] <= bottom + 2]
+                inside = [
+                    pt
+                    for pt in sub
+                    if left - 2 <= pt[0] <= right + 2 and top - 2 <= pt[1] <= bottom + 2
+                ]
                 if len(inside) < 5:
                     continue
                 colors[col].append(inside)

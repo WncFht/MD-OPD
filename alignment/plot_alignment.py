@@ -40,7 +40,9 @@ def load_runs(derived_dir: Path) -> dict[str, pd.DataFrame]:
         run_id = csv_path.name.split("__")[0]
         frames[run_id] = pd.read_csv(csv_path).sort_values("step")
     if not frames:
-        raise SystemExit(f"error: no *__alignment.csv under {derived_dir} (run compute_alignment.py first)")
+        raise SystemExit(
+            f"error: no *__alignment.csv under {derived_dir} (run compute_alignment.py first)"
+        )
     return frames
 
 
@@ -63,7 +65,9 @@ def annotate_clipping(ax, styles: dict, style) -> None:
     )
 
 
-def plot_fig9(frames: dict[str, pd.DataFrame], labels: dict[str, str], figures_dir: Path, style) -> None:
+def plot_fig9(
+    frames: dict[str, pd.DataFrame], labels: dict[str, str], figures_dir: Path, style
+) -> None:
     theme = style.apply_rc("tableau-paper")
     colors = style.series_colors("tableau-paper", len(frames))
     styles = style.line_styles(theme.line_preset)
@@ -89,14 +93,14 @@ def plot_fig9(frames: dict[str, pd.DataFrame], labels: dict[str, str], figures_d
         )
 
     ax_d.set_yscale("log")
-    ax_d.set_xlabel("Training Step")
-    ax_d.set_ylabel(r"$d_t\,/\,d_{30}$")
+    ax_d.set_xlabel("Training step $t$ (dimensionless)")
+    ax_d.set_ylabel(r"normalised distance $d_t/d_{30}$ (dimensionless)")
     ax_d.set_title("Distance Left $d_t/d_{30}$")
     annotate_clipping(ax_d, styles, style)
 
     ax_v.set_yscale("log")
-    ax_v.set_xlabel("Training Step")
-    ax_v.set_ylabel(r"$v_t$ (%)")
+    ax_v.set_xlabel("Training step $t$ (dimensionless)")
+    ax_v.set_ylabel(r"absorption rate $v_t$ (% per step)")
     ax_v.set_title(r"Absorption Rate $v_t$ (%)")
     annotate_clipping(ax_v, styles, style)
 
@@ -104,7 +108,9 @@ def plot_fig9(frames: dict[str, pd.DataFrame], labels: dict[str, str], figures_d
         style.apply_frame(ax, theme.frame)
         style.apply_grid(ax, theme.grid, axis="y")
     handles, names = ax_d.get_legend_handles_labels()
-    fig.legend(handles, names, loc="upper center", ncol=len(frames), bbox_to_anchor=(0.5, 1.06))
+    fig.legend(
+        handles, names, loc="upper center", ncol=len(frames), bbox_to_anchor=(0.5, 1.06)
+    )
     fig.tight_layout()
     out = figures_dir / "fig9_style.png"
     fig.savefig(out, dpi=300, bbox_inches="tight")
@@ -112,7 +118,9 @@ def plot_fig9(frames: dict[str, pd.DataFrame], labels: dict[str, str], figures_d
     print(f"[plot] {out}")
 
 
-def plot_distance_raw(frames: dict[str, pd.DataFrame], labels: dict[str, str], figures_dir: Path, style) -> None:
+def plot_distance_raw(
+    frames: dict[str, pd.DataFrame], labels: dict[str, str], figures_dir: Path, style
+) -> None:
     theme = style.apply_rc("tableau-paper")
     colors = style.series_colors("tableau-paper", len(frames))
     styles = style.line_styles(theme.line_preset)
@@ -129,8 +137,8 @@ def plot_distance_raw(frames: dict[str, pd.DataFrame], labels: dict[str, str], f
             label=f"{labels[run_id]}  $-\\overline{{A}}_t$",
         )
     ax.set_yscale("log")
-    ax.set_xlabel("Training Step")
-    ax.set_ylabel("Distance proxy (nats / token)")
+    ax.set_xlabel("Training step $t$ (dimensionless)")
+    ax.set_ylabel("distance proxy $d_t$ (nats/token)")
     ax.set_title("Teacher-Student Distance $d_t$ (mean per-token reverse KL)")
     annotate_clipping(ax, styles, style)
     style.apply_frame(ax, theme.frame)
@@ -150,7 +158,9 @@ def plot_absorption_estimators(
     colors = style.series_colors("tableau-paper", len(frames))
     styles = style.line_styles(theme.line_preset)
 
-    fig, axes = plt.subplots(1, len(frames), figsize=(4.6 * len(frames), 3.8), squeeze=False)
+    fig, axes = plt.subplots(
+        1, len(frames), figsize=(4.6 * len(frames), 3.8), squeeze=False
+    )
     for idx, (run_id, df_all) in enumerate(frames.items()):
         ax = axes[0][idx]
         df = df_all[df_all["step"] >= CLIPPING_STEP]
@@ -172,15 +182,17 @@ def plot_absorption_estimators(
             label=r"geometric window $[t/1.4,\,1.4t]$",
         )
         ax.set_yscale("log")
-        ax.set_xlabel("Training Step")
+        ax.set_xlabel("Training step $t$ (dimensionless)")
         if idx == 0:
-            ax.set_ylabel(r"$v_t$ (%)")
+            ax.set_ylabel(r"absorption rate $v_t$ (% per step)")
         ax.set_title(labels[run_id])
         annotate_clipping(ax, styles, style)
         style.apply_frame(ax, theme.frame)
         style.apply_grid(ax, theme.grid, axis="y")
         ax.legend(loc="upper right", fontsize=8)
-    fig.suptitle(r"Absorption Rate $v_t$: one-step ratio vs geometric-window estimate", y=1.0)
+    fig.suptitle(
+        r"Absorption Rate $v_t$: one-step ratio vs geometric-window estimate", y=1.0
+    )
     fig.tight_layout()
     out = figures_dir / "absorption_estimators.png"
     fig.savefig(out, dpi=300, bbox_inches="tight")
@@ -189,9 +201,15 @@ def plot_absorption_estimators(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--derived-dir", type=Path, default=Path(__file__).resolve().parent / "derived")
-    parser.add_argument("--figures-dir", type=Path, default=Path(__file__).resolve().parent / "figures")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--derived-dir", type=Path, default=Path(__file__).resolve().parent / "derived"
+    )
+    parser.add_argument(
+        "--figures-dir", type=Path, default=Path(__file__).resolve().parent / "figures"
+    )
     parser.add_argument(
         "--labels-file",
         type=Path,

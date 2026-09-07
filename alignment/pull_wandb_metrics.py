@@ -62,11 +62,17 @@ DEFAULT_KEYS = [
     "response/aborted_ratio",
     "perf/time_per_step",
     "perf/throughput",
+    # validation checkpoints used by the Figure-19 and ln(d)-capability analyses
+    "val-core/AIME25/acc/mean@16",
+    "val-core/AMC23/acc/mean@16",
+    "val-core/MATH-500/acc/mean@16",
 ]
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument(
         "--entity",
         default=os.environ.get("WANDB_ENTITY"),
@@ -77,7 +83,9 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("WANDB_PROJECT"),
         help="W&B project (default $WANDB_PROJECT)",
     )
-    parser.add_argument("--run-id", nargs="+", required=True, help="One or more W&B run ids")
+    parser.add_argument(
+        "--run-id", nargs="+", required=True, help="One or more W&B run ids"
+    )
     parser.add_argument(
         "--out",
         type=Path,
@@ -129,18 +137,24 @@ def pull_run(
     csv_path = out_dir / f"{run_id}__history.csv"
     meta_path = out_dir / f"{run_id}__meta.json"
     if csv_path.exists() and meta_path.exists() and not force:
-        print(f"[skip] {run_id}: {csv_path} already exists (use --force to re-download)")
+        print(
+            f"[skip] {run_id}: {csv_path} already exists (use --force to re-download)"
+        )
         return csv_path
 
     run = api.run(f"{entity}/{project}/{run_id}")
-    print(f"[pull] {run_id}: {run.name} (state={run.state}, last_step={run.lastHistoryStep})")
+    print(
+        f"[pull] {run_id}: {run.name} (state={run.state}, last_step={run.lastHistoryStep})"
+    )
 
     # scan_history with explicit keys only: runs with many metrics fail without it
     rows = list(run.scan_history(keys=keys, page_size=1000))
     df = pd.DataFrame(rows)
     df = df.dropna(axis=1, how="all").sort_values("_step").reset_index(drop=True)
     df.to_csv(csv_path, index=False)
-    print(f"[pull] {run_id}: {df.shape[0]} steps x {df.shape[1] - 1} metrics -> {csv_path}")
+    print(
+        f"[pull] {run_id}: {df.shape[0]} steps x {df.shape[1] - 1} metrics -> {csv_path}"
+    )
 
     meta = {
         "run_id": run_id,

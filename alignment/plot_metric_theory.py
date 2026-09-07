@@ -26,7 +26,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-SKILL_SCRIPTS = Path(__file__).resolve().parents[1] / ".agents" / "skills" / "plot-skill" / "scripts"
+SKILL_SCRIPTS = (
+    Path(__file__).resolve().parents[1]
+    / ".agents"
+    / "skills"
+    / "plot-skill"
+    / "scripts"
+)
 sys.path.insert(0, str(SKILL_SCRIPTS))
 
 import matplotlib.pyplot as plt  # noqa: E402
@@ -63,7 +69,10 @@ def save(fig: plt.Figure, name: str) -> Path:
 def load_run(run_id: str) -> pd.DataFrame:
     df = pd.read_csv(RUNS / f"{run_id}__history.csv").sort_values("_step")
     df["d"] = -df["opd/token_reward_mean"]
-    df["ce"] = -df["opd/teacher_logp_mean"]
+    if "opd/teacher_logp_mean" in df:
+        df["ce"] = -df["opd/teacher_logp_mean"]
+    else:
+        df["ce"] = np.nan
     return df
 
 
@@ -91,6 +100,7 @@ def v_geo(d: np.ndarray, steps: np.ndarray, t: float, t0: int = 30) -> float | N
 def theory_t1() -> None:
     current = apply_rc(THEME)
     colors = series_colors(THEME, 2)
+    styles = line_styles(current.line_preset)
 
     # spectrum A: discrete scale-free cascade, rho_i = rho1 i^-beta, a_i ∝ i^-delta
     i = np.arange(1, 4001)
@@ -184,6 +194,7 @@ def theory_t1() -> None:
 def theory_t2() -> None:
     current = apply_rc(THEME)
     colors = series_colors(THEME, 4)
+    styles = line_styles(current.line_preset)
 
     # wide discrete spectrum, rates spanning ~1 decade (matches the measured range)
     rng = np.random.default_rng(7)
@@ -195,8 +206,12 @@ def theory_t2() -> None:
 
     t = np.arange(30.0, 4001.0)
     d_l1 = (a[:, None] * np.exp(-rho[:, None] * t[None, :])).sum(0)  # rate rho
-    d_kl = (rho[:, None] * a[:, None] * np.exp(-2 * rho[:, None] * t[None, :])).sum(0)  # rate 2rho, lambda-weighted
-    d_rms = np.sqrt((a[:, None] * np.exp(-2 * rho[:, None] * t[None, :])).sum(0))  # rate 2rho, unweighted
+    d_kl = (rho[:, None] * a[:, None] * np.exp(-2 * rho[:, None] * t[None, :])).sum(
+        0
+    )  # rate 2rho, lambda-weighted
+    d_rms = np.sqrt(
+        (a[:, None] * np.exp(-2 * rho[:, None] * t[None, :])).sum(0)
+    )  # rate 2rho, unweighted
 
     def local_logslope(y: np.ndarray, win: int = 121) -> np.ndarray:
         out = np.full_like(y, np.nan)
@@ -332,7 +347,9 @@ def theory_t3() -> None:
         axes[0, col].set_ylabel("position $d_t$", fontsize=9)
         axes[1, col].plot(t, m, color=c, lw=2.0)
         axes[1, col].set_yscale("log")
-        axes[1, col].set_ylabel("movement  $\\mathrm{KL}(\\pi_t\\|\\pi_{t+1})$", fontsize=9)
+        axes[1, col].set_ylabel(
+            "movement  $\\mathrm{KL}(\\pi_t\\|\\pi_{t+1})$", fontsize=9
+        )
         axes[2, col].plot(t, drop, color=c, lw=2.0)
         axes[2, col].set_yscale("symlog", linthresh=1e-6)
         axes[2, col].set_ylabel("position drop  $d_t-d_{t+1}$", fontsize=9)
@@ -397,8 +414,12 @@ def data_d1() -> None:
     ratio = kl / df["ce"] * 100
     ax2.semilogy(df["_step"], ratio, color=colors[2], lw=2.0)
     ax2.axhline(100, color=NEUTRALS["baseline"], lw=1.0, ls=":")
-    ax2.annotate(f"step 30: {ratio.iloc[0]:.0f}%", xy=(32, ratio.iloc[0] * 1.15), fontsize=9)
-    ax2.annotate(f"step 278: {ratio.iloc[-1]:.1f}%", xy=(200, ratio.iloc[-1] * 3.2), fontsize=9)
+    ax2.annotate(
+        f"step 30: {ratio.iloc[0]:.0f}%", xy=(32, ratio.iloc[0] * 1.15), fontsize=9
+    )
+    ax2.annotate(
+        f"step 278: {ratio.iloc[-1]:.1f}%", xy=(200, ratio.iloc[-1] * 3.2), fontsize=9
+    )
     ax2.set_xlabel("step")
     ax2.set_ylabel("KL proxy as % of CE")
     ax2.set_title("at the tail the signal is <1% of each operand")
@@ -422,7 +443,9 @@ def data_d2() -> None:
     df = load_run("mdxt04lm")
     df = df[df["_step"] >= 30].reset_index(drop=True)
     mean_abs = df["d"].abs()
-    ext = np.maximum(df["critic/advantages/max"].abs(), df["critic/advantages/min"].abs())
+    ext = np.maximum(
+        df["critic/advantages/max"].abs(), df["critic/advantages/min"].abs()
+    )
     roll = ext.rolling(21, center=True, min_periods=5).median()
     ratio = ext / mean_abs
 
@@ -451,8 +474,12 @@ def data_d2() -> None:
     ax1.legend(loc="lower left", fontsize=9)
 
     ax2.semilogy(df["_step"], ratio, color=colors[2], lw=2.0)
-    ax2.annotate(f"step 30: {ratio.iloc[0]:.0f}x", xy=(33, ratio.iloc[0] * 1.2), fontsize=9)
-    ax2.annotate(f"step 278: {ratio.iloc[-1]:.0f}x", xy=(190, ratio.iloc[-1] * 1.5), fontsize=9)
+    ax2.annotate(
+        f"step 30: {ratio.iloc[0]:.0f}x", xy=(33, ratio.iloc[0] * 1.2), fontsize=9
+    )
+    ax2.annotate(
+        f"step 278: {ratio.iloc[-1]:.0f}x", xy=(190, ratio.iloc[-1] * 1.5), fontsize=9
+    )
     ax2.set_xlabel("step")
     ax2.set_ylabel("$\\max|A_i|\\,/\\,\\mathbb{E}|A|$")
     ax2.set_title("a single mean cannot represent this distribution")
@@ -500,7 +527,9 @@ def data_d3() -> None:
             color=c,
         )
     ax.margins(x=0.10)
-    ax.set_xlabel("cumulative absorption  $-\\ln\\, d_t$   (nats/token, rightward = more absorbed)")
+    ax.set_xlabel(
+        "cumulative absorption  $-\\ln\\, d_t$   (nats/token, rightward = more absorbed)"
+    )
     ax.set_ylabel("downstream accuracy (%, mean@16)")
     ax.set_title("run mdxt04lm: ln d tracks capability -- with task-dependent slope")
     apply_frame(ax, current.frame)
@@ -521,20 +550,17 @@ def data_d4() -> None:
 
     runs = [
         ("mdxt04lm", "healthy: d falls 15x\n(grad_norm 0.08-0.9)", colors[0]),
+        ("tjjxnvw9", r"$\beta_2=0.95$: fastest tail", colors[1]),
         (
-            "mzwm9q04",
-            "spinning: flat d, grad_norm x100\n(discounted-reward misconfig)",
-            colors[1],
-        ),
-        (
-            "um5vzc6m",
-            "silent: flat d, normal grad_norm\n(Qwen3-1.7B student)",
+            "ybi7q89v",
+            r"lr $5\times10^{-7}$: slowest early absorption",
             colors[2],
         ),
     ]
     fig, axes = plt.subplots(2, 3, figsize=(11.4, 6.4), sharex="col")
     for col, (rid, label, c) in enumerate(runs):
-        df = load_run(rid)
+        df = pd.read_csv(RUNS / f"{rid}__history.csv").sort_values("_step")
+        df["d"] = -df["opd/token_reward_mean"]
         df = df[df["_step"] >= 10]
         d30 = df[df["_step"] >= 30]["d"].iloc[0]
         ax = axes[0, col]
@@ -545,7 +571,8 @@ def data_d4() -> None:
         if col == 0:
             ax.set_ylabel("$d_t\\,/\\,d_{30}$", fontsize=9)
         ax2 = axes[1, col]
-        ax2.plot(df["_step"], df["actor/grad_norm"], color=c, lw=1.8)
+        grad = df.get("actor/grad_norm", pd.Series(np.nan, index=df.index))
+        ax2.plot(df["_step"], grad, color=c, lw=1.8)
         ax2.set_yscale("log")
         ax2.set_xlabel("step", fontsize=9)
         if col == 0:
@@ -575,7 +602,10 @@ def data_d5() -> None:
     def v_curve(rid: str, scale: float = 1.0, tmax: float | None = None):
         df = load_run(rid)
         d, steps = df["d"].values, df["_step"].values
-        vs = [(u, v_geo(d, steps, u / scale)) for u in np.arange(42 * scale, (tmax or steps.max()) * scale, 4.0)]
+        vs = [
+            (u, v_geo(d, steps, u / scale))
+            for u in np.arange(42 * scale, (tmax or steps.max()) * scale, 4.0)
+        ]
         us = [u for u, v in vs if v is not None]
         return np.array(us), np.array([v for _, v in vs if v is not None]) * 100
 

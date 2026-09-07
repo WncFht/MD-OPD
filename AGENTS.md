@@ -19,3 +19,7 @@
 - 不要写 `set -euo pipefail`，可以写 `set -eo pipefail`
 
 文献引用一律用脚注：正文在作者-年份或论文名后紧跟 `[^key]`（键为小写 ASCII 与连字符，如 `[^zhang20]`；同一文献可多处引用），行内不放链接；文末设 `### 参考文献` 节，逐行写 `[^key]: 作者. 标题. venue 年份. [arXiv:编号](链接)`，编号由渲染器按首次引用自动生成，venue 只写核实过的。
+
+## 画图
+
+- 所有的 absolute 都要到 step 0，然后 normalized 也要到 step 0 只不过在 normalized 的 baseline 地方加竖线，把左侧的颜色变浅

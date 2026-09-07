@@ -183,7 +183,9 @@ def hump_check(style) -> None:
     ):
         d = load_main_branch(f"5A_lr_collapse_v2__panel1__{hexc}*.csv")
         rc = rate_curve(d)
-        ax1.plot(rc["step"], rc["v"] * 100, color=colors[k], linewidth=1.6, label=f"lr={lr}")
+        ax1.plot(
+            rc["step"], rc["v"] * 100, color=colors[k], linewidth=1.6, label=f"lr={lr}"
+        )
     ax1.set_yscale("log")
     ax1.set_xlabel("Training Step")
     ax1.set_ylabel(r"$v_t$ (%)")
@@ -194,7 +196,9 @@ def hump_check(style) -> None:
 
     # (b) online vs off-policy (H3b)
     colors = style.series_colors("tableau-paper", 4)
-    for k, (hexc, label) in enumerate((("00-3e-75", "On-Policy"), ("a6-18-2d", "Off-Policy"))):
+    for k, (hexc, label) in enumerate(
+        (("00-3e-75", "On-Policy"), ("a6-18-2d", "Off-Policy"))
+    ):
         a = load_main_branch(f"5_online_offline__panel2__{hexc}*.csv")
         a["value"] = -a["value"]
         rc = rate_curve(a)
