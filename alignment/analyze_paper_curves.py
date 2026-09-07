@@ -31,13 +31,13 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, HERE)
 
 
-from compute_alignment import geometric_absorption  # noqa: E402
 from fit_tail import (  # noqa: E402
     fit_floor_exp,
     fit_power_law,
     fit_stretched_exp,
     local_alpha,
 )
+from metrics import geometric_absorption  # noqa: E402
 
 T_START = 30
 
@@ -217,8 +217,7 @@ def main() -> int:
             "fold_k": match_table[fhex]["k"],
             "fold_rmse_log": match_table[fhex]["rmse_log"],
             "hump_vs_t": hump_step(rc_t),
-            "hump_u_from_t": hump_step(rc_t).get("hump_step", np.nan)
-            * match_table[fhex]["k"],
+            "hump_u_from_t": hump_step(rc_t).get("hump_step", np.nan) * match_table[fhex]["k"],
             "hump_vs_u": hump_step(rc_u),
         }
     results["lr_collapse"] = dict(sorted(lr_arms.items()))

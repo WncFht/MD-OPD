@@ -1,37 +1,36 @@
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import pandas as pd
+from metrics import compute_alignment_metrics
+from run_config import M4_RUNS
+
+from data import load_run_history
 
 R = Path(__file__).resolve().parent / "runs"
-O = Path(__file__).resolve().parent / "figures" / "metric"
-O.mkdir(exist_ok=True)
-RUNS = [
-    ("mdxt04lm", "lr 1e-6", "#1f8a9a", 1),
-    ("tjjxnvw9", r"$\beta_2=0.95$", "#7a3e9d", 1),
-    ("yj2w13fq", "lr 2e-6", "#245b9a", 2),
-    ("ybi7q89v", "lr 5e-7", "#b07a00", 0.5),
-]
+OUTPUT_DIR = Path(__file__).resolve().parent / "figures" / "metric"
+OUTPUT_DIR.mkdir(exist_ok=True)
+RUNS = [(rid, spec["label"], spec["color"], spec["scale"]) for rid, spec in M4_RUNS.items()]
 
 
 def load(r):
-    return pd.read_csv(R / f"{r}__history.csv").sort_values("_step")
+    history = load_run_history(r, R)
+    return history.frame, compute_alignment_metrics(history)
 
 
 def d1():
     fig, axs = plt.subplots(1, 2, figsize=(11, 4))
-    for rid, l, c, s in RUNS:
-        x = load(rid)
-        t = x["_step"]
+    for rid, label, color, scale in RUNS:
+        x, metrics = load(rid)
+        t = metrics["step"]
         ce = -x["opd/teacher_logp_mean"]
         h = x["actor/entropy"]
-        k = -x["opd/token_reward_mean"]
+        k = metrics["d_nats"]
         for y, ls, lw in [(ce, "-", 1.5), (h, ":", 1.0), (k, "--", 1.7)]:
-            axs[0].plot(t[t < 60], y[t < 60], color=c, lw=lw, ls=ls, alpha=0.25)
-            axs[0].plot(t[t >= 60], y[t >= 60], color=c, lw=lw, ls=ls)
+            axs[0].plot(t[t < 60], y[t < 60], color=color, lw=lw, ls=ls, alpha=0.25)
+            axs[0].plot(t[t >= 60], y[t >= 60], color=color, lw=lw, ls=ls)
         ratio = 100 * k / ce
-        axs[1].plot(t[t < 60], ratio[t < 60], color=c, lw=1.2, alpha=0.25)
-        axs[1].plot(t[t >= 60], ratio[t >= 60], color=c, lw=1.7, label=l)
+        axs[1].plot(t[t < 60], ratio[t < 60], color=color, lw=1.2, alpha=0.25)
+        axs[1].plot(t[t >= 60], ratio[t >= 60], color=color, lw=1.7, label=label)
     for a in axs:
         a.axvline(30, color="grey", ls="--", lw=0.8)
         a.axvline(60, color="grey", ls=":", lw=0.9)
@@ -55,20 +54,20 @@ def d1():
         a.grid(axis="y", alpha=0.25)
         a.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
-    fig.savefig(O / "D1_multirun_ce_entropy_kl.png", dpi=250)
+    fig.savefig(OUTPUT_DIR / "D1_multirun_ce_entropy_kl.png", dpi=250)
     plt.close(fig)
 
 
 def d2():
     fig, axs = plt.subplots(1, 2, figsize=(10, 4))
-    for rid, l, c, s in RUNS:
-        x = load(rid)
-        t = x["_step"]
-        k = -x["opd/token_reward_mean"]
+    for rid, label, color, scale in RUNS:
+        x, metrics = load(rid)
+        t = metrics["step"]
+        k = metrics["d_nats"]
         base = k.iloc[(t - 60).abs().argmin()]
-        axs[0].plot(t[t < 60], (k / base)[t < 60], color=c, lw=1.2, alpha=0.25)
-        axs[0].plot(t[t >= 60], (k / base)[t >= 60], color=c, lw=1.8, label=l)
-        axs[1].plot(t, k, color=c, lw=1.8, label=l)
+        axs[0].plot(t[t < 60], (k / base)[t < 60], color=color, lw=1.2, alpha=0.25)
+        axs[0].plot(t[t >= 60], (k / base)[t >= 60], color=color, lw=1.8, label=label)
+        axs[1].plot(t, k, color=color, lw=1.8, label=label)
     for a in axs:
         a.axvline(30, color="grey", ls="--", lw=0.8)
         a.axvline(60, color="grey", ls=":", lw=0.9)
@@ -84,20 +83,20 @@ def d2():
         a.spines[["top", "right"]].set_visible(False)
     axs[1].legend(fontsize=8)
     fig.tight_layout()
-    fig.savefig(O / "D2_multirun_mean_collapse.png", dpi=250)
+    fig.savefig(OUTPUT_DIR / "D2_multirun_mean_collapse.png", dpi=250)
     plt.close(fig)
 
 
 def d5():
     fig, axs = plt.subplots(1, 2, figsize=(11, 4))
-    for rid, l, c, s in RUNS:
-        x = load(rid)
-        t = x["_step"].to_numpy()
-        k = -x["opd/token_reward_mean"].to_numpy()
-        axs[0].plot(t, k / k[0], color=c, lw=1.7, label=l)
-        axs[1].plot(s * t, k / k[0], color=c, lw=1.7, label=l)
-        axs[0].axvline(t[-1], color=c, ls="--", lw=0.8, alpha=0.6)
-        axs[1].axvline(s * t[-1], color=c, ls="--", lw=0.8, alpha=0.6)
+    for rid, label, color, scale in RUNS:
+        x, metrics = load(rid)
+        t = metrics["step"].to_numpy()
+        k = metrics["d_nats"].to_numpy()
+        axs[0].plot(t, k / k[0], color=color, lw=1.7, label=label)
+        axs[1].plot(scale * t, k / k[0], color=color, lw=1.7, label=label)
+        axs[0].axvline(t[-1], color=color, ls="--", lw=0.8, alpha=0.6)
+        axs[1].axvline(scale * t[-1], color=color, ls="--", lw=0.8, alpha=0.6)
     axs[0].set_yscale("log")
     axs[1].set_yscale("log")
     axs[0].set_title("M4 distance on training-step axis")
@@ -110,7 +109,7 @@ def d5():
         a.spines[["top", "right"]].set_visible(False)
     axs[1].legend(fontsize=8)
     fig.tight_layout()
-    fig.savefig(O / "D5_m4_distance_collapse.png", dpi=250)
+    fig.savefig(OUTPUT_DIR / "D5_m4_distance_collapse.png", dpi=250)
     plt.close(fig)
 
 

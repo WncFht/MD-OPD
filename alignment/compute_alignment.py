@@ -30,15 +30,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
+from metrics import alignment_summary, compute_alignment_metrics
 
-GEO_FACTOR = 1.4  # paper's geometric window [t/1.4, 1.4t]
-DISTANCE_COLUMN = "opd/token_reward_mean"
+from data import load_run_history
 
 
 def run_label(meta: dict) -> str:
@@ -56,122 +53,38 @@ def run_label(meta: dict) -> str:
         return "sampled-token (discounted, seed 2)"
     if "discounted" in name:
         return "sampled-token (discounted)"
-    top_k = meta.get("config_flat", {}).get(
-        "distillation.fsdp_teacher.log_prob_top_k", 0
-    )
+    top_k = meta.get("config_flat", {}).get("distillation.fsdp_teacher.log_prob_top_k", 0)
     return f"top{int(top_k)}" if top_k else "sampled-token"
 
 
-def geometric_absorption(
-    steps: np.ndarray, dist: np.ndarray, t_start: int, factor: float
-) -> np.ndarray:
-    """v_t = 1 - exp(slope of log d over the geometric window [t/factor, factor*t])."""
-    v = np.full(steps.shape, np.nan)
-    log_d = np.log(dist)
-    for i, t in enumerate(steps):
-        lo, hi = t / factor, t * factor
-        window = (steps >= lo) & (steps <= hi)
-        if window.sum() < 3:
-            continue
-        x, y = steps[window].astype(float), log_d[window]
-        slope = np.polyfit(x, y, 1)[0]
-        v[i] = 1.0 - math.exp(slope)
-    return v
-
-
-def power_law_exponent(steps: np.ndarray, dist: np.ndarray) -> float | None:
-    """alpha in d ~ t^-alpha, least squares on (log t, log d) from t_start on."""
-    mask = (steps >= 2) & np.isfinite(dist) & (dist > 0)
-    if mask.sum() < 5:
-        return None
-    return float(
-        -np.polyfit(np.log(steps[mask].astype(float)), np.log(dist[mask]), 1)[0]
-    )
-
-
 def analyze_run(history_csv: Path, t_start: int, v_target_step: int) -> dict | None:
-    df = pd.read_csv(history_csv)
-    if DISTANCE_COLUMN not in df.columns:
-        print(f"[skip] {history_csv.name}: no {DISTANCE_COLUMN} column")
+    run_id = history_csv.name.split("__")[0]
+    history = load_run_history(run_id, history_csv.parent)
+    try:
+        frame = compute_alignment_metrics(history, t_start)
+    except (KeyError, ValueError) as error:
+        print(f"[skip] {history_csv.name}: {error}")
         return None
-
-    df = df.sort_values("_step").reset_index(drop=True)
-    steps = df["_step"].to_numpy(dtype=float)
-    dist = -df[DISTANCE_COLUMN].to_numpy(
-        dtype=float
-    )  # signed reward -> distance proxy (nats/token)
-    if t_start not in steps:
-        print(f"[skip] {history_csv.name}: step {t_start} missing")
-        return None
-
-    d_start = float(dist[steps == t_start][0])
-    d_rel = dist / d_start
-
-    v_direct = np.full(steps.shape, np.nan)
-    v_direct[:-1] = (dist[:-1] - dist[1:]) / dist[:-1]
-    v_geo = geometric_absorption(steps, dist, t_start, GEO_FACTOR)
-
-    out = pd.DataFrame(
-        {
-            "step": steps.astype(int),
-            "d_nats": dist,
-            "d_rel": d_rel,
-            "v_direct": v_direct,
-            "v_geo": v_geo,
-        }
-    )
-
-    tail = out.tail(5)
-    d_end = float(tail["d_nats"].mean())
-
-    def v_geo_at(step: int) -> float:
-        return float(out.iloc[(out["step"] - step).abs().argmin()]["v_geo"])
-
-    summary = {
-        "run_id": history_csv.name.split("__")[0],
-        "n_steps": int(out["step"].max()),
-        "d_start_nats": d_start,
-        "d_end_nats": d_end,
-        "d_end_over_d_start": d_end / d_start,
-        "v_geo_at_50": v_geo_at(50),
-        "v_geo_at_200": v_geo_at(200),
-        "v50_over_v200": v_geo_at(50) / v_geo_at(200),
-        "power_law_alpha": power_law_exponent(
-            steps[steps >= t_start], dist[steps >= t_start]
-        ),
-    }
-    return {"frame": out, "summary": summary}
+    return {"frame": frame, "summary": alignment_summary(frame, run_id, t_start)}
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    parser.add_argument(
-        "--runs-dir", type=Path, default=Path(__file__).resolve().parent / "runs"
-    )
-    parser.add_argument(
-        "--out-dir", type=Path, default=Path(__file__).resolve().parent / "derived"
-    )
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--runs-dir", type=Path, default=Path(__file__).resolve().parent / "runs")
+    parser.add_argument("--out-dir", type=Path, default=Path(__file__).resolve().parent / "derived")
     parser.add_argument(
         "--t-start",
         type=int,
         default=30,
         help="First step counted (clip active before this)",
     )
-    parser.add_argument(
-        "--v-target-step", type=int, default=50, help="Step for the headline v readout"
-    )
+    parser.add_argument("--v-target-step", type=int, default=50, help="Step for the headline v readout")
     args = parser.parse_args()
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     # Main comparison excludes Qwen3 and discounted-reward diagnostics.
     include_ids = {"mdxt04lm", "tjjxnvw9", "yj2w13fq", "ybi7q89v"}
-    histories = [
-        p
-        for p in sorted(args.runs_dir.glob("*__history.csv"))
-        if p.name.split("__")[0] in include_ids
-    ]
+    histories = [p for p in sorted(args.runs_dir.glob("*__history.csv")) if p.name.split("__")[0] in include_ids]
     if not histories:
         print(
             f"error: no *__history.csv under {args.runs_dir} (run pull_wandb_metrics.py first)",
@@ -195,9 +108,7 @@ def main() -> int:
         print(f"[compute] {run_id} -> {out_csv}")
 
     summary_path = args.out_dir / "summary.json"
-    summary_path.write_text(
-        json.dumps({"labels": labels, "runs": all_summaries}, indent=2)
-    )
+    summary_path.write_text(json.dumps({"labels": labels, "runs": all_summaries}, indent=2))
     print(f"[compute] summary -> {summary_path}")
 
     header = f"{'run':<14} {'label':<14} {'d_end/d30':>10} {'v50':>8} {'v200':>8} {'v50/v200':>9} {'alpha':>7}"

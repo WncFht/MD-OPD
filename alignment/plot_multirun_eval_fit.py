@@ -4,23 +4,23 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from metrics import distance_proxy
+from run_config import M4_RUNS
+
+from data import load_run_history
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "alignment/runs"
 OUT = ROOT / "alignment/figures/multirun_eval_vs_logd.png"
-runs = [
-    ("mdxt04lm", "baseline lr=1e-6", "#1f8a9a"),
-    ("tjjxnvw9", r"$\beta_2=0.95$", "#7a3e9d"),
-    ("yj2w13fq", "lr=2e-6", "#245b9a"),
-    ("ybi7q89v", "lr=5e-7", "#b07a00"),
-]
+runs = [(rid, spec["label"], spec["color"]) for rid, spec in M4_RUNS.items()]
 benches = [("AIME25", "AIME25"), ("AMC23", "AMC23"), ("MATH-500", "MATH-500")]
 fig, axs = plt.subplots(2, 2, figsize=(10, 7), sharex=False)
 axs = axs.ravel()
 for rid, label, color in runs:
-    d = pd.read_csv(RUNS / f"{rid}__history.csv").sort_values("_step")
+    history = load_run_history(rid, RUNS)
+    d = history.frame
     d = d[d["_step"] >= 30]
-    x = -np.log(-d["opd/token_reward_mean"])
+    x = -np.log(distance_proxy(history)[d.index.to_numpy()])
     for j, (short, name) in enumerate(benches):
         c = f"val-core/{short}/acc/mean@16"
         m = d[c].notna() if c in d else pd.Series(False, index=d.index)

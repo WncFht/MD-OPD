@@ -2,25 +2,20 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+from metrics import compute_alignment_metrics
+from run_config import M4_RUNS
+
+from data import load_run_history
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "alignment/runs"
 OUT = ROOT / "alignment/figures"
-RUNSPEC = [
-    ("ybi7q89v", r"lr $5\times10^{-7}$", 0.5, "#b07a00"),
-    ("mdxt04lm", r"lr $1\times10^{-6}$", 1.0, "#1f8a9a"),
-    ("yj2w13fq", r"lr $2\times10^{-6}$", 2.0, "#245b9a"),
-    ("tjjxnvw9", r"$\beta_2=0.95$", 1.0, "#7a3e9d"),
-]
+RUNSPEC = [(rid, spec["label"], spec["scale"], spec["color"]) for rid, spec in M4_RUNS.items()]
 
 
 def load(rid):
-    return (
-        pd.read_csv(RUNS / f"{rid}__history.csv")
-        .sort_values("_step")
-        .reset_index(drop=True)
-    )
+    history = load_run_history(rid, RUNS)
+    return history.frame, compute_alignment_metrics(history)
 
 
 def split_plot(ax, x, y, color, cut):
@@ -32,9 +27,9 @@ def split_plot(ax, x, y, color, cut):
 def main():
     fig, axs = plt.subplots(3, 2, figsize=(13, 10), sharex="col")
     for rid, label, scale, color in RUNSPEC:
-        d = load(rid)
-        t = d["_step"].to_numpy(float)
-        dist = -d["opd/token_reward_mean"].to_numpy(float)
+        d, metrics = load(rid)
+        t = metrics["step"].to_numpy(float)
+        dist = metrics["d_nats"].to_numpy(float)
         u = scale * t
         vals = [dist, dist / np.interp(30, t, dist), dist / np.interp(60, t, dist)]
         for row, y in enumerate(vals):
@@ -71,17 +66,11 @@ def main():
         )
     axs[2, 0].set_xlabel("training step $t$ (dimensionless)")
     axs[2, 1].set_xlabel(r"effective time $u=(lr/10^{-6})t$ (dimensionless)")
-    axs[0, 0].text(
-        30, axs[0, 0].get_ylim()[1] * 0.7, "30", rotation=90, fontsize=8, color="grey"
-    )
-    axs[0, 0].text(
-        60, axs[0, 0].get_ylim()[1] * 0.7, "60", rotation=90, fontsize=8, color="grey"
-    )
-    h, l = axs[0, 0].get_legend_handles_labels()
-    fig.legend(h, l, loc="upper center", ncol=4, bbox_to_anchor=(0.5, 1.01))
-    fig.suptitle(
-        "M4 distance diagnostics: absolute and two normalisation baselines", y=1.03
-    )
+    axs[0, 0].text(30, axs[0, 0].get_ylim()[1] * 0.7, "30", rotation=90, fontsize=8, color="grey")
+    axs[0, 0].text(60, axs[0, 0].get_ylim()[1] * 0.7, "60", rotation=90, fontsize=8, color="grey")
+    handles, labels = axs[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper center", ncol=4, bbox_to_anchor=(0.5, 1.01))
+    fig.suptitle("M4 distance diagnostics: absolute and two normalisation baselines", y=1.03)
     fig.tight_layout()
     fig.savefig(OUT / "metric/m4_distance_six_panel.png", dpi=250, bbox_inches="tight")
     plt.close(fig)
@@ -90,17 +79,13 @@ def main():
 def accuracy():
     fig, ax = plt.subplots(figsize=(9, 4.8))
     for rid, label, scale, color in RUNSPEC:
-        d = load(rid)
-        cols = [
-            c for c in d if c.startswith("val-core/") and c.endswith("/acc/mean@16")
-        ]
+        d, _ = load(rid)
+        cols = [c for c in d if c.startswith("val-core/") and c.endswith("/acc/mean@16")]
         if not cols:
             continue
         v = d[cols].mean(axis=1)
         m = v.notna()
-        ax.plot(
-            d.loc[m, "_step"], v[m] * 100, "-s", ms=3, lw=1.4, color=color, label=label
-        )
+        ax.plot(d.loc[m, "_step"], v[m] * 100, "-s", ms=3, lw=1.4, color=color, label=label)
     ax.set_xlabel("training step $t$ (dimensionless)")
     ax.set_ylabel("validation accuracy (%, 3-task mean@16)")
     ax.set_title("M4 validation accuracy")

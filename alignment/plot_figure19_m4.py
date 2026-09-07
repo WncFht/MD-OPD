@@ -4,30 +4,29 @@
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import pandas as pd
+from metrics import compute_alignment_metrics
+from run_config import M4_RUNS
+
+from data import load_run_history
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "alignment/runs"
 OUT = ROOT / "alignment/figures/figure19_m4.png"
 spec = [
-    ("ybi7q89v", r"lr $5\times10^{-7}$", 0.5, "#b07a00"),
-    ("mdxt04lm", r"lr $1\times10^{-6}$", 1.0, "#1f8a9a"),
-    ("yj2w13fq", r"lr $2\times10^{-6}$", 2.0, "#245b9a"),
+    (rid, settings["label"], settings["scale"], settings["color"])
+    for rid, settings in M4_RUNS.items()
+    if rid != "tjjxnvw9"
 ]
 fig, ax = plt.subplots(1, 3, figsize=(14, 4.2))
 for rid, label, scale, color in spec:
-    d = (
-        pd.read_csv(RUNS / f"{rid}__history.csv")
-        .sort_values("_step")
-        .reset_index(drop=True)
-    )
-    t = d["_step"].to_numpy()
-    dist = -d["opd/token_reward_mean"].to_numpy()
+    history = load_run_history(rid, RUNS)
+    d = history.frame
+    metrics = compute_alignment_metrics(history)
+    t = metrics["step"].to_numpy()
+    dist = metrics["d_nats"].to_numpy()
     ax[1].plot(t, dist, color=color, lw=1.7, label=label)
     ax[2].plot(scale * t, dist, color=color, lw=1.7, label=label)
-    valcols = [
-        c for c in d.columns if c.startswith("val-core/") and c.endswith("/acc/mean@16")
-    ]
+    valcols = [c for c in d.columns if c.startswith("val-core/") and c.endswith("/acc/mean@16")]
     if valcols:
         vv = d[valcols].mean(axis=1)
         m = vv.notna()

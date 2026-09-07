@@ -1,39 +1,34 @@
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import pandas as pd
+from metrics import compute_alignment_metrics
+from run_config import M4_RUNS
+
+from data import load_run_history
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "alignment/runs"
 OUT = ROOT / "alignment/figures"
-RUNSPEC = [
-    ("ybi7q89v", r"lr $5\times10^{-7}$", 0.5, "#b07a00"),
-    ("mdxt04lm", r"lr $1\times10^{-6}$", 1.0, "#1f8a9a"),
-    ("yj2w13fq", r"lr $2\times10^{-6}$", 2.0, "#245b9a"),
-    ("tjjxnvw9", r"$\beta_2=0.95$", 1.0, "#7a3e9d"),
-]
+RUNSPEC = [(rid, settings["label"], settings["scale"], settings["color"]) for rid, settings in M4_RUNS.items()]
 
 
 def data(rid):
-    return (
-        pd.read_csv(RUNS / f"{rid}__history.csv")
-        .sort_values("_step")
-        .reset_index(drop=True)
-    )
+    history = load_run_history(rid, RUNS)
+    return history.frame, compute_alignment_metrics(history)
 
 
 def figure19(t0):
     fig, ax = plt.subplots(1, 3, figsize=(14, 4.2))
     for rid, label, scale, color in RUNSPEC:
-        d = data(rid)
-        d = d[d._step >= t0]
-        t = d._step.to_numpy()
-        dist = -d["opd/token_reward_mean"].to_numpy()
+        raw, metrics = data(rid)
+        mask = metrics.step >= t0
+        d = raw.loc[mask]
+        series = metrics.loc[mask]
+        t = series.step.to_numpy()
+        dist = series.d_nats.to_numpy()
         ax[1].plot(t, dist, color=color, lw=1.6, label=label)
         ax[2].plot(scale * t, dist / dist[0], color=color, lw=1.6, label=label)
-        cols = [
-            c for c in d if c.startswith("val-core/") and c.endswith("/acc/mean@16")
-        ]
+        cols = [c for c in d if c.startswith("val-core/") and c.endswith("/acc/mean@16")]
         if cols:
             v = d[cols].mean(axis=1)
             m = v.notna()
@@ -74,8 +69,8 @@ def figure19(t0):
     for a in ax:
         a.grid(axis="y", alpha=0.25)
         a.spines[["top", "right"]].set_visible(False)
-    h, l = ax[1].get_legend_handles_labels()
-    fig.legend(h, l, loc="upper center", ncol=4, bbox_to_anchor=(0.5, 1.05))
+    handles, labels = ax[1].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper center", ncol=4, bbox_to_anchor=(0.5, 1.05))
     fig.tight_layout()
     fig.savefig(OUT / f"figure19_m4_step{t0}.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
@@ -84,10 +79,10 @@ def figure19(t0):
 def d5(t0):
     fig, ax = plt.subplots(1, 2, figsize=(11, 4))
     for rid, label, scale, color in RUNSPEC:
-        d = data(rid)
-        d = d[d._step >= t0]
-        t = d._step.to_numpy()
-        dist = -d["opd/token_reward_mean"].to_numpy()
+        _, metrics = data(rid)
+        series = metrics.loc[metrics.step >= t0]
+        t = series.step.to_numpy()
+        dist = series.d_nats.to_numpy()
         ax[0].plot(t, dist / dist[0], color=color, lw=1.7, label=label)
         ax[1].plot(scale * t, dist / dist[0], color=color, lw=1.7, label=label)
         ax[0].axvline(t[-1], color=color, ls="--", lw=0.8, alpha=0.65)
@@ -130,11 +125,9 @@ def d5(t0):
 def grad():
     fig, ax = plt.subplots(figsize=(10, 4.2))
     for rid, label, scale, color in RUNSPEC:
-        d = data(rid)
-        ax.plot(d._step, d["actor/grad_norm"], color=color, lw=1.5, label=label)
-    ax.axhline(
-        1.0, color="black", ls="--", lw=1, label="gradient-clip threshold $||g||=1$"
-    )
+        d, metrics = data(rid)
+        ax.plot(metrics.step, d["actor/grad_norm"], color=color, lw=1.5, label=label)
+    ax.axhline(1.0, color="black", ls="--", lw=1, label="gradient-clip threshold $||g||=1$")
     ax.axvline(60, color="grey", ls=":", lw=1, label="common baseline step 60")
     ax.set_yscale("log")
     ax.set_xlabel("training step $t$ (dimensionless)")
