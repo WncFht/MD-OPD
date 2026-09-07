@@ -187,6 +187,10 @@ class OPDTrainerMixin:
         overlap statistics, but ``rm_scores`` stays the plain (B, T) reverse KL.
         """
         batch.meta_info["opd_top_k_is_reward"] = self.opd_top_k_is_reward()
+        # Frozen-state mode caches only the rollout tokens/states.  The teacher
+        # remains frozen, but we intentionally run one teacher forward per
+        # optimizer step so metric-only top-K uses the *current* student's
+        # candidate set and reports fresh overlap/mass statistics.
         teacher_output = self.opd_teacher_wg.compute_rm_score(batch)
 
         if "token_level_scores" in batch.batch.keys():
@@ -202,7 +206,9 @@ class OPDTrainerMixin:
         # even when top-K reward mode is enabled.  This makes the metrics
         # comparable across metric-only and top-K training runs.
         teacher_log_probs = batch.batch["teacher_log_probs"]
-        student_log_probs = batch.batch["old_log_probs"].to(teacher_log_probs.device)
+        student_log_probs = batch.batch.get("current_student_log_probs", batch.batch["old_log_probs"]).to(
+            teacher_log_probs.device
+        )
         token_mask = response_mask.to(teacher_log_probs.dtype)
         advantage = teacher_log_probs - student_log_probs
         denom = token_mask.sum().clamp_min(1.0)

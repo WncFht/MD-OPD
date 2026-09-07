@@ -18,6 +18,7 @@ PPO Trainer with Ray-based single controller.
 This trainer supports model-agonistic model initialization with huggingface
 """
 
+import copy
 import json
 import os
 import uuid
@@ -368,6 +369,34 @@ class RayPPOTrainer(OPDTrainerMixin):
         # inference-replica teacher loop; the two are mutually exclusive.
         self.use_opd_teacher = opd_teacher_enabled(self.config)
         self.use_template_mode = template_enabled(self.config)
+        self.frozen_rollout = bool(self.config.algorithm.get("frozen_rollout", False))
+        self.frozen_policy_loss_mode = self.config.actor_rollout_ref.actor.policy_loss.get("loss_mode", "vanilla")
+        if self.frozen_rollout:
+            if not self.use_opd_teacher:
+                raise ValueError("algorithm.frozen_rollout requires OPD teacher distillation")
+            if self.frozen_policy_loss_mode not in ("opd_noratio", "vanilla"):
+                raise ValueError(
+                    "algorithm.frozen_rollout requires policy_loss.loss_mode=opd_noratio or vanilla"
+                )
+            if int(self.config.distillation.fsdp_teacher.get("log_prob_top_k", 0) or 0) > 0:
+                raise ValueError(
+                    "algorithm.frozen_rollout currently supports sampled-token OPD only (log_prob_top_k=0)"
+                )
+            rollout_corr = self.config.algorithm.get("rollout_correction", {}) or {}
+            if rollout_corr.get("rollout_is") is not None or rollout_corr.get("rollout_rs") is not None:
+                raise ValueError(
+                    "algorithm.frozen_rollout requires rollout_correction.rollout_is=null and rollout_rs=null"
+                )
+        self._frozen_rollout_output = None
+        self._frozen_rollout_batch = None
+        self._frozen_old_log_probs = None
+        if self.frozen_rollout:
+            print(
+                "[frozen-opd] enabled: "
+                f"policy_loss={self.frozen_policy_loss_mode}, "
+                "rollout_cache=first_batch, current_student_logp=recomputed, "
+                "teacher_forward=every_step, rollout_is=disabled"
+            )
         self.validate_opd_top_k_config()
 
         self.use_rm = need_reward_model(self.config)
@@ -479,6 +508,15 @@ class RayPPOTrainer(OPDTrainerMixin):
 
         if self.config.trainer.total_training_steps is not None:
             total_training_steps = self.config.trainer.total_training_steps
+
+        # Frozen-state runs intentionally reuse one cached rollout batch for
+        # many optimizer steps.  Extend the epoch loop so an explicit
+        # total_training_steps is actually reached even when the one-shot
+        # dataloader contains only a single batch.
+        if getattr(self, "frozen_rollout", False) and self.config.trainer.total_training_steps is not None:
+            batches_per_epoch = max(len(self.train_dataloader), 1)
+            required_epochs = (total_training_steps + batches_per_epoch - 1) // batches_per_epoch
+            self.config.trainer.total_epochs = max(int(self.config.trainer.total_epochs), required_epochs)
 
         self.total_training_steps = total_training_steps
         print(f"Total training steps: {self.total_training_steps}")
@@ -1753,14 +1791,17 @@ class RayPPOTrainer(OPDTrainerMixin):
                 with marked_timer("step", timing_raw):
                     # generate a batch
                     with marked_timer("gen", timing_raw, color="red"):
-                        if curr_step_profile:
-                            self.llm_server_manager.start_profile()
-                        combined_gen_output = self.async_rollout_manager.generate_sequences(combined_gen_batch)
-                        self.checkpoint_manager.sleep_replicas()
-                        if curr_step_profile:
-                            self.llm_server_manager.stop_profile()
+                        if self.frozen_rollout and self._frozen_rollout_output is not None:
+                            combined_gen_output = copy.deepcopy(self._frozen_rollout_output)
+                        else:
+                            if curr_step_profile:
+                                self.llm_server_manager.start_profile()
+                            combined_gen_output = self.async_rollout_manager.generate_sequences(combined_gen_batch)
+                            self.checkpoint_manager.sleep_replicas()
+                            if curr_step_profile:
+                                self.llm_server_manager.stop_profile()
 
-                        timing_raw.update(combined_gen_output.meta_info["timing"])
+                        timing_raw.update(combined_gen_output.meta_info.get("timing", {}))
                         combined_gen_output.meta_info.pop("timing", None)
 
                     gen_batch_output = combined_gen_output.slice(0, num_sampled_prompts)
@@ -1784,6 +1825,15 @@ class RayPPOTrainer(OPDTrainerMixin):
                     # repeat to align with repeated responses in rollout
                     batch = batch.repeat(repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True)
                     batch = batch.union(gen_batch_output)
+
+                    if self.frozen_rollout and self._frozen_rollout_batch is not None:
+                        batch = copy.deepcopy(self._frozen_rollout_batch)
+                    elif self.frozen_rollout:
+                        # Cache the first generated state/trajectory pool.  Future
+                        # steps reuse these tokens but still recompute current
+                        # student log-probs below.
+                        self._frozen_rollout_output = copy.deepcopy(gen_batch_output)
+                        self._frozen_rollout_batch = copy.deepcopy(batch)
 
                     if "response_mask" not in batch.batch.keys():
                         batch.batch["response_mask"] = compute_response_mask(batch)
@@ -1834,6 +1884,20 @@ class RayPPOTrainer(OPDTrainerMixin):
                     else:  # Recompute old_log_probs
                         with marked_timer("old_log_prob", timing_raw, color="blue"):
                             old_log_prob, old_log_prob_mfu = self._compute_old_log_prob(batch)
+                            # This forward is the current student's no-grad
+                            # scoring pass.  Preserve it separately for OPD
+                            # teacher scoring and top-k metrics.  In frozen PPO
+                            # mode, the PPO anchor is the first-step value and
+                            # must remain fixed across later updates.
+                            current_student_log_probs = old_log_prob.batch["old_log_probs"]
+                            old_log_prob.batch["current_student_log_probs"] = current_student_log_probs
+                            if self.frozen_rollout and self.frozen_policy_loss_mode == "vanilla":
+                                if self._frozen_old_log_probs is None:
+                                    self._frozen_old_log_probs = current_student_log_probs.detach().cpu().clone()
+                                else:
+                                    old_log_prob.batch["old_log_probs"] = self._frozen_old_log_probs.to(
+                                        current_student_log_probs.device
+                                    )
                             entropys = old_log_prob.batch["entropys"]
                             response_masks = batch.batch["response_mask"]
                             actor_config = self.config.actor_rollout_ref.actor
@@ -1909,6 +1973,7 @@ class RayPPOTrainer(OPDTrainerMixin):
                             rollout_corr_config is not None
                             and "rollout_log_probs" in batch.batch
                             and not bypass_recomputing_logprobs  # Only in decoupled mode
+                            and not self.frozen_rollout
                         ):
                             from verl.trainer.ppo.rollout_corr_helper import compute_rollout_correction_and_add_to_batch
 
@@ -1969,9 +2034,18 @@ class RayPPOTrainer(OPDTrainerMixin):
                             with marked_timer("save_checkpoint", timing_raw, color="green"):
                                 self._save_checkpoint()
 
-                        # update weights from trainer to rollout
-                        with marked_timer("update_weights", timing_raw, color="red"):
-                            self.checkpoint_manager.update_weights(self.global_steps)
+                        # Frozen training never regenerates its training batch,
+                        # so rollout weights only need refreshing immediately
+                        # before a validation pass. Normal on-policy training
+                        # still synchronizes after every actor update.
+                        validation_due = (
+                            self.validation_enabled
+                            and self.config.trainer.test_freq > 0
+                            and (is_last_step or self.global_steps % self.config.trainer.test_freq == 0)
+                        )
+                        if not self.frozen_rollout or validation_due:
+                            with marked_timer("update_weights", timing_raw, color="red"):
+                                self.checkpoint_manager.update_weights(self.global_steps)
 
                         actor_output_metrics = reduce_metrics(actor_output.meta_info["metrics"])
                         metrics.update(actor_output_metrics)

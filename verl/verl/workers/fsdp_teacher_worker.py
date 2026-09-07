@@ -51,6 +51,7 @@ from verl.utils.fsdp_utils import (
     init_fn,
 )
 from verl.utils.py_functional import convert_to_regular_types
+from verl.utils.topk_logits import top_k_logits_chunk_rows
 from verl.utils.torch_dtypes import PrecisionType
 from verl.workers.config import FsdpTeacherConfig
 
@@ -64,13 +65,6 @@ __all__ = [
     "group_rows_by_teacher",
     "local_micro_batch_counts",
 ]
-
-
-# Keep the FP32 vocab-sized temporary bounded independently of the configured
-# teacher micro-batch.  The row cap limits kernel-launch overhead while the
-# byte cap remains safe for larger vocabularies.
-_TOP_K_LOGITS_CHUNK_ROWS = 1024
-_TOP_K_LOGITS_CHUNK_BYTES = 512 * 1024 * 1024
 
 
 def group_rows_by_teacher(routes) -> dict[str, list[int]]:
@@ -133,7 +127,7 @@ def compute_top_k_teacher_log_probs(
     student_in_teacher = torch.empty((*output_shape, student_k), dtype=torch.bool, device=logits.device)
     teacher_in_student = torch.empty((*output_shape, top_k), dtype=torch.bool, device=logits.device)
 
-    chunk_rows = _top_k_logits_chunk_rows(logits)
+    chunk_rows = top_k_logits_chunk_rows(logits)
     if logits.ndim == 2:
         row_ranges = ((slice(start, min(start + chunk_rows, n_rows)),) for start in range(0, n_rows, chunk_rows))
     else:
@@ -196,13 +190,6 @@ def _supports_logits_to_keep(module) -> bool:
         return "logits_to_keep" in inspect.signature(target.forward).parameters
     except (TypeError, ValueError):
         return False
-
-
-def _top_k_logits_chunk_rows(logits: torch.Tensor) -> int:
-    """Return a bounded number of rows for FP32 vocab post-processing."""
-    fp32_bytes = torch.finfo(torch.float32).bits // 8
-    rows_by_bytes = _TOP_K_LOGITS_CHUNK_BYTES // (logits.shape[-1] * fp32_bytes)
-    return max(1, min(_TOP_K_LOGITS_CHUNK_ROWS, rows_by_bytes))
 
 
 def compute_reward_weights(
@@ -439,7 +426,7 @@ class TeacherWorker(Worker):
         order = group_rows_by_teacher(routes)
 
         response_mask = data.batch["response_mask"] if "response_mask" in data.batch.keys() else None
-        student_log_probs = data.batch["old_log_probs"]
+        student_log_probs = data.batch.get("current_student_log_probs", data.batch["old_log_probs"])
         teacher_log_probs = torch.empty_like(student_log_probs)
 
         student_top_k_ids = data.batch.get("student_top_k_ids")

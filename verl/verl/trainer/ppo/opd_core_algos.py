@@ -48,6 +48,7 @@ __all__ = [
     "compute_token_reward_direct_plus_grpo_advantage",
     "compute_discounted_token_reward_advantage",
     "compute_policy_loss_vanilla_topk",
+    "compute_policy_loss_opd_noratio",
 ]
 
 
@@ -232,5 +233,42 @@ def compute_policy_loss_vanilla_topk(
     return pg_loss, {
         "actor/pg_clipfrac": pg_clipfrac.detach().item(),
         "actor/ppo_kl": ppo_kl.detach().item(),
+        "actor/pg_clipfrac_lower": 0.0,
+    }
+
+
+@register_policy_loss("opd_noratio")
+def compute_policy_loss_opd_noratio(
+    old_log_prob: torch.Tensor,
+    log_prob: torch.Tensor,
+    advantages: torch.Tensor,
+    response_mask: torch.Tensor,
+    loss_agg_mode: str = "token-mean",
+    config: Optional[ActorConfig] = None,
+    rollout_is_weights: torch.Tensor | None = None,
+) -> tuple[torch.Tensor, dict[str, Any]]:
+    """Pure OPD policy-gradient loss: no PPO ratio and no rollout IS.
+
+    ``old_log_prob`` is accepted for the common actor-loss interface but is
+    deliberately unused.  The advantage is detached because OPD computes the
+    teacher-minus-current-student gap before entering the policy-gradient
+    loss; differentiating through that gap would add an unintended second
+    term.  This is the loss used by the frozen-state experiment.
+    """
+    if rollout_is_weights is not None:
+        raise ValueError("opd_noratio does not support rollout importance-sampling weights")
+    if config is None:
+        raise ValueError("opd_noratio requires ActorConfig")
+
+    pg_losses = -advantages.detach() * log_prob
+    pg_loss = agg_loss(
+        loss_mat=pg_losses,
+        loss_mask=response_mask,
+        loss_agg_mode=loss_agg_mode,
+        **config.global_batch_info,
+    )
+    return pg_loss, {
+        "actor/pg_clipfrac": 0.0,
+        "actor/ppo_kl": 0.0,
         "actor/pg_clipfrac_lower": 0.0,
     }

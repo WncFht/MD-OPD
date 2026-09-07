@@ -1317,10 +1317,11 @@ class FSDPEngineWithLMHead(FSDPEngine):
         a second (tokens, vocab) tensor.
         """
         top_k = min(top_k, logits.shape[-1])
-        top_k_logits, top_k_ids = torch.topk(logits, k=top_k, dim=-1)
-        log_probs = top_k_logits.float() - torch.logsumexp(logits.float(), dim=-1, keepdim=True)
+        from verl.utils.topk_logits import chunked_top_k_log_probs
+
+        top_k_ids, log_probs = chunked_top_k_log_probs(logits, top_k)
         return {
-            "student_top_k_ids": top_k_ids.to(torch.int64),
+            "student_top_k_ids": top_k_ids,
             "student_top_k_log_probs": log_probs,
         }
 
