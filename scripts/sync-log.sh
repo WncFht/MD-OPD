@@ -146,9 +146,21 @@ unpack_logs() {
 
     cp -a "$extract_dir/wandb/." "$WANDB_DIR/"
     if command -v wandb >/dev/null 2>&1; then
+      local attempts="${OPD_SYNC_ATTEMPTS:-3}" attempt rc
       for run in "${runs_to_sync[@]}"; do
         echo ">>> wandb sync $run"
-        wandb sync "$run" || sync_rc=$?
+        rc=0
+        for ((attempt = 1; attempt <= attempts; attempt++)); do
+          if wandb sync "$run"; then rc=0; break; fi
+          rc=$?
+          (( attempt < attempts )) || break
+          # HTTP 500s from api.wandb.ai (e.g. "mysql query exceeded guard
+          # deadline") are W&B server-side and transient; re-running sync
+          # skips already-uploaded history.
+          echo ">>> wandb sync failed (exit $rc), retry in 60s (attempt $attempt/$attempts)" >&2
+          sleep 60
+        done
+        (( rc == 0 )) || sync_rc=$rc
       done
     else echo ">>> wandb command not found; skipping W&B sync" >&2; fi
   fi
