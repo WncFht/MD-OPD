@@ -14,13 +14,13 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, HERE)
 
+from core.metrics import geometric_absorption  # noqa: E402
 from fit_tail import (  # noqa: E402
     fit_floor_exp,
     fit_power_law,
     fit_stretched_exp,
     local_alpha,
 )
-from metrics import geometric_absorption  # noqa: E402
 
 STYLE_PATH = ROOT / ".agents/skills/plot-skill/scripts/style_presets.py"
 T_START = 30

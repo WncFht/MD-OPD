@@ -2,10 +2,9 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from metrics import compute_alignment_metrics
-from run_config import M4_RUNS
-
-from data import load_run_history
+from config.runs import M4_RUNS
+from core.data import load_run_history
+from core.metrics import compute_alignment_metrics
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "alignment/runs"

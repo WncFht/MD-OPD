@@ -1,0 +1,1 @@
+"""Named analysis configurations."""

@@ -33,9 +33,8 @@ import json
 import sys
 from pathlib import Path
 
-from metrics import alignment_summary, compute_alignment_metrics
-
-from data import load_run_history
+from core.data import load_run_history
+from core.metrics import alignment_summary, compute_alignment_metrics
 
 
 def run_label(meta: dict) -> str:

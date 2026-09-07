@@ -1,123 +1,155 @@
-# 对齐度量：d_t（距离）与 v_t（吸收率）
+# Alignment analysis pipeline
 
-OPD 教师-学生对齐的离线分析，度量定义来自 Fu et al. (2026) Eq. 6/7 与
-`docs/2026-09-06-absorption-rate-spectral-theory.md`：
+`alignment/` 是 One-Shot-OPD 的离线分析代码。设计目标不是管理每一张图片，而是让**数据如何进入系统**、**指标如何计算**成为稳定的代码接口；绘图脚本只是这些指标的一个消费者。
 
-$$
-d_t=\frac{1}{|\mathcal T_t|}\sum_{i\in\mathcal T_t}\left|\log\pi_T(y_i\mid s_i)-\log\pi_{\theta_t}(y_i\mid s_i)\right|,\qquad
-v_t=\frac{d_t-d_{t+1}}{d_t}.
-$$
+## 设计理念
 
-度量从 step 30 开始追踪（此前 gradient clipping 仍在生效）；$v_t$ 另有论文的几何窗口 $[t/1.4,\,1.4t]$ 估计（见下）。
-
-## 流水线
-
-```
-pull_wandb_metrics.py      W&B -> alignment/runs/<run_id>__history.csv + __meta.json
-compute_alignment.py       CSV  -> alignment/derived/<run_id>__alignment.csv + summary.json
-plot_alignment.py          CSV  -> alignment/figures/*.png
-fit_tail.py                CSV  -> D1 尾部形态拟合（幂律 / 拉伸指数 / floor+指数）
-extract_paper_figures.py   论文图 PDF -> paper_curves/*.csv（矢量逐点提取）
-analyze_paper_curves.py    paper_curves -> derived/paper_analysis.json（M1）
-plot_paper_analysis.py     M1 三图（tail fits / alpha 对比 / hump 判别）
-invert_spectrum.py         derived -> derived/spectrum__*.csv + figures（M2）
+```text
+外部数据 / 本地文件
+        ↓
+数据层：读取、排序、保留原始字段和 metadata
+        ↓
+指标层：distance、absorption、tail fit、spectrum、validation
+        ↓
+绘图和报告：展示指标表
 ```
 
-拉取本仓库标准的两个 run（top16 vs sampled-token）：
+数据层不解释科学含义。例如 W&B 的 `opd/token_reward_mean` 只是原始字段；它被解释成正的 distance proxy 是指标层的职责。这样更换数据来源时不必重写绘图，更换指标口径时也不必修改 loader。
+
+指标层输出表格或 JSON，而不是直接输出图片。当前 alignment 的标准逐步表为：
+
+| 列 | 含义 |
+| --- | --- |
+| `step` | 训练步 |
+| `d_nats` | 正的 reverse-KL distance proxy，即 `-opd/token_reward_mean` |
+| `d_rel` | 相对于分析 baseline（默认 step 30）的距离 |
+| `v_direct` | 原始单步吸收率 |
+| `v_geo` | 几何窗口平滑吸收率 |
+
+指标计算保留完整 step 范围。是否从 step 0 展示、哪个 baseline 用于归一化、baseline 前如何淡化，属于绘图层的决定。
+
+## 目录结构
+
+```text
+alignment/
+├── core/
+│   ├── data.py       # RunHistory 和本地 history loader
+│   └── metrics.py    # distance / absorption / summary
+├── config/
+│   └── runs.py       # M4 run 的 label、颜色、effective-time scale
+├── data.py           # 兼容旧脚本的转发入口
+├── metrics.py        # 兼容旧脚本的转发入口
+├── run_config.py     # 兼容旧脚本的转发入口
+├── pull_wandb_metrics.py
+├── compute_alignment.py
+├── plot_alignment.py
+├── fit_tail.py
+├── extract_paper_figures.py
+├── analyze_paper_curves.py
+├── plot_paper_analysis.py
+├── invert_spectrum.py
+├── plot_metric_theory.py
+├── plot_qwen3_diagnosis.py
+├── plot_figure19_m4.py
+├── plot_baseline_variants.py
+├── plot_m4_six_panel.py
+├── plot_m4_supplement.py
+├── plot_multirun_eval_fit.py
+├── runs/             # W&B 原始 history 和 metadata
+├── derived/          # 指标表、拟合参数、谱反演结果
+├── paper_curves/     # 从论文 PDF 提取的 tidy 曲线
+└── figures/          # 绘图输出
+```
+
+`core/` 是以后优先复用和扩展的代码。根目录的三个同名文件暂时保留，是为了让现有“从 alignment 目录直接运行”的脚本继续工作；新代码应优先从 `core` 和 `config` 导入。
+
+## 常用流程
+
+### 1. 拉取 W&B 数据
 
 ```bash
 .venv/bin/python alignment/pull_wandb_metrics.py \
-    --entity wncfht --project One-Shot-OPD \
-    --run-id be00rj9e mdxt04lm
-.venv/bin/python alignment/compute_alignment.py
-.venv/bin/python alignment/plot_alignment.py
-.venv/bin/python alignment/fit_tail.py
+  --entity wncfht --project One-Shot-OPD \
+  --run-id mdxt04lm be00rj9e --out alignment/runs
 ```
 
-`pull_wandb_metrics.py` 与项目无关：任意 `--entity/--project/--run-id` 均可；
-输出文件已存在时自动跳过（`--force` 强制重拉）；默认键列表是 curated 的 OPD 指标集 `DEFAULT_KEYS`（可用 `--keys`/`--keys-file` 覆盖）。凭证来自 `~/.netrc` / `$WANDB_API_KEY`。
+这个步骤只做外部数据落盘，不计算 alignment 指标。已有文件默认不会重复拉取；需要更新时使用 `--force`。
 
-## 距离代理是什么
-
-训练日志里没有直接的 $d_t$，但两个 run 都是 `adv_estimator=token_reward_direct`，trainer 记录的 `opd/token_reward_mean` 是逐 token reward $\mathrm{rm\_scores}=\log\pi_T-\log\pi_\theta$ 在访问 token 上的均值（见 `verl/verl/workers/fsdp_teacher_worker.py`）。我们取
-
-$$d_t^{\mathrm{proxy}} = -\,\texttt{opd/token\_reward\_mean}$$
-
-作为距离（nats/token）：
-
-- **sampled-token** run（`mdxt04lm`，`log_prob_top_k=0`）：完整的 reverse-KL
-  k1 估计，$d^{\mathrm{proxy}}_t$ 即每 token 平均 reverse KL。
-- **top16** run（`be00rj9e`，`log_prob_top_k=16`，策略 `only_stu`）：同一量的
-  top-16 截断版（也正是实际训练信号）。
-
-注意：该代理是 KL 型（平方型）距离，不是论文的 L1 均值 $|\cdot|$，且 top16 截断会压低绝对水平，因此**两个 run 的绝对值不可横向比较，读的是衰减形状**（$v_t$、指数、比值）。
-
-## v_t 的几何窗口估计
-
-单步定义 $v_t=(d_t-d_{t+1})/d_t$ 在后期噪声太大。若在窗口内 $\ln d_s$ 近似线性：$\ln d_s \approx a + \beta s$，则 $d_{t+1}/d_t \approx e^{\beta}$，于是单步吸收率为
-
-$$
-\boxed{\;v_t^{\mathrm{geo}} \;=\; 1-\exp\!\big(\hat\beta_t\big),\qquad
-\hat\beta_t=\underset{\beta}{\arg\min}\sum_{s\in[t/1.4,\;1.4t]}
-\big(\ln d_s-a-\beta s\big)^2\;}
-$$
-
-即 $\hat\beta_t$ 是 $\ln d_s$ 对步数 $s$ 在几何窗口 $[t/1.4,\,1.4t]$ 上的 OLS 斜率。窗口点数 $\approx 0.686t$ 随 $t$ 增长，后期自然更平滑；窗口必须完整落在 $[t_{\mathrm{start}}, T]$ 内，所以估计只存在于 $t\in[1.4\,t_{\mathrm{start}},\,T/1.4]$——279 步的 run 即 $t\in[42,199]$，这正是论文脚注 3 里"$v_t$ 在 step 300 之前停止"的原因。
-
-## derived 列含义（`alignment/derived/<run_id>__alignment.csv`）
-
-| 列         | 含义                                                              |
-| ---------- | ----------------------------------------------------------------- |
-| `step`     | 训练步（`_step`）                                                 |
-| `d_nats`   | 距离代理，nats/token                                              |
-| `d_rel`    | $d_t/d_{30}$（相对 step-30 的剩余距离）                           |
-| `v_direct` | 原始单步比值 $(d_t-d_{t+1})/d_t$（噪声大）                        |
-| `v_geo`    | 几何窗口估计 $1-\exp(\hat\beta_t)$，窗口 $[t/1.4,\,1.4t]$，见上式 |
-
-`summary.json` 是头部诊断：`d_end/d_start`、step 50/200 处的 `v_geo`、`v50_over_v200`（纯幂律预测 ≈ 4）、log-log 尾部幂律指数 `alpha`。
-
-## D1 尾部形态拟合（`fit_tail.py`）
-
-对 step ≥ 30 的 $d_t$ 分别拟合三种衰减形式并比较对数空间残差（笔记 §5 D1；每个模型在固定形状参数后退化为普通最小二乘，无需 scipy）：
-
-| 模型            | 形式                          | 谱含义（笔记 §2.4）      |
-| --------------- | ----------------------------- | ------------------------ |
-| `power_law`     | $d=Ct^{-\alpha}$              | 幂律谱 + 振幅沿谱衰减    |
-| `stretched_exp` | $d=Ce^{-(t/\tau)^\gamma}$     | 宽谱近均匀振幅（玻璃态） |
-| `floor_exp`     | $d=d_\infty+Ae^{-t/\tau}$     | 单一主模式 + 噪声底      |
-
-输出：`derived/tail_fits.json`（参数 + 各模型 rmse + 最优模型）、`derived/<run_id>__local_alpha.csv`（滑窗局部指数 $\alpha(t)$）、`figures/tail_fits__<run_id>.png`（`--plot`）。注意：$\gamma\lesssim0.2$ 时拉伸指数退化为"指数漂移的幂律"，网格在该处截断并在 JSON 里以 `at_grid_boundary` 标记。
-
-## 图（`alignment/figures/`）
-
-- `fig9_style.png` -- 论文 Figure 9 版式：左 $d_t/d_{30}$、右 $v_t$（%），对数纵轴 vs 线性步轴，双 run 对比。
-- `distance_raw.png` -- 原始距离代理（nats/token）。
-- `absorption_estimators.png` -- 每个 run 的单步 `v_direct` vs 几何窗口 `v_geo` 对比。
-- `tail_fits__<run_id>.png` -- D1 三种尾部形态的拟合对比（log-log）。
-
-## M1：论文曲线数字化与判别（M1 完成，2026-09-06）
-
-输入是论文图 9 / §5.3 / 附录 C.2 的**矢量 PDF**（matplotlib 导出，曲线为逐点折线）：
+### 2. 计算标准 alignment 指标
 
 ```bash
-.venv/bin/python alignment/extract_paper_figures.py \
-    --pdf /path/to/5_digestion_rate_v2.pdf --out alignment/paper_curves
-.venv/bin/python alignment/analyze_paper_curves.py
-.venv/bin/python alignment/plot_paper_analysis.py
+.venv/bin/python alignment/compute_alignment.py \
+  --runs-dir alignment/runs --out-dir alignment/derived --t-start 30
 ```
 
-提取器用黑色坐标框定位面板、灰色网格线 + 嵌入刻度文本标定坐标（支持 log 轴、
-科学计数法多词标签、同一 path 对象内的多条子路径）。产物：`paper_curves/*.csv`。
-分析产物：`derived/paper_analysis.json` 与三张图（tail fits / α(t) 对比 /
-hump 判别）。核心结果见文档 §4.1。
+输出 `derived/<run_id>__alignment.csv` 和 `derived/summary.json`。入口脚本负责遍历输入和写文件，真正的计算在 `core/metrics.py`。
 
-## M2：谱反演（M2 完成，单 seed 版）
+### 3. 画基础 alignment 图
 
 ```bash
-.venv/bin/python alignment/invert_spectrum.py
+.venv/bin/python alignment/plot_alignment.py \
+  --derived-dir alignment/derived --figures-dir alignment/figures
 ```
 
-对数空间加权 NNLS（multiplicative updates）+ L-curve 脊选择 + hold-out 外推。
-产物：`derived/spectrum__*.csv`（每步速率 ρ 网格上的谱权重/密度）、
-`derived/inversion_summary.json`、`figures/spectrum__*.png`。
-注意口径：KL 代理的每步速率 ρ = 2ηλ（η=1e-6），论文 L1 的 ρ = ηλ。
+基础图会保留 step 0 到末尾。step 30 以前使用浅色，step 30 用竖线标注为分析 baseline / clipping boundary。
+
+### 4. 尾部拟合
+
+```bash
+.venv/bin/python alignment/fit_tail.py --derived-dir alignment/derived --plot
+```
+
+会比较幂律、拉伸指数和 floor+指数，并写入 `derived/tail_fits.json`。
+
+### 5. M4、论文和 Qwen3 分析
+
+M4 图共享 `config/runs.py` 的 run 配置，并通过 `core.data` 和 `core.metrics` 取得数据和 distance：
+
+```bash
+.venv/bin/python alignment/plot_figure19_m4.py
+.venv/bin/python alignment/plot_m4_supplement.py
+.venv/bin/python alignment/plot_m4_six_panel.py
+```
+
+论文曲线和 Qwen3 诊断有独立数据源，不为了形式统一而强行塞进同一种 history schema：
+
+```text
+论文 PDF → extract_paper_figures.py → paper_curves/*.csv
+Qwen3 eval JSONL + W&B history → plot_qwen3_diagnosis.py
+```
+
+它们可以共享 tail fitting、absorption 和 plotting style，但保留各自 loader 更清楚。
+
+## 修改代码时的约定
+
+1. 新数据源先加 loader，不要在绘图脚本里直接读取原始文件。
+2. 新指标先加到 `core/metrics.py`，返回数组、DataFrame 或 JSON-compatible 结果。
+3. 绘图函数接收已经计算好的数据，绘图层负责 baseline、坐标轴、颜色和输出路径。
+4. 不要在多个脚本重复定义 run id、label、color 和 scale；M4 配置放在 `config/runs.py`。
+5. 保留现有脚本作为可执行入口，但新功能应避免 import 时自动画图。
+6. 指标口径发生变化时，先在 docstring 和 README 说明，不要默默改变已有 derived 文件的含义。
+
+## 后续 TODO
+
+### 优先级高
+
+- 把剩余 M4 图中的 `step >= 30` / `step >= 60` 处理统一到绘图辅助函数，全面遵守 step 0 + baseline 淡化约定。
+- 把 `fit_tail.py` 的拟合函数迁入 `core/metrics.py`，让论文曲线和本地 run 共用同一套 tail API。
+- 把 `plot_qwen3_diagnosis.py` 中的绝对路径改成命令行参数或项目配置。
+- 给 `core.metrics` 增加少量端到端检查：输入已有 CSV，确认标准列、baseline 和 summary 数值稳定。
+
+### 优先级中
+
+- 将 `plot_metric_theory.py` 拆成理论合成图和真实数据诊断图两个入口；先移动职责，不改变数学和图形语义。
+- 为不同 distance 口径增加显式 metric 选择，而不是在脚本中隐含 `-opd/token_reward_mean`。
+- 把 validation、CE/entropy/KL 分解、effective-time folding 提炼成指标函数，绘图只消费结果。
+- 统一脚本的 `main()` 和参数风格，消除 import 时直接执行绘图的入口。
+
+### 优先级低
+
+- 在数据和指标接口稳定后，再考虑 `python -m alignment ...` 的统一 CLI。
+- 如果未来需要跨项目复用，再把 W&B 拉取和核心 metric 模块整理成可安装 package；当前不必过早包装。
+
+## 当前边界
+
+`alignment/` 是离线分析工具，不负责 GPU 训练、远程集群提交或 checkpoint 修改。`spectral_effopd.py` 是 trainer-agnostic 的算法原型，和离线绘图 pipeline 共享研究背景，但不应被误认为是数据分析入口。

@@ -31,13 +31,13 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, HERE)
 
 
+from core.metrics import geometric_absorption  # noqa: E402
 from fit_tail import (  # noqa: E402
     fit_floor_exp,
     fit_power_law,
     fit_stretched_exp,
     local_alpha,
 )
-from metrics import geometric_absorption  # noqa: E402
 
 T_START = 30
 
