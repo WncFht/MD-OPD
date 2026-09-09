@@ -21,6 +21,7 @@
 #     c_lr_2e6       lr 1e-6 -> 2e-6                  # (c) H1 折叠复验 + H3a
 #     c_lr_5e6       lr 1e-6 -> 5e-6                  # (c) H1 折叠复验 + H3a，lr 往大延伸
 #     c_lr_1e5       lr 1e-6 -> 1e-5                  # (c) H1 折叠复验 + H3a，lr 往大延伸
+#     c_lr_1e4       lr 1e-6 -> 1e-4                  # (c) H1 折叠复验 + H3a，lr 往大延伸
 
 set -uo pipefail
 
@@ -80,7 +81,11 @@ arm_c_lr_1e5() {
     run c_lr_1e5 actor_rollout_ref.actor.optim.lr=1e-5
 }
 
-ALL_ARMS=(a_beta2_0p95 b_eps_1e6 b_eps_1e4 c_lr_5e7 c_lr_2e6 c_lr_5e6 c_lr_1e5)
+arm_c_lr_1e4() {
+    run c_lr_1e4 actor_rollout_ref.actor.optim.lr=1e-4
+}
+
+ALL_ARMS=(a_beta2_0p95 b_eps_1e6 b_eps_1e4 c_lr_5e7 c_lr_2e6 c_lr_5e6 c_lr_1e5 c_lr_1e4)
 
 if [[ "$ARM" == "all" ]]; then
     failed=()

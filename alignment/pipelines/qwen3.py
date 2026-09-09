@@ -8,10 +8,10 @@
   fig4_val_curves.png          训练中 val mean@16：Qwen3 学生起点即平台 vs DeepSeek 学生持续上升
 
 数据源：
-  - justrl eval：/Users/fanghaotian/Desktop/src/OPD/justrl_eval_outputs/thinking（逐题 jsonl，
+  - justrl eval：--eval-dir 指定的 thinking 目录（逐题 jsonl，
     用 OPD/scripts/val/eval/utils.grade_answer_verl 判分，规则分与官方 grading_results.json 一致）
   - wandb offline run：um5vzc6m（Qwen3 对）、mdxt04lm（DeepSeek 对基线），本地 CSV 在 alignment/runs/
-  - val 成绩：wandb val-core/*/acc/mean@16，拉取后硬编码在下方 VAL 表
+  - val 成绩：从本地 W&B history CSV 读取 val-core/*/acc/mean@16
 """
 
 from __future__ import annotations
@@ -61,9 +61,7 @@ MODEL_LABELS = {
 }
 
 
-def per_problem_pass(
-    model: str, task: str, eval_dir: Path, opd_eval_dir: Path
-) -> dict[str, int]:
+def per_problem_pass(model: str, task: str, eval_dir: Path, opd_eval_dir: Path) -> dict[str, int]:
     """逐题 pass@16（example_id 与 prompt 已验证一一对应）。"""
     sys.path.insert(0, str(opd_eval_dir))
     from utils import grade_answer_verl
@@ -81,9 +79,7 @@ def per_problem_pass(
 
 # ---------------------------------------------------------------- fig1: eval 成绩
 def fig1(passes: dict[str, dict[str, dict[str, int]]]) -> None:
-    means = {
-        m: [np.mean(list(passes[m][t].values())) / 16 for t in TASKS] for m in MODELS
-    }
+    means = {m: [np.mean(list(passes[m][t].values())) / 16 for t in TASKS] for m in MODELS}
     apply_rc(THEME)
     colors = series_colors(THEME, len(MODELS))
     fig, ax = plt.subplots(figsize=(7.2, 4.4))
@@ -99,7 +95,7 @@ def fig1(passes: dict[str, dict[str, dict[str, int]]]) -> None:
             edgecolor="white",
             linewidth=0.6,
         )
-        for b, v in zip(bars, means[m]):
+        for b, v in zip(bars, means[m], strict=True):
             ax.text(
                 b.get_x() + b.get_width() / 2,
                 v + 0.012,
@@ -112,9 +108,7 @@ def fig1(passes: dict[str, dict[str, dict[str, int]]]) -> None:
     ax.set_xticks(x, [TASK_LABELS[t] for t in TASKS])
     ax.set_ylabel("mean@16 准确率")
     ax.set_ylim(0, 1.0)
-    ax.set_title(
-        "Qwen3 三档模型解题成绩（justrl eval：T=0.7, top_p=0.95, n=16, thinking）"
-    )
+    ax.set_title("Qwen3 三档模型解题成绩（justrl eval：T=0.7, top_p=0.95, n=16, thinking）")
     apply_frame(ax, "closed")
     apply_grid(ax, "y-only")
     ax.legend(loc="upper left", fontsize=9)
@@ -210,7 +204,7 @@ def fig3() -> None:
             "top-k 重叠率",
         ),
     ]
-    for ax, (key, title, ylab) in zip(axes, metrics):
+    for ax, (key, title, ylab) in zip(axes, metrics, strict=True):
         for i, (label, rid) in enumerate(RUN_PAIRS.items()):
             df = pd.read_csv(RUNS_DIR / f"{rid}__history.csv").sort_values("_step")
             s = df[["_step", key]].dropna()
@@ -248,86 +242,20 @@ def fig3() -> None:
 
 
 # ---------------------------------------------------------------- fig4: val 曲线
-# wandb val-core/*/acc/mean@16（2026-09-07 拉取；um5vzc6m 到 step 140 仍在跑）
-VAL = {
-    "um5zc6m": {
-        "MATH-500": (
-            [20, 40, 60, 80, 100, 120, 140],
-            [0.897, 0.889, 0.888, 0.888, 0.888, 0.889, 0.888],
-        ),
-        "AMC23": (
-            [20, 40, 60, 80, 100, 120, 140],
-            [0.852, 0.819, 0.830, 0.814, 0.836, 0.830, 0.841],
-        ),
-        "AIME25": (
-            [20, 40, 60, 80, 100, 120, 140],
-            [0.385, 0.331, 0.346, 0.377, 0.340, 0.333, 0.362],
-        ),
-    },
-    "mdxt04lm": {
-        "MATH-500": (
-            [20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 279],
-            [
-                0.842,
-                0.862,
-                0.867,
-                0.854,
-                0.836,
-                0.844,
-                0.859,
-                0.862,
-                0.866,
-                0.873,
-                0.871,
-                0.871,
-                0.874,
-                0.877,
-            ],
-        ),
-        "AMC23": (
-            [20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 279],
-            [
-                0.752,
-                0.802,
-                0.809,
-                0.830,
-                0.794,
-                0.800,
-                0.855,
-                0.859,
-                0.858,
-                0.853,
-                0.873,
-                0.856,
-                0.855,
-                0.853,
-            ],
-        ),
-        "AIME25": (
-            [20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 279],
-            [
-                0.252,
-                0.283,
-                0.285,
-                0.317,
-                0.292,
-                0.319,
-                0.310,
-                0.321,
-                0.331,
-                0.331,
-                0.342,
-                0.352,
-                0.333,
-                0.331,
-            ],
-        ),
-    },
-}
-RUN_LABELS = {
-    "um5zc6m": "Qwen3-1.7B 学生（um5vzc6m）",
-    "mdxt04lm": "DeepSeek-R1-Distill-1.5B 学生（mdxt04lm）",
-}
+VAL_TASKS = ["MATH-500", "AMC23", "AIME25"]
+
+
+def validation_series(run_id: str, task: str) -> tuple[np.ndarray, np.ndarray]:
+    """Read one sparse validation series from the pulled W&B history."""
+    frame = pd.read_csv(RUNS_DIR / f"{run_id}__history.csv").sort_values("_step")
+    column = f"val-core/{task}/acc/mean@16"
+    if column not in frame:
+        raise KeyError(f"{run_id} history has no {column!r}")
+    observed = frame[["_step", column]].dropna()
+    return (
+        observed["_step"].to_numpy(dtype=int),
+        observed[column].to_numpy(dtype=float),
+    )
 
 
 def fig4() -> None:
@@ -338,15 +266,14 @@ def fig4() -> None:
     for ax, (rid, title) in zip(
         axes,
         [
-            ("um5zc6m", "Qwen3 对：step 20 起全程平台"),
+            ("um5vzc6m", "Qwen3 对：step 20 起全程平台"),
             ("mdxt04lm", "DeepSeek 对：持续上升"),
         ],
+        strict=True,
     ):
-        for i, task in enumerate(["MATH-500", "AMC23", "AIME25"]):
-            steps, vals = VAL[rid][task]
-            ax.plot(
-                steps, vals, color=colors[i], marker=marks[i], ms=4, lw=1.6, label=task
-            )
+        for i, task in enumerate(VAL_TASKS):
+            steps, vals = validation_series(rid, task)
+            ax.plot(steps, vals, color=colors[i], marker=marks[i], ms=4, lw=1.6, label=task)
         ax.set_xlabel("训练步")
         ax.set_title(title, fontsize=10.5)
         apply_frame(ax, "closed")
@@ -385,10 +312,7 @@ def main() -> None:
     else:
         raw = {}
         for m in MODELS:
-            raw[m] = {
-                t: per_problem_pass(m, t, args.eval_dir, args.opd_eval_dir)
-                for t in TASKS
-            }
+            raw[m] = {t: per_problem_pass(m, t, args.eval_dir, args.opd_eval_dir) for t in TASKS}
         cache.write_text(json.dumps(raw, indent=1))
         print(f"[cache] per-problem pass -> {cache}")
     passes = raw

@@ -207,16 +207,17 @@ $$
 1. 目标是学生采样状态上的 reverse-KL；不冻结状态时，目标与 $F_t/H_t$ 随学生策略漂移。
 2. **OPD 梯度不是普通 CE 的梯度。** 对序列 $y=(y_1,\ldots,y_T)$，Cai et al. 2026[^cai26] 的完整梯度可写成
 
-   $$
-   \nabla J_{\rm OPD}
-   =\mathbb E_{y\sim\pi_\theta}
-   \left[\sum_{t=1}^T\left(\sum_{t'=t}^T\Delta_{t'}\right)
-   \nabla\log\pi_\theta(y_t\mid s_t)\right],
-   \qquad
-   \Delta_{t'}=\log\pi_\theta(y_{t'}\mid s_{t'})-\log\pi_T(y_{t'}\mid s_{t'}).
-   $$
+    $$
+    \nabla J_{\rm OPD}
+    =\mathbb E_{y\sim\pi_\theta}
+    \left[\sum_{t=1}^T\left(\sum_{t'=t}^T\Delta_{t'}\right)
+    \nabla\log\pi_\theta(y_t\mid s_t)\right],
+    \qquad
+    \Delta_{t'}=\log\pi_\theta(y_{t'}\mid s_{t'})-\log\pi_T(y_{t'}\mid s_{t'}).
+    $$
 
-   这是因为 $y_{t+1:T}$ 的 log-prob 也依赖于前缀 $y_{1:t}$ 的参数梯度。实践中常用的 immediate-token 近似只保留 $\Delta_t\nabla\log\pi_\theta(y_t\mid s_t)$，从而每个 token 都有 dense 信号。这个“序列累计 advantage → token-level 近似”的结构是 OPD 特有的目标梯度，不是从普通监督标签直接得到的 CE 梯度。
+    这是因为 $y_{t+1:T}$ 的 log-prob 也依赖于前缀 $y_{1:t}$ 的参数梯度。实践中常用的 immediate-token 近似只保留 $\Delta_t\nabla\log\pi_\theta(y_t\mid s_t)$，从而每个 token 都有 dense 信号。这个“序列累计 advantage → token-level 近似”的结构是 OPD 特有的目标梯度，不是从普通监督标签直接得到的 CE 梯度。
+
 3. 梯度由带符号的 token advantage 估计，top-$k$ 截断会改变有效谱权重，因此 $\mathbb E|A|$ 的非负模式分解只是近似。
 4. 教师固定、学生移动，使“剩余误差”有明确的吸收方向；教师与学生共同更新时则不再成立。
 5. 学生只在自己访问的状态上训练，状态覆盖缺口和模型表示缺口都可能造成长尾或平台。

@@ -70,9 +70,7 @@ DEFAULT_KEYS = [
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "--entity",
         default=os.environ.get("WANDB_ENTITY"),
@@ -83,9 +81,7 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("WANDB_PROJECT"),
         help="W&B project (default $WANDB_PROJECT)",
     )
-    parser.add_argument(
-        "--run-id", nargs="+", required=True, help="One or more W&B run ids"
-    )
+    parser.add_argument("--run-id", nargs="+", required=True, help="One or more W&B run ids")
     parser.add_argument(
         "--out",
         type=Path,
@@ -132,29 +128,26 @@ def pull_run(
     out_dir: Path,
     force: bool,
 ) -> Path:
-    import pandas as pd
 
     csv_path = out_dir / f"{run_id}__history.csv"
     meta_path = out_dir / f"{run_id}__meta.json"
     if csv_path.exists() and meta_path.exists() and not force:
-        print(
-            f"[skip] {run_id}: {csv_path} already exists (use --force to re-download)"
-        )
+        print(f"[skip] {run_id}: {csv_path} already exists (use --force to re-download)")
         return csv_path
 
     run = api.run(f"{entity}/{project}/{run_id}")
-    print(
-        f"[pull] {run_id}: {run.name} (state={run.state}, last_step={run.lastHistoryStep})"
-    )
+    print(f"[pull] {run_id}: {run.name} (state={run.state}, last_step={run.lastHistoryStep})")
 
-    # scan_history with explicit keys only: runs with many metrics fail without it
-    rows = list(run.scan_history(keys=keys, page_size=1000))
-    df = pd.DataFrame(rows)
+    # W&B treats scan_history(keys=...) as an intersection: a row is returned
+    # only when it contains every requested key. Validation and diagnostic
+    # metrics are sparse, so that query can silently truncate an otherwise
+    # complete run. Fetch the full history first, then select the curated keys.
+    history = run.history(keys=None, samples=max(run.lastHistoryStep + 1, 10_000))
+    selected = ["_step", *(key for key in keys if key in history.columns)]
+    df = history.loc[:, [column for column in selected if column in history.columns]]
     df = df.dropna(axis=1, how="all").sort_values("_step").reset_index(drop=True)
     df.to_csv(csv_path, index=False)
-    print(
-        f"[pull] {run_id}: {df.shape[0]} steps x {df.shape[1] - 1} metrics -> {csv_path}"
-    )
+    print(f"[pull] {run_id}: {df.shape[0]} steps x {df.shape[1] - 1} metrics -> {csv_path}")
 
     meta = {
         "run_id": run_id,

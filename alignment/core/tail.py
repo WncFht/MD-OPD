@@ -10,9 +10,7 @@ def rmse_log(log_distance: np.ndarray, prediction: np.ndarray) -> float:
     return float(np.sqrt(np.mean((np.log(prediction) - log_distance) ** 2)))
 
 
-def _ols_2param(
-    x: np.ndarray, log_distance: np.ndarray
-) -> tuple[float, float, np.ndarray]:
+def _ols_2param(x: np.ndarray, log_distance: np.ndarray) -> tuple[float, float, np.ndarray]:
     matrix = np.vstack([np.ones_like(x), x]).T
     coefficient, *_ = np.linalg.lstsq(matrix, log_distance, rcond=None)
     return coefficient[0], coefficient[1], coefficient[0] + coefficient[1] * x
@@ -85,14 +83,18 @@ def fit_floor_exp(t: np.ndarray, d: np.ndarray) -> dict:
     return best
 
 
-def local_alpha(
-    t: np.ndarray, d: np.ndarray, half_width: float = 0.12, min_points: int = 8
-) -> np.ndarray:
+def local_alpha(t: np.ndarray, d: np.ndarray, half_width: float = 0.12, min_points: int = 8) -> np.ndarray:
     """Return the sliding local exponent ``-d log d / d log t``."""
-    log_t, log_d = np.log10(t), np.log10(d)
     result = np.full(t.shape, np.nan)
+    valid = np.isfinite(t) & (t > 0) & np.isfinite(d) & (d > 0)
+    log_t = np.full(t.shape, np.nan, dtype=float)
+    log_d = np.full(d.shape, np.nan, dtype=float)
+    log_t[valid] = np.log10(t[valid])
+    log_d[valid] = np.log10(d[valid])
     for index, value in enumerate(log_t):
-        mask = np.abs(log_t - value) <= half_width
+        if not valid[index]:
+            continue
+        mask = valid & (np.abs(log_t - value) <= half_width)
         if mask.sum() >= min_points:
             result[index] = -np.polyfit(log_t[mask], log_d[mask], 1)[0]
     return result

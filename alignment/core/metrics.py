@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from .data import RunHistory
+from .tail import local_alpha
 
 DISTANCE_COLUMN = "opd/token_reward_mean"
 GEO_FACTOR = 1.4
@@ -15,11 +16,7 @@ GEO_FACTOR = 1.4
 
 def validation_mean(frame: pd.DataFrame) -> pd.Series:
     """Return the mean available validation accuracy across val-core tasks."""
-    columns = [
-        column
-        for column in frame
-        if column.startswith("val-core/") and column.endswith("/acc/mean@16")
-    ]
+    columns = [column for column in frame if column.startswith("val-core/") and column.endswith("/acc/mean@16")]
     if not columns:
         return pd.Series(index=frame.index, dtype=float)
     return frame[columns].mean(axis=1)
@@ -48,10 +45,19 @@ def effective_step(step: np.ndarray, scale: float) -> np.ndarray:
 
 
 def distance_proxy(history: RunHistory) -> np.ndarray:
-    """Return the positive reverse-KL distance proxy from a W&B history."""
+    """Return the signed-advantage reverse-KL proxy from a W&B history."""
     if DISTANCE_COLUMN not in history.frame.columns:
         raise KeyError(f"history {history.run_id} has no {DISTANCE_COLUMN!r} column")
     return -history.frame[DISTANCE_COLUMN].to_numpy(dtype=float)
+
+
+def direct_absorption(distance: np.ndarray) -> np.ndarray:
+    """Return the one-step relative drop, masking non-positive MC estimates."""
+    result = np.full(distance.shape, np.nan, dtype=float)
+    valid = np.isfinite(distance[:-1]) & np.isfinite(distance[1:]) & (distance[:-1] > 0) & (distance[1:] > 0)
+    indices = np.flatnonzero(valid)
+    result[indices] = (distance[indices] - distance[indices + 1]) / distance[indices]
+    return result
 
 
 def geometric_absorption(
@@ -63,9 +69,11 @@ def geometric_absorption(
     """Estimate absorption from the log-distance slope in a geometric window."""
     del t_start
     values = np.full(steps.shape, np.nan)
-    log_distance = np.log(distance)
+    valid = np.isfinite(distance) & (distance > 0)
+    log_distance = np.full(distance.shape, np.nan, dtype=float)
+    log_distance[valid] = np.log(distance[valid])
     for index, step in enumerate(steps):
-        window = (steps >= step / factor) & (steps <= step * factor)
+        window = (steps >= step / factor) & (steps <= step * factor) & valid
         if window.sum() < 3:
             continue
         slope = np.polyfit(steps[window].astype(float), log_distance[window], 1)[0]
@@ -91,8 +99,7 @@ def compute_alignment_metrics(history: RunHistory, t_start: int = 30) -> pd.Data
     if t_start not in steps:
         raise ValueError(f"history {history.run_id} has no baseline step {t_start}")
     baseline = float(distance[steps == t_start][0])
-    direct = np.full(steps.shape, np.nan)
-    direct[:-1] = (distance[:-1] - distance[1:]) / distance[:-1]
+    direct = direct_absorption(distance)
     return pd.DataFrame(
         {
             "step": steps.astype(int),
@@ -100,6 +107,7 @@ def compute_alignment_metrics(history: RunHistory, t_start: int = 30) -> pd.Data
             "d_rel": distance / baseline,
             "v_direct": direct,
             "v_geo": geometric_absorption(steps, distance),
+            "alpha_local": local_alpha(steps, distance),
         }
     )
 
@@ -124,7 +132,5 @@ def alignment_summary(metrics: pd.DataFrame, run_id: str, t_start: int = 30) -> 
         "v_geo_at_50": v50,
         "v_geo_at_200": v200,
         "v50_over_v200": v50 / v200,
-        "power_law_alpha": power_law_exponent(
-            metrics["step"].to_numpy(float), metrics["d_nats"].to_numpy(float)
-        ),
+        "power_law_alpha": power_law_exponent(metrics["step"].to_numpy(float), metrics["d_nats"].to_numpy(float)),
     }
