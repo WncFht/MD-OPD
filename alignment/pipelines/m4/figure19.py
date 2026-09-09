@@ -6,6 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 from alignment.config.runs import M4_RUNS
+from alignment.core.accuracy import add_accuracy_baselines
 from alignment.core.data import load_run_history
 from alignment.core.metrics import compute_alignment_metrics, validation_mean
 from alignment.core.plotting import figure_path
@@ -32,6 +33,7 @@ for rid, label, scale, color in spec:
         vv = validation_mean(d)
         m = vv.notna()
         ax[0].plot(t[m], vv[m], color=color, marker="s", ms=3, lw=1.4, label=label)
+add_accuracy_baselines(ax[0], as_percent=False)
 ax[0].set_title("Average Validation Accuracy")
 ax[0].set_xlabel("Training Step")
 ax[0].set_ylabel("mean@16 (3-task average)")
@@ -46,7 +48,7 @@ ax[2].set_ylabel(r"distance $d_t$ (nats/token)")
 for a in ax:
     a.grid(True, axis="y", alpha=0.25)
     a.spines[["top", "right"]].set_visible(False)
-handles, labels = ax[1].get_legend_handles_labels()
+handles, labels = ax[0].get_legend_handles_labels()
 fig.legend(handles, labels, loc="upper center", ncol=5, bbox_to_anchor=(0.5, 1.05))
 fig.tight_layout()
 if __name__ == "__main__":

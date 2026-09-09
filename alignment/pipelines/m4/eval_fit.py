@@ -4,7 +4,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
 from alignment.config.runs import M4_RUNS
+from alignment.core.accuracy import add_accuracy_baselines
 from alignment.core.data import load_run_history
 from alignment.core.metrics import cumulative_absorption, distance_proxy
 from alignment.core.plotting import figure_path
@@ -42,6 +44,8 @@ for rid, label, color in runs:
             fontsize=8,
             va="top",
         )
+for j, (short, _) in enumerate(benches):
+    add_accuracy_baselines(axs[j], task=short, as_percent=True)
 for j, (short, name) in enumerate(benches):
     axs[j].set_title(name)
     axs[j].set_xlabel(r"cumulative absorption $-\ln d_t$")

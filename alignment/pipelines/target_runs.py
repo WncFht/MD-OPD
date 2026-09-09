@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from alignment.core.accuracy import accuracy_baseline_values, add_accuracy_baselines
 from alignment.core.metrics import direct_absorption, geometric_absorption, validation_mean
 from alignment.core.plotting import figure_path
 from alignment.core.tail import local_alpha
@@ -128,9 +129,14 @@ def style_axis(
     axis.spines[["top", "right"]].set_visible(False)
 
 
-def accuracy_y_limits(values: list[np.ndarray]) -> tuple[float, float]:
+def accuracy_y_limits(values: list[np.ndarray], task: str | None = None) -> tuple[float, float]:
     """Return a safe manual or data-driven percentage range for accuracy plots."""
-    valid_values = np.concatenate([array[np.isfinite(array)] for array in values if np.isfinite(array).any()])
+    valid_values = np.concatenate(
+        [
+            *[array[np.isfinite(array)] for array in values if np.isfinite(array).any()],
+            np.array(list(accuracy_baseline_values(task, as_percent=True).values())),
+        ]
+    )
     if ACCURACY_Y_LIMITS is not None:
         lower, upper = ACCURACY_Y_LIMITS
         if not 0 <= lower < upper <= 100:
@@ -216,6 +222,7 @@ def distance_validation_figure() -> Path:
         "3-task mean@16 (%)",
         y_limits=accuracy_y_limits(accuracy_values),
     )
+    add_accuracy_baselines(axes[1, 0], as_percent=True)
     style_axis(axes[1, 1], "Policy entropy", "entropy (nats/token)")
     distance_definition(axes[0, 0])
     distance_definition(axes[0, 1])
@@ -231,7 +238,7 @@ def distance_validation_figure() -> Path:
         fontsize=8,
         color="#555555",
     )
-    handles, labels = axes[0, 0].get_legend_handles_labels()
+    handles, labels = axes[1, 0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.01))
     fig.suptitle("Requested W&B runs: distance and learning behavior", y=1.04)
     fig.tight_layout()
@@ -270,8 +277,9 @@ def validation_task_figure() -> Path:
             axis,
             task,
             "accuracy mean@16 (%)",
-            y_limits=accuracy_y_limits(accuracy_values_by_task[task]),
+            y_limits=accuracy_y_limits(accuracy_values_by_task[task], task),
         )
+        add_accuracy_baselines(axis, task=task, as_percent=True)
         axis.set_xlabel("training step $t$")
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.03))

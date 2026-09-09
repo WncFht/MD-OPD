@@ -1,7 +1,9 @@
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+
 from alignment.config.runs import M4_RUNS
+from alignment.core.accuracy import add_accuracy_baselines
 from alignment.core.data import load_run_history
 from alignment.core.metrics import (
     compute_alignment_metrics,
@@ -13,10 +15,7 @@ from alignment.core.plotting import figure_path
 ROOT = Path(__file__).resolve().parents[3]
 RUNS = ROOT / "alignment/runs"
 OUT = ROOT / "alignment/figures"
-RUNSPEC = [
-    (rid, settings["label"], settings["scale"], settings["color"])
-    for rid, settings in M4_RUNS.items()
-]
+RUNSPEC = [(rid, settings["label"], settings["scale"], settings["color"]) for rid, settings in M4_RUNS.items()]
 
 
 def data(rid):
@@ -34,12 +33,8 @@ def figure19(t0):
         t = series.step.to_numpy()
         dist = series.d_nats.to_numpy()
         ax[1].plot(t, dist, color=color, lw=1.6, label=label)
-        ax[2].plot(
-            effective_step(t, scale), dist / dist[0], color=color, lw=1.6, label=label
-        )
-        cols = [
-            c for c in d if c.startswith("val-core/") and c.endswith("/acc/mean@16")
-        ]
+        ax[2].plot(effective_step(t, scale), dist / dist[0], color=color, lw=1.6, label=label)
+        cols = [c for c in d if c.startswith("val-core/") and c.endswith("/acc/mean@16")]
         if cols:
             v = validation_mean(d)
             m = v.notna()
@@ -66,6 +61,7 @@ def figure19(t0):
             fontsize=7,
             color=color,
         )
+    add_accuracy_baselines(ax[0], as_percent=False)
     ax[0].set_title("Average validation accuracy")
     ax[0].set_xlabel("training step $t$ (dimensionless)")
     ax[0].set_ylabel("mean@16 (3-task average)")
@@ -84,9 +80,7 @@ def figure19(t0):
     fig.legend(handles, labels, loc="upper center", ncol=4, bbox_to_anchor=(0.5, 1.05))
     fig.tight_layout()
     fig.savefig(
-        figure_path(
-            "m4", "validation-distance-collapse", "step", "runs-m4", f"norm-d{t0}"
-        ),
+        figure_path("m4", "validation-distance-collapse", "step", "runs-m4", f"norm-d{t0}"),
         dpi=300,
         bbox_inches="tight",
     )
@@ -101,9 +95,7 @@ def d5(t0):
         t = series.step.to_numpy()
         dist = series.d_nats.to_numpy()
         ax[0].plot(t, dist / dist[0], color=color, lw=1.7, label=label)
-        ax[1].plot(
-            effective_step(t, scale), dist / dist[0], color=color, lw=1.7, label=label
-        )
+        ax[1].plot(effective_step(t, scale), dist / dist[0], color=color, lw=1.7, label=label)
         ax[0].axvline(t[-1], color=color, ls="--", lw=0.8, alpha=0.65)
         ax[1].axvline(scale * t[-1], color=color, ls="--", lw=0.8, alpha=0.65)
     ax[0].axvline(t0, color="black", ls=":", lw=1.2)
@@ -149,9 +141,7 @@ def grad():
     for rid, label, scale, color in RUNSPEC:
         d, metrics = data(rid)
         ax.plot(metrics.step, d["actor/grad_norm"], color=color, lw=1.5, label=label)
-    ax.axhline(
-        1.0, color="black", ls="--", lw=1, label="gradient-clip threshold $||g||=1$"
-    )
+    ax.axhline(1.0, color="black", ls="--", lw=1, label="gradient-clip threshold $||g||=1$")
     ax.axvline(60, color="grey", ls=":", lw=1, label="common baseline step 60")
     ax.set_yscale("log")
     ax.set_xlabel("training step $t$ (dimensionless)")

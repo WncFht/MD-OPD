@@ -26,6 +26,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from alignment.core.accuracy import add_accuracy_baseline_segments, add_accuracy_baselines
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUNS_DIR = REPO_ROOT / "alignment" / "runs"
 DEFAULT_FIG_DIR = REPO_ROOT / "alignment" / "figures" / "qwen3"
@@ -105,6 +107,13 @@ def fig1(passes: dict[str, dict[str, dict[str, int]]]) -> None:
                 fontsize=8.5,
                 color=NEUTRALS["ink"],
             )
+    add_accuracy_baseline_segments(
+        ax,
+        TASKS,
+        x,
+        half_width=w * 1.4,
+        as_percent=False,
+    )
     ax.set_xticks(x, [TASK_LABELS[t] for t in TASKS])
     ax.set_ylabel("mean@16 准确率")
     ax.set_ylim(0, 1.0)
@@ -263,17 +272,25 @@ def fig4() -> None:
     colors = series_colors(THEME, 3)
     marks = series_markers(THEME, 3)
     fig, axes = plt.subplots(1, 2, figsize=(11.2, 4.0), sharey=True)
-    for ax, (rid, title) in zip(
-        axes,
-        [
-            ("um5vzc6m", "Qwen3 对：step 20 起全程平台"),
-            ("mdxt04lm", "DeepSeek 对：持续上升"),
-        ],
-        strict=True,
+    for panel_index, (ax, (rid, title)) in enumerate(
+        zip(
+            axes,
+            [
+                ("um5vzc6m", "Qwen3 对：step 20 起全程平台"),
+                ("mdxt04lm", "DeepSeek 对：持续上升"),
+            ],
+            strict=True,
+        )
     ):
         for i, task in enumerate(VAL_TASKS):
             steps, vals = validation_series(rid, task)
             ax.plot(steps, vals, color=colors[i], marker=marks[i], ms=4, lw=1.6, label=task)
+        add_accuracy_baselines(
+            ax,
+            tasks=VAL_TASKS,
+            as_percent=False,
+            with_labels=panel_index == 0,
+        )
         ax.set_xlabel("训练步")
         ax.set_title(title, fontsize=10.5)
         apply_frame(ax, "closed")

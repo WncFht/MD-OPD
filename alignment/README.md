@@ -126,6 +126,7 @@ $$
 - valid/accuracy 保留 step 30 左侧的有效点和连线，不截断、不淡化；baseline 阴影和竖线仅作参考。
 - `ACCURACY_Y_LIMITS = None` 时按所有有效观测点自动留边；设为 `(下限, 上限)` 可手动缩放。手动范围必须覆盖全部有效点，不得裁掉数据；只有需要展示完整概率域时才设为 `(0, 100)`。
 - 分任务小图默认分别按各自 task 的有效观测点自动缩放；设置 `ACCURACY_Y_LIMITS` 后才使用同一组全局上下限。
+- accuracy 图统一用 `6uorrk2k`（student）和 `u87buult`（teacher）的横向虚线作参考；均值图使用三项 validation 的均值，分任务图使用对应 task 的基准值。
 - 有多个 step 时用折线连接实际的非空观测点，可保留小 marker；只有一个 step 时才画单点。
 - W&B 稀疏日志中的空值不当作 0，也不连到空值位置。
 
