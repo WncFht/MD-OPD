@@ -55,7 +55,7 @@ from verl.trainer.ppo.metric_utils import (
     compute_variance_proxy_metrics,
     process_validation_metrics,
 )
-from verl.trainer.ppo.opd_trainer_mixin import OPDTrainerMixin, opd_teacher_enabled, template_enabled
+from verl.trainer.ppo.opd_trainer_mixin import OPDTrainerMixin, compute_mdpo_eta, opd_teacher_enabled, template_enabled
 from verl.trainer.ppo.reflection_metrics import (
     analyze_reflection_responses,
     compute_grouped_reflection_metrics,
@@ -375,9 +375,7 @@ class RayPPOTrainer(OPDTrainerMixin):
             if not self.use_opd_teacher:
                 raise ValueError("algorithm.frozen_rollout requires OPD teacher distillation")
             if self.frozen_policy_loss_mode not in ("opd_noratio", "vanilla"):
-                raise ValueError(
-                    "algorithm.frozen_rollout requires policy_loss.loss_mode=opd_noratio or vanilla"
-                )
+                raise ValueError("algorithm.frozen_rollout requires policy_loss.loss_mode=opd_noratio or vanilla")
             if int(self.config.distillation.fsdp_teacher.get("log_prob_top_k", 0) or 0) > 0:
                 raise ValueError(
                     "algorithm.frozen_rollout currently supports sampled-token OPD only (log_prob_top_k=0)"
@@ -398,6 +396,7 @@ class RayPPOTrainer(OPDTrainerMixin):
                 "teacher_forward=every_step, rollout_is=disabled"
             )
         self.validate_opd_top_k_config()
+        self.validate_mdpo_config()
 
         self.use_rm = need_reward_model(self.config)
 
@@ -1640,6 +1639,16 @@ class RayPPOTrainer(OPDTrainerMixin):
             dataloader_kwargs={"shuffle": shuffle},
             compute_loss=True,
         )
+        if self.config.actor_rollout_ref.actor.mdpo_kl_loss:
+            mdpo_eta = compute_mdpo_eta(
+                global_step=self.global_steps,
+                total_training_steps=self.total_training_steps,
+                critic_warmup=self.config.trainer.critic_warmup,
+                eta_start=self.config.actor_rollout_ref.actor.mdpo_eta_start,
+                eta_end=self.config.actor_rollout_ref.actor.mdpo_eta_end,
+                schedule=self.config.actor_rollout_ref.actor.mdpo_eta_schedule,
+            )
+            tu.assign_non_tensor(batch_td, mdpo_eta=mdpo_eta)
         # OPD: in top-K reward mode the advantage has a trailing candidate axis, so
         # the training forward has to emit the student's candidate log-probs too --
         # ppo_loss takes the policy gradient over them (see opd_top_k_is_reward()).

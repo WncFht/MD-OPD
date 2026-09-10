@@ -48,7 +48,7 @@ from verl.workers.config import FsdpTeacherConfig
 logger = logging.getLogger(__name__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
 
-__all__ = ["OPDTrainerMixin", "opd_teacher_enabled", "template_enabled"]
+__all__ = ["OPDTrainerMixin", "compute_mdpo_eta", "opd_teacher_enabled", "template_enabled"]
 
 
 def _mean_metric(value):
@@ -80,6 +80,25 @@ def template_enabled(config) -> bool:
     """Whether template mode (student writes its own query) is on."""
     template = config.get("template", None)
     return bool(template is not None and template.get("enabled", False))
+
+
+def compute_mdpo_eta(
+    global_step: int,
+    total_training_steps: int,
+    critic_warmup: int,
+    eta_start: float,
+    eta_end: float,
+    schedule: str,
+) -> float:
+    """Return the MDPO mirror step for one actor outer update."""
+    if schedule == "constant":
+        return eta_start
+
+    first_actor_step = max(1, critic_warmup)
+    actor_update_count = total_training_steps - first_actor_step + 1
+    progress = (global_step - first_actor_step) / max(actor_update_count - 1, 1)
+    progress = min(max(progress, 0.0), 1.0)
+    return eta_start + progress * (eta_end - eta_start)
 
 
 class OPDTrainerMixin:
@@ -169,6 +188,29 @@ class OPDTrainerMixin:
                 "candidate set than the one the advantage was built from. Use metric_top_k instead if you "
                 "only want the agreement statistics."
             )
+
+    def validate_mdpo_config(self) -> None:
+        """Reject training modes whose policy anchors differ from MDPO's old policy."""
+        actor = self.config.actor_rollout_ref.actor
+        if not actor.mdpo_kl_loss:
+            return
+        if not self.use_opd_teacher:
+            raise ValueError("mdpo_kl_loss requires OPD teacher distillation")
+        if actor.policy_loss.get("loss_mode", "vanilla") != "vanilla":
+            raise ValueError("mdpo_kl_loss requires policy_loss.loss_mode=vanilla")
+        if self.config.algorithm.use_kl_in_reward:
+            raise ValueError("mdpo_kl_loss does not support algorithm.use_kl_in_reward=True")
+        if self.frozen_rollout:
+            raise ValueError("mdpo_kl_loss does not support algorithm.frozen_rollout=True")
+        if int(self.config.distillation.fsdp_teacher.get("log_prob_top_k", 0) or 0) > 0:
+            raise ValueError("mdpo_kl_loss supports sampled-token OPD only (log_prob_top_k=0)")
+        rollout_corr = self.config.algorithm.get("rollout_correction", {}) or {}
+        if (
+            rollout_corr.get("bypass_mode", False)
+            or rollout_corr.get("rollout_is") is not None
+            or rollout_corr.get("rollout_rs") is not None
+        ):
+            raise ValueError("mdpo_kl_loss does not support rollout correction or bypass mode")
 
     # ------------------------------------------------------------------
     # teacher reward

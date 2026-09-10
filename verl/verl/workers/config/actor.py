@@ -130,9 +130,13 @@ class ActorConfig(BaseConfig):
         tau_pos (float): Positive tau for SAPO smoothing (>= 1.0 keeps rewards stable).
         tau_neg (float): Negative tau for SAPO smoothing (> tau_pos for asymmetry).
         use_kl_loss (bool): Whether to use KL divergence loss.
+        mdpo_kl_loss (bool): Whether to add MDPO KL against the fixed old policy of the rollout batch.
         use_torch_compile (bool): Whether to use torch.compile for optimization.
         kl_loss_coef (float): KL divergence loss coefficient.
         kl_loss_type (str): Type of KL loss to use.
+        mdpo_eta_schedule (str): MDPO mirror-step schedule, either "constant" or "linear".
+        mdpo_eta_start (float): Initial MDPO mirror step.
+        mdpo_eta_end (float): Final MDPO mirror step for the linear schedule.
         ppo_epochs (int): Number of PPO epochs per training step.
         shuffle (bool): Whether to shuffle data during training.
         checkpoint (CheckpointConfig): Configuration for checkpointing.
@@ -173,11 +177,15 @@ class ActorConfig(BaseConfig):
     calculate_entropy: bool = False
     calculate_sum_pi_squared: bool = False
     use_kl_loss: bool = False
+    mdpo_kl_loss: bool = False
     # Whether to enable PrefixGrouper-based shared-prefix forward
     use_prefix_grouper: bool = False
     use_torch_compile: bool = True
     kl_loss_coef: float = 0.001
-    kl_loss_type: str = "low_var_kl"
+    kl_loss_type: str = "k3+"
+    mdpo_eta_schedule: str = "constant"
+    mdpo_eta_start: float = 1.0
+    mdpo_eta_end: float = 0.01
     ppo_epochs: int = 1
     shuffle: bool = False
     data_loader_seed: int = 42
@@ -223,6 +231,13 @@ class ActorConfig(BaseConfig):
         ]
         if self.loss_agg_mode not in valid_loss_agg_modes:
             raise ValueError(f"Invalid loss_agg_mode: {self.loss_agg_mode}")
+        if self.mdpo_kl_loss:
+            if self.use_kl_loss:
+                raise ValueError("mdpo_kl_loss and use_kl_loss are mutually exclusive")
+            if self.mdpo_eta_schedule not in ("constant", "linear"):
+                raise ValueError(f"mdpo_eta_schedule must be 'constant' or 'linear', got {self.mdpo_eta_schedule}")
+            if self.mdpo_eta_start <= 0 or self.mdpo_eta_end <= 0:
+                raise ValueError("mdpo_eta_start and mdpo_eta_end must be positive")
 
     def validate(self, n_gpus: int, train_batch_size: int, model_config: dict = None):
         """Validate actor configuration with runtime parameters."""

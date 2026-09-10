@@ -172,6 +172,10 @@ export GAMMA=${GAMMA:-1.0}
 export LOSS_AGG_MODE=${LOSS_AGG_MODE:-token-mean}
 export MODEL_DTYPE=${MODEL_DTYPE:-bfloat16}
 export USE_KL=${USE_KL:-False}
+export MDPO_KL=${MDPO_KL:-False}
+export MDPO_ETA_SCHEDULE=${MDPO_ETA_SCHEDULE:-linear}
+export MDPO_ETA_START=${MDPO_ETA_START:-1.0}
+export MDPO_ETA_END=${MDPO_ETA_END:-0.01}
 
 # 默认只保存 Hugging Face 格式模型到 checkpoint/huggingface/，不保存
 # optimizer 或 extra 状态。此模式适合作为推理/发布产物，不支持从该 checkpoint
@@ -284,11 +288,22 @@ export PPO_MAX_TOKEN_LEN_PER_GPU
 if [ "$USE_KL" = "True" ]; then
     KL_ARGS="actor_rollout_ref.actor.use_kl_loss=True \
         actor_rollout_ref.actor.kl_loss_coef=0.005 \
-        actor_rollout_ref.actor.kl_loss_type=low_var_kl"
+        actor_rollout_ref.actor.kl_loss_type=k3+"
 else
     KL_ARGS="actor_rollout_ref.actor.use_kl_loss=False"
 fi
 export KL_ARGS
+
+if [ "$MDPO_KL" = "True" ] && [ "$USE_KL" = "True" ]; then
+    echo "MDPO_KL=True requires USE_KL=False because MDPO anchors KL to the rollout policy." >&2
+    exit 1
+fi
+
+MDPO_ARGS="actor_rollout_ref.actor.mdpo_kl_loss=${MDPO_KL} \\
+    actor_rollout_ref.actor.mdpo_eta_schedule=${MDPO_ETA_SCHEDULE} \\
+    actor_rollout_ref.actor.mdpo_eta_start=${MDPO_ETA_START} \\
+    actor_rollout_ref.actor.mdpo_eta_end=${MDPO_ETA_END}"
+export MDPO_ARGS
 
 # common_args：所有 launcher 共用的 Hydra override。这里故意按空白分词
 # （Hydra 要求每个 override 一个 token），因此路径不能包含空格。
@@ -319,6 +334,7 @@ common_args() {
         actor_rollout_ref.actor.loss_agg_mode=${LOSS_AGG_MODE} \
         actor_rollout_ref.actor.policy_loss.loss_mode=${POLICY_LOSS_MODE} \
         ${KL_ARGS} \
+        ${MDPO_ARGS} \
         actor_rollout_ref.actor.fsdp_config.param_offload=True \
         actor_rollout_ref.actor.fsdp_config.optimizer_offload=True \
         actor_rollout_ref.rollout.name=vllm \

@@ -102,6 +102,10 @@ calculate_sum_pi_squared: false
 # Whether to use KL loss instead of KL reward penalty. True for GRPO
 use_kl_loss: false
 
+# Whether to add MDPO KL against the fixed old policy of the current rollout batch.
+# This is distinct from use_kl_loss and does not create a reference policy.
+mdpo_kl_loss: false
+
 # Whether to enable PrefixGrouper shared-prefix forward
 use_prefix_grouper: false
 
@@ -112,8 +116,18 @@ use_torch_compile: true
 # KL loss coefficient when use_kl_loss is enabled. For GRPO
 kl_loss_coef: 0.001
 
-# Type of KL divergence loss. Options: "kl"(k1), "abs", "mse"(k2), "low_var_kl"(k3), "full"
-kl_loss_type: low_var_kl
+# Type of KL divergence loss. Options: "kl"(k1), "abs", "mse"(k2), "low_var_kl"(k3), "k3+", "full".
+# k3+ logs K3 but uses the K2 straight-through gradient.
+kl_loss_type: k3+
+
+# MDPO mirror-step schedule. Options: "constant" and "linear".
+mdpo_eta_schedule: constant
+
+# Initial MDPO mirror step. Its old-policy KL coefficient is 1 / mdpo_eta_start.
+mdpo_eta_start: 1.0
+
+# Final MDPO mirror step for the linear schedule. Ignored by the constant schedule.
+mdpo_eta_end: 0.01
 
 # Number of PPO epochs per batch
 ppo_epochs: 1

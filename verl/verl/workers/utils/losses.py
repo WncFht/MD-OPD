@@ -91,6 +91,7 @@ def ppo_loss(config: ActorConfig, model_output, data: TensorDict, dp_group=None)
         metric_aggregation = AggregationType.MEAN
 
     metrics = {}
+    mdpo_eta = tu.get_non_tensor_data(data=data, key="mdpo_eta", default=None)
 
     # select fields and convert to padded tensor
     fields = ["response_mask", "old_log_probs", "advantages"]
@@ -159,6 +160,36 @@ def ppo_loss(config: ActorConfig, model_output, data: TensorDict, dp_group=None)
         policy_loss += kl_loss * config.kl_loss_coef
         metrics["kl_loss"] = Metric(value=kl_loss, aggregation=metric_aggregation)
         metrics["kl_coef"] = config.kl_loss_coef
+
+    if config.mdpo_kl_loss:
+        if top_k_log_probs is not None:
+            raise NotImplementedError("mdpo_kl_loss supports sampled-token OPD only")
+        if mdpo_eta is None:
+            raise ValueError("mdpo_kl_loss requires mdpo_eta on the actor update batch")
+
+        mdpo_log_ratio = log_prob - old_log_prob.detach()
+        mdpo_k1 = mdpo_log_ratio
+        mdpo_k3 = kl_penalty(logprob=log_prob, ref_logprob=old_log_prob.detach(), kl_penalty="k3")
+        mdpo_kl_loss = agg_loss(
+            loss_mat=kl_penalty(logprob=log_prob, ref_logprob=old_log_prob.detach(), kl_penalty=config.kl_loss_type),
+            loss_mask=response_mask,
+            loss_agg_mode=config.loss_agg_mode,
+            **config.global_batch_info,
+        )
+        mdpo_kl_coef = 1.0 / mdpo_eta
+        policy_loss += mdpo_kl_coef * mdpo_kl_loss
+        mdpo_k1_mean = masked_mean(mdpo_k1, response_mask)
+        mdpo_k3_mean = masked_mean(mdpo_k3, response_mask)
+        mdpo_k1_std = masked_mean((mdpo_k1 - mdpo_k1_mean).square(), response_mask).sqrt()
+        mdpo_k3_std = masked_mean((mdpo_k3 - mdpo_k3_mean).square(), response_mask).sqrt()
+        metrics["mdpo_kl_loss"] = Metric(value=mdpo_kl_loss, aggregation=metric_aggregation)
+        metrics["mdpo_kl_contribution"] = Metric(value=mdpo_kl_coef * mdpo_kl_loss, aggregation=metric_aggregation)
+        metrics["mdpo_kl_coef"] = mdpo_kl_coef
+        metrics["mdpo_eta"] = mdpo_eta
+        metrics["mdpo_k1_mean"] = Metric(value=mdpo_k1_mean, aggregation=AggregationType.MEAN)
+        metrics["mdpo_k1_std"] = Metric(value=mdpo_k1_std, aggregation=AggregationType.MEAN)
+        metrics["mdpo_k3_mean"] = Metric(value=mdpo_k3_mean, aggregation=AggregationType.MEAN)
+        metrics["mdpo_k3_std"] = Metric(value=mdpo_k3_std, aggregation=AggregationType.MEAN)
 
     return policy_loss, metrics
 
