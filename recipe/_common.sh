@@ -299,9 +299,9 @@ if [ "$MDPO_KL" = "True" ] && [ "$USE_KL" = "True" ]; then
     exit 1
 fi
 
-MDPO_ARGS="actor_rollout_ref.actor.mdpo_kl_loss=${MDPO_KL} \\
-    actor_rollout_ref.actor.mdpo_eta_schedule=${MDPO_ETA_SCHEDULE} \\
-    actor_rollout_ref.actor.mdpo_eta_start=${MDPO_ETA_START} \\
+MDPO_ARGS="actor_rollout_ref.actor.mdpo_kl_loss=${MDPO_KL} \
+    actor_rollout_ref.actor.mdpo_eta_schedule=${MDPO_ETA_SCHEDULE} \
+    actor_rollout_ref.actor.mdpo_eta_start=${MDPO_ETA_START} \
     actor_rollout_ref.actor.mdpo_eta_end=${MDPO_ETA_END}"
 export MDPO_ARGS
 
