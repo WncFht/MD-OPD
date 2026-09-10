@@ -160,6 +160,9 @@ fi
 
 # ============ 训练超参数 ============
 export MINI_BATCH_SIZE=${MINI_BATCH_SIZE:-64}
+# 同一份 rollout 重复更新几次。不是 trainer.total_epochs（整份数据扫几遍）。
+# LOG_PROB_TOP_K>0 时必须保持 1，否则 top-K candidate 会和 advantage 错位。
+export PPO_EPOCHS=${PPO_EPOCHS:-1}
 export TEMPERATURE=${TEMPERATURE:-1.0}
 export TEACHER_TEMPERATURE=${TEACHER_TEMPERATURE:-1.0}
 export N_RESPONSES=${N_RESPONSES:-1}
@@ -308,6 +311,7 @@ common_args() {
         ++actor_rollout_ref.model.override_config.attn_implementation=${ATTN_IMPLEMENTATION} \
         actor_rollout_ref.actor.optim.lr=1e-6 \
         actor_rollout_ref.actor.ppo_mini_batch_size=${MINI_BATCH_SIZE} \
+        actor_rollout_ref.actor.ppo_epochs=${PPO_EPOCHS} \
         actor_rollout_ref.actor.use_dynamic_bsz=True \
         actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=1 \
         actor_rollout_ref.actor.ppo_max_token_len_per_gpu=${PPO_MAX_TOKEN_LEN_PER_GPU} \

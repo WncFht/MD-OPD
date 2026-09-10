@@ -72,6 +72,30 @@
       "top_k_overlap_last": 0.946289571634997,
       "entropy_first": 0.8811162114143372,
       "entropy_last": 0.7289965152740479
+    },
+    {
+      "run_id": "0i38mr1k",
+      "name": "frozen_ppo_lr_1e6_0909-1419",
+      "state": "failed",
+      "last_history_step": 218,
+      "n_history_rows": 218,
+      "distance_d1": 0.1048397892643255,
+      "distance_d30": 0.0990316023326764,
+      "distance_d100": 0.0698825382674662,
+      "distance_d_end": 0.0493944011499163,
+      "distance_end_over_d30": 0.49877412852501285,
+      "v_geo_at_50": 0.001233873422477716,
+      "alpha_at_50": 0.045746507967282746,
+      "validation_first_mean16": 0.6086597222222222,
+      "validation_last_mean16": 0.6561458333333333,
+      "validation_max_mean16": 0.6567847222222222,
+      "validation_max_step": 120,
+      "adv_abs_first": 0.2415381073951721,
+      "adv_abs_last": 0.0863442793488502,
+      "top_k_overlap_first": 0.8183451929531866,
+      "top_k_overlap_last": 0.9028914769273104,
+      "entropy_first": 0.7946509122848511,
+      "entropy_last": 0.8204553127288818
     }
   ]
 }

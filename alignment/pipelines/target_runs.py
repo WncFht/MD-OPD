@@ -28,16 +28,20 @@ BASELINE_STEP = 30
 ACCURACY_Y_LIMITS: tuple[float, float] | None = None
 RUN_SPECS = {
     "5aub1k4h": {
-        "label": "online vanilla (finished at 300)",
+        "label": "oneshot vanilla",
         "color": "#1f77b4",
     },
     "ceejzu26": {
-        "label": "frozen rollout + OPD no-ratio",
+        "label": "oneshot frozen no-ratio",
         "color": "#d95f02",
     },
     "mdxt04lm": {
-        "label": "full-data vanilla baseline",
+        "label": "full vanilla",
         "color": "#2ca02c",
+    },
+    "0i38mr1k": {
+        "label": "oneshot frozen vanilla",
+        "color": "#9467bd",
     },
 }
 
