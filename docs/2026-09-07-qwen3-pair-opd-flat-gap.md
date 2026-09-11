@@ -1,7 +1,7 @@
 # Qwen3 师生对 OPD 平坦 gap 诊断：eval setting 对照与"学生太强"假说检验
 
 > 状态：诊断完成（2026-09-07，单 run 单 seed 口径）。run `um5vzc6m`（`0906-opd_math_full_Qwen3-1.7B-sampled_adv_direct-T_1.0-0728`）158 步时 OPD gap 无衰减迹象。
-> 配套图由 `alignment/pipelines/qwen3.py` 生成，位于 `alignment/figures/qwen3/`。
+> 配套图由 `alignment/pipelines/qwen3/main.py` 生成，位于 `alignment/figures/qwen3/`。
 
 ## 0. 结论（TL;DR）
 
@@ -90,7 +90,7 @@ valid 口径（T=0.7, top_p=0.9, n=16）的佐证：Qwen3 学生 **step 20 即�
 
 ## 7. 复现
 
-- 判分与作图：`alignment/pipelines/qwen3.py`（依赖 `OPD/scripts/val/eval/utils.py` 的 `grade_answer_verl`；逐题 pass 缓存在 `alignment/figures/qwen3/per_problem_pass_cache.json`）。
+- 判分与作图：`alignment/pipelines/qwen3/main.py`（依赖 `OPD/scripts/val/eval/utils.py` 的 `grade_answer_verl`；逐题 pass 缓存在 `alignment/figures/qwen3/per_problem_pass_cache.json`）。
 - OPD 训练指标：`alignment/runs/{um5vzc6m,mdxt04lm}__history.csv`（`alignment/pull_wandb_metrics.py` 拉取）。
 - val 成绩：wandb `val-core/{task}/acc/mean@16`（`val_kwargs: T=0.7, top_p=0.9, n=16`）。
 - 注意：repo 根目录的 `wandb/` 本地目录会遮蔽 `import wandb`，一律用 `.venv/bin/python` 并在 repo 外运行跨仓脚本。

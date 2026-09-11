@@ -83,7 +83,10 @@ $$
 alignment/
 ├── core/
 │   ├── data.py       # RunHistory 和本地 history loader
-│   └── metrics.py    # distance / absorption / summary
+│   ├── metrics.py    # distance / absorption / validation / CE-entropy-KL / folding / summary
+│   ├── tail.py       # tail-form 拟合和 local alpha
+│   ├── accuracy.py   # student/teacher baseline、自适应 accuracy 纵轴
+│   └── plotting.py   # figure_path、baseline 标记/淡化、plot-skill 加载
 ├── config/
 │   └── runs.py       # M4 run 的 label、颜色、effective-time scale
 ├── pull_wandb_metrics.py
@@ -93,19 +96,23 @@ alignment/
 ├── analyze_paper_curves.py
 ├── plot_paper_analysis.py
 ├── invert_spectrum.py
-├── pipelines/
-│   ├── alignment.py
-│   ├── theory.py
-│   ├── qwen3.py
-│   ├── paper/plots.py
-│   └── m4/{figure19,baselines,panels,supplement,eval_fit}.py
+├── pipelines/        # 每个 topic 一个目录
+│   ├── alignment/main.py
+│   ├── theory/main.py
+│   ├── qwen3/main.py
+│   ├── offpolicy_exp/main.py
+│   ├── md_opd/main.py
+│   ├── lr_ablation/{figure19,baselines,panels,supplement,eval_fit,absorption,alpha,advantage,topk}.py
+│   └── paper/plots.py
 ├── runs/             # W&B 原始 history 和 metadata
 ├── derived/          # 指标表、拟合参数、谱反演结果
 ├── paper_curves/     # 从论文 PDF 提取的 tidy 曲线
-└── figures/          # 绘图输出
+└── figures/          # 绘图输出，按 topic 建子目录
 ```
 
-`core/` 是可复用的数据和指标代码，`config/` 是实验组配置；根目录脚本是面向研究流程的可执行入口。新代码应从 `core` 和 `config` 导入，不在脚本之间复制指标实现。
+`core/` 是可复用的数据和指标代码，`config/` 是实验组配置；根目录脚本是面向研究流程的可执行入口。新代码应从 `core` 和 `config` 导入，不在脚本之间复制指标实现。`core/plotting.py` 还提供 baseline 淡化（`plot_series`）、baseline 标记（`mark_baseline`）、距离定义标注（`distance_definition`）和 `figure_path` 文件名约定，topic 代码只编排 panel。
+
+`figures/` 下每个 topic 一个子目录，目录名、`pipelines/` 下的 topic 目录名和 derived 摘要文件名共用同一个 topic 标识，例如 `pipelines/offpolicy_exp/` 输出到 `figures/offpolicy-exp/` 和 `derived/offpolicy_exp_summary.json`，`pipelines/md_opd/` 输出到 `figures/md-opd/` 和 `derived/md_opd_summary.json`。新增对比实验时先定 topic 名，再让三处命名保持一致。
 
 ### 图中定义要求
 
@@ -122,7 +129,7 @@ $$
 
 ### Accuracy 图规则
 
-- accuracy 图的横轴从 step 0 开始；纵轴范围由 `alignment/pipelines/target_runs.py` 顶部的 `ACCURACY_Y_LIMITS` 控制，单位是百分比。
+- accuracy 图的横轴从 step 0 开始；纵轴范围由 `alignment/pipelines/offpolicy_exp/main.py` 顶部的 `ACCURACY_Y_LIMITS` 控制，单位是百分比；自适应和手动校验都由 `core/accuracy.py` 的 `accuracy_ylim` 实现，其他 pipeline 直接复用。
 - valid/accuracy 保留 step 30 左侧的有效点和连线，不截断、不淡化；baseline 阴影和竖线仅作参考。
 - `ACCURACY_Y_LIMITS = None` 时按所有有效观测点自动留边；设为 `(下限, 上限)` 可手动缩放。手动范围必须覆盖全部有效点，不得裁掉数据；只有需要展示完整概率域时才设为 `(0, 100)`。
 - 分任务小图默认分别按各自 task 的有效观测点自动缩放；设置 `ACCURACY_Y_LIMITS` 后才使用同一组全局上下限。
@@ -142,6 +149,8 @@ $$
 
 这个步骤只做外部数据落盘，不计算 alignment 指标。已有文件默认不会重复拉取；需要更新时使用 `--force`。
 
+这些 run 是离线 `wandb sync` 上来的：任务在集群跑完后才把日志同步到 W&B，所以 `run.state`（以及 meta.json 里的 `state`）可能是 `failed`/`crashed`，即使训练本身正常完成或被抢占后已续跑。**不要**用 `state` 判断一个 run 是否失败或数据是否完整；以实际拉到的 history 步数为准。
+
 ### 2. 计算标准 alignment 指标
 
 ```bash
@@ -154,7 +163,7 @@ $$
 ### 3. 画基础 alignment 图
 
 ```bash
-.venv/bin/python -m alignment.pipelines.alignment \
+.venv/bin/python -m alignment.pipelines.alignment.main \
   --derived-dir alignment/derived --figures-dir alignment/figures
 ```
 
@@ -168,21 +177,21 @@ $$
 
 会比较幂律、拉伸指数和 floor+指数，并写入 `derived/tail_fits.json`。
 
-### 5. M4、论文和 Qwen3 分析
+### 5. lr-ablation（M4）、论文和 Qwen3 分析
 
-M4 图共享 `config/runs.py` 的 run 配置，并通过 `core.data` 和 `core.metrics` 取得数据和 distance：
+lr-ablation 图共享 `config/runs.py` 的 M4 run 配置，并通过 `core.data` 和 `core.metrics` 取得数据和 distance：
 
 ```bash
-.venv/bin/python -m alignment.pipelines.m4.figure19
-.venv/bin/python -m alignment.pipelines.m4.supplement
-.venv/bin/python -m alignment.pipelines.m4.panels
+.venv/bin/python -m alignment.pipelines.lr_ablation.figure19
+.venv/bin/python -m alignment.pipelines.lr_ablation.supplement
+.venv/bin/python -m alignment.pipelines.lr_ablation.panels
 ```
 
 论文曲线和 Qwen3 诊断有独立数据源，不为了形式统一而强行塞进同一种 history schema：
 
 ```text
 论文 PDF → extract_paper_figures.py → paper_curves/*.csv
-Qwen3 eval JSONL + W&B history → pipelines/qwen3.py
+Qwen3 eval JSONL + W&B history → pipelines/qwen3/main.py
 ```
 
 它们可以共享 tail fitting、absorption 和 plotting style，但保留各自 loader 更清楚。
@@ -194,28 +203,8 @@ Qwen3 eval JSONL + W&B history → pipelines/qwen3.py
 3. 绘图函数接收已经计算好的数据，绘图层负责 baseline、坐标轴、颜色和输出路径。
 4. 不要在多个脚本重复定义 run id、label、color 和 scale；M4 配置放在 `config/runs.py`。
 5. 保留现有脚本作为可执行入口，但新功能应避免 import 时自动画图。
-6. 指标口径发生变化时，先在 docstring 和 README 说明，不要默默改变已有 derived 文件的含义。
-
-## 后续 TODO
-
-以下是截至 2026-09-09 的未完成项；tail 拟合已迁入 `core/tail.py`，Qwen3 绘图已支持 `--runs-dir`、`--fig-dir`、`--eval-dir` 和 `--opd-eval-dir`，不再列为 TODO。
-
-### 优先级高
-
-- 把剩余 M4 图中的 `step >= 30` / `step >= 60` 处理统一到绘图辅助函数，全面遵守 step 0 + baseline 淡化约定。
-- 给 `core.metrics` 增加少量端到端检查：输入已有 CSV，确认标准列、baseline 和 summary 数值稳定。
-
-### 优先级中
-
-- 将 `plot_metric_theory.py` 拆成理论合成图和真实数据诊断图两个入口；先移动职责，不改变数学和图形语义。
-- 为不同 distance 口径增加显式 metric 选择，而不是在脚本中隐含 `-opd/token_reward_mean`。
-- 把 validation、CE/entropy/KL 分解、effective-time folding 提炼成指标函数，绘图只消费结果。
-- 统一脚本的 `main()` 和参数风格，消除 import 时直接执行绘图的入口。
-
-### 优先级低
-
-- 在数据和指标接口稳定后，再考虑 `python -m alignment ...` 的统一 CLI。
-- 如果未来需要跨项目复用，再把 W&B 拉取和核心 metric 模块整理成可安装 package；当前不必过早包装。
+6. step 轴上的图一律用 `core.plotting` 的 `plot_series`（step 0 起、baseline 前淡化）和 `mark_baseline`（baseline 阴影加竖线），不要手写 `step >= t0` 截断或重复的淡化逻辑。
+7. 指标口径发生变化时，先在 docstring 和 README 说明，不要默默改变已有 derived 文件的含义。
 
 ## 当前边界
 

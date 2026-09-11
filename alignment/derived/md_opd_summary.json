@@ -1,0 +1,62 @@
+[
+  {
+    "run_id": "5aub1k4h",
+    "label": "one-shot",
+    "state": "finished",
+    "last_step": 300,
+    "rows": 300,
+    "opd/token_reward_mean__first": -0.10352281543398,
+    "opd/token_reward_mean__last": -0.0015357102037657,
+    "opd/adv_abs_mean__first": 0.2352638840675354,
+    "opd/adv_abs_mean__last": 0.0250689536333084,
+    "actor/entropy__first": 0.7716193795204163,
+    "actor/entropy__last": 0.5984092354774475,
+    "validation_last_mean16": 0.6633958333333334,
+    "validation_best_mean16": 0.6692986111111111
+  },
+  {
+    "run_id": "nh3jj9bt",
+    "label": "4 mini steps",
+    "state": "finished",
+    "last_step": 300,
+    "rows": 300,
+    "opd/token_reward_mean__first": -0.1032115242709102,
+    "opd/token_reward_mean__last": -0.0007513355965922,
+    "opd/adv_abs_mean__first": 0.2367938458919525,
+    "opd/adv_abs_mean__last": 0.0212855655699968,
+    "actor/entropy__first": 0.7676249146461487,
+    "actor/entropy__last": 0.5873502492904663,
+    "validation_last_mean16": 0.6844930555555555,
+    "validation_best_mean16": 0.6844930555555555
+  },
+  {
+    "run_id": "zyskh7f2",
+    "label": "16 mini steps",
+    "state": "finished",
+    "last_step": 300,
+    "rows": 300,
+    "opd/token_reward_mean__first": -0.1031722367067763,
+    "opd/token_reward_mean__last": -0.0040882894286713,
+    "opd/adv_abs_mean__first": 0.2361170202493667,
+    "opd/adv_abs_mean__last": 0.0388301126658916,
+    "actor/entropy__first": 0.7611142992973328,
+    "actor/entropy__last": 0.6285128593444824,
+    "validation_last_mean16": 0.6819722222222221,
+    "validation_best_mean16": 0.691951388888889
+  },
+  {
+    "run_id": "6p579hnn",
+    "label": "mirror descent (MDPO)",
+    "state": "failed",
+    "last_step": 299,
+    "rows": 299,
+    "opd/token_reward_mean__first": -0.1031722367067763,
+    "opd/token_reward_mean__last": -0.0010850557046205,
+    "opd/adv_abs_mean__first": 0.2361170202493667,
+    "opd/adv_abs_mean__last": 0.0247324537485837,
+    "actor/entropy__first": 0.7611142992973328,
+    "actor/entropy__last": 0.6315051913261414,
+    "validation_last_mean16": 0.6761527777777778,
+    "validation_best_mean16": 0.6909444444444445
+  }
+]

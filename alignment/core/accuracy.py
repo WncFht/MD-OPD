@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Iterable
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 DEFAULT_RUNS_DIR = Path(__file__).resolve().parents[1] / "runs"
@@ -74,6 +75,37 @@ def accuracy_baseline_values(
         values = {role: task_values[canonical] for role, task_values in raw.items()}
     scale = 100.0 if as_percent else 1.0
     return {role: value * scale for role, value in values.items()}
+
+
+def accuracy_ylim(
+    values: Iterable[np.ndarray],
+    task: str | None = None,
+    *,
+    limits: tuple[float, float] | None = None,
+    runs_dir: Path = DEFAULT_RUNS_DIR,
+) -> tuple[float, float]:
+    """Return a percentage range covering observations and baselines.
+
+    ``values`` must already be on the percent scale; student/teacher baselines
+    are appended internally. ``limits=(lower, upper)`` selects a manual range
+    that must cover every finite observation; otherwise the range is padded by
+    ``max(2, 10% of the observed span)``.
+    """
+    arrays = [np.asarray(array, dtype=float) for array in values]
+    arrays.append(np.array(list(accuracy_baseline_values(task, as_percent=True, runs_dir=runs_dir).values())))
+    observed = np.concatenate([array[np.isfinite(array)] for array in arrays if np.isfinite(array).any()])
+    if observed.size == 0:
+        return 0.0, 100.0
+    if limits is not None:
+        lower, upper = limits
+        if not 0.0 <= lower < upper <= 100.0:
+            raise ValueError(f"accuracy limits must satisfy 0 <= lower < upper <= 100, got {limits}")
+        if observed.min() < lower or observed.max() > upper:
+            raise ValueError(f"accuracy limits {limits} clip a valid observation")
+        return float(lower), float(upper)
+    lower, upper = float(observed.min()), float(observed.max())
+    padding = max(2.0, (upper - lower) * 0.1)
+    return max(0.0, lower - padding), min(100.0, upper + padding)
 
 
 def add_accuracy_baselines(

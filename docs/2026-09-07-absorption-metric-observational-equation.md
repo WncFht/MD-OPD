@@ -73,21 +73,21 @@ $$
 
 ## 3. M4 run：从“谁最快”改成“测到了什么”
 
-![M4 几何吸收率：实际步数与学习率折叠](../alignment/figures/m4/absorption-rate_vs_step-and-effective-step__runs-m4__geometric.png)
+![M4 几何吸收率：实际步数与学习率折叠](../alignment/figures/lr-ablation/absorption-rate_vs_step-and-effective-step__runs-m4__geometric.png)
 
-![M4 top-$k$ reward 的距离、归一化距离与吸收率](../alignment/figures/m4/topk-distance-and-absorption_vs_step-and-effective-step__runs-m4__diagnostics.png)
+![M4 top-$k$ reward 的距离、归一化距离与吸收率](../alignment/figures/lr-ablation/topk-distance-and-absorption_vs_step-and-effective-step__runs-m4__diagnostics.png)
 
-![M4 sampled-token 的局部幂律指数](../alignment/figures/m4/local-alpha_vs_step__runs-m4__sampled-token.png)
+![M4 sampled-token 的局部幂律指数](../alignment/figures/lr-ablation/local-alpha_vs_step__runs-m4__sampled-token.png)
 
-![M4 top-$k$ 的局部幂律指数](../alignment/figures/m4/local-alpha_vs_step__runs-m4__top-k.png)
+![M4 top-$k$ 的局部幂律指数](../alignment/figures/lr-ablation/local-alpha_vs_step__runs-m4__top-k.png)
 
-![M4 folded sampled-token 的局部幂律指数](../alignment/figures/m4/local-alpha_vs_effective-step__runs-m4__sampled-token-folded.png)
+![M4 folded sampled-token 的局部幂律指数](../alignment/figures/lr-ablation/local-alpha_vs_effective-step__runs-m4__sampled-token-folded.png)
 
-![M4 folded top-$k$ 的局部幂律指数](../alignment/figures/m4/local-alpha_vs_effective-step__runs-m4__top-k-folded.png)
+![M4 folded top-$k$ 的局部幂律指数](../alignment/figures/lr-ablation/local-alpha_vs_effective-step__runs-m4__top-k-folded.png)
 
-![M4 step-30 normalized folded sampled-token alpha](../alignment/figures/m4/local-alpha-normalized_vs_effective-step__runs-m4__sampled-token-folded-step30.png)
+![M4 step-30 normalized folded sampled-token alpha](../alignment/figures/lr-ablation/local-alpha-normalized_vs_effective-step__runs-m4__sampled-token-folded-step30.png)
 
-![M4 step-30 normalized folded top-$k$ alpha](../alignment/figures/m4/local-alpha-normalized_vs_effective-step__runs-m4__top-k-folded-step30.png)
+![M4 step-30 normalized folded top-$k$ alpha](../alignment/figures/lr-ablation/local-alpha-normalized_vs_effective-step__runs-m4__top-k-folded-step30.png)
 
 用 \`opd/top_k_reward_mean\` 重算后，top-$k$ 距离的形状与 sampled-token KL 很接近，但不同 run 的相对尾部排序会改变：例如 \`mdxt04lm\`、\`yj2w13fq\` 和 \`tjjxnvw9\` 的 top-$k$ 尾部比例分别约为 0.072、0.066 和 0.054；\`l0a6rsc1\` 则约为 0.183。早期 $v_{50}$ 仍随 lr 增大而上升并在高 lr 处平台，说明 top-$k$ 读数保留了相同的“快启动—慢尾部”动力学。top-$k$ 与全量 sampled-token 的差异更适合解释为候选支持集和权重改变，而不是训练动力学完全不同。
 
@@ -140,7 +140,7 @@ $$
 
 ## 4. 关键证据：signed 距离比幅度距离下降得更快
 
-![M4 advantage 的 signed、幅度与正比例诊断](../alignment/figures/m4/advantage-diagnostics_vs_step__runs-m4__signed-magnitude-fraction.png)
+![M4 advantage 的 signed、幅度与正比例诊断](../alignment/figures/lr-ablation/advantage-diagnostics_vs_step__runs-m4__signed-magnitude-fraction.png)
 
 只有 `ml6mz58f` 和 `l0a6rsc1` 记录了完整 advantage 聚合量。到末段：
 
@@ -149,7 +149,7 @@ $$
 
 signed KL proxy 的下降明显快于 $\mathbb E\mid A\mid$ 幅度。这个差异不说明 signed 指标失效，而是说明 KL（二次型、带学生概率权重）与 L1（逐 token 幅度）对同一训练状态的加权不同；正负 advantage 分解仍有助于判断单 token 缺口是否集中或重排。
 
-![M4 的 CE、entropy 与 KL proxy 分解](../alignment/figures/m4/ce-entropy-kl_vs_step__runs-m4__decomposition.png)
+![M4 的 CE、entropy 与 KL proxy 分解](../alignment/figures/lr-ablation/ce-entropy-kl_vs_step__runs-m4__decomposition.png)
 
 top-$k$ reward 始终比全量 reward 更负，说明重点 token 的缺口更大，但不能把前者当作全量距离的替代。CE、entropy 与 student NLL 在末段彼此接近，故 signed $d_t$ 是两个大数之差，距离越小，相对数值误差越容易放大。
 
