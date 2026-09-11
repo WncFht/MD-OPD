@@ -403,7 +403,7 @@ $$
 
 读法：**我们的 KL 曲线需要"幂律+弯曲"的多模式谱才能外推尾部，论文的 L1 曲线用单幂律即可**——与发现 1 的 α(t) 对比完全自洽。这不是谁对谁错：两口径对同一谱的加权不同（§2.8），KL 的 λ-加权放大了高曲率端的弯曲。M3 落地后应在同一 run 内用 L1/KL/CE 三口径各做一次反演（M2 的复跑清单已加）。
 
-**图（`plots/figures/`，由 `plot_paper_analysis.py` / `invert_spectrum.py` 生成）：**
+**图（`plots/figures/paper/`，由 `plots/pipelines/paper/plots.py` / `invert_spectrum.py` 生成）：**
 
 ![论文图9四条L1曲线的尾部形态拟合](../plots/figures/paper/tail-distance_vs_step__source-paper__fits.png)
 
@@ -419,7 +419,7 @@ _图 M1-c：左——三个 lr 臂的 v_t（实时轴），凸起位置 {63, 40,
 
 ![top16 run 的 NNLS 谱反演](../plots/figures/paper/spectrum-density_vs_rate__metric-ours_top16_kl.png)
 
-_图 M2-a：top16 run 的谱反演。左：测量 d_t 与 NNLS 重构（竖线右侧为 hold-out 外推区）；右：反演出的谱密度 μ'(ρ)（对数-对数），斜率 ≈ −0.42。sampled-token 与论文 Full-Data 的同款图见 `figures/spectrum__ours_sampled_token_kl.png` / `figures/spectrum__paper_fulldata_l1.png`。_
+_图 M2-a：top16 run 的谱反演。左：测量 d_t 与 NNLS 重构（竖线右侧为 hold-out 外推区）；右：反演出的谱密度 μ'(ρ)（对数-对数），斜率 ≈ −0.42。sampled-token 与论文 Full-Data 的同款图见 `figures/paper/spectrum-density_vs_rate__metric-ours_sampled_token_kl.png` / `figures/paper/spectrum-density_vs_rate__metric-paper_fulldata_l1.png`。_
 
 ---
 

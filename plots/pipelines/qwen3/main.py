@@ -32,8 +32,6 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_RUNS_DIR = REPO_ROOT / "plots" / "runs"
 DEFAULT_FIG_DIR = REPO_ROOT / "plots" / "figures" / "qwen3"
 
-sys.path.insert(0, str(REPO_ROOT / ".agents" / "skills" / "plot-skill" / "scripts"))
-
 from style_presets import (  # noqa: E402
     NEUTRALS,
     apply_frame,

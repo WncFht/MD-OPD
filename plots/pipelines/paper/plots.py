@@ -3,17 +3,15 @@
 
 from __future__ import annotations
 
-import importlib.util
 import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from plots.core.plotting import figure_path
+from plots.core.plotting import figure_path, load_plot_style
 
 HERE = Path(__file__).resolve().parents[2]
-ROOT = HERE.parent
 sys.path.insert(0, HERE)
 
 from plots.core.metrics import geometric_absorption  # noqa: E402
@@ -24,16 +22,7 @@ from plots.core.tail import (  # noqa: E402
     local_alpha,
 )
 
-STYLE_PATH = ROOT / ".agents/skills/plot-skill/scripts/style_presets.py"
 T_START = 30
-
-
-def load_style():
-    spec = importlib.util.spec_from_file_location("alignment_plot_style", STYLE_PATH)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
 
 
 def load_concat(name: str) -> pd.DataFrame:
@@ -57,7 +46,7 @@ def rate_curve(df: pd.DataFrame, t_start: int = T_START) -> pd.DataFrame:
     steps = df["step"].to_numpy(dtype=float)
     dist = df["value"].to_numpy(dtype=float)
     mask = steps >= t_start
-    v = geometric_absorption(steps[mask], dist[mask], t_start, 1.4)
+    v = geometric_absorption(steps[mask], dist[mask])
     return pd.DataFrame({"step": steps[mask], "v": v}).dropna().reset_index(drop=True)
 
 
@@ -237,8 +226,7 @@ def hump_check(style) -> None:
 
 
 def main() -> int:
-    style = load_style()
-    (HERE / "figures").mkdir(exist_ok=True)
+    style = load_plot_style()
     paper_tail_fits(style)
     alpha_comparison(style)
     hump_check(style)

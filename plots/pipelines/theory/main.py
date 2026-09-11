@@ -23,18 +23,9 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np
 import pandas as pd
-
-from plots.core.accuracy import add_accuracy_baselines
-from plots.core.data import load_run_history
-from plots.core.metrics import ce_entropy_kl, distance_proxy, value_at_step
-from plots.core.plotting import BASELINE_STEP, figure_path, mark_baseline, plot_series
-
-SKILL_SCRIPTS = Path(__file__).resolve().parents[3] / ".agents" / "skills" / "plot-skill" / "scripts"
-sys.path.insert(0, str(SKILL_SCRIPTS))
-
-import matplotlib.pyplot as plt  # noqa: E402
 from style_presets import (  # noqa: E402
     NEUTRALS,
     apply_frame,
@@ -43,6 +34,11 @@ from style_presets import (  # noqa: E402
     line_styles,
     series_colors,
 )
+
+from plots.core.accuracy import add_accuracy_baselines
+from plots.core.data import load_run_history
+from plots.core.metrics import ce_entropy_kl, distance_proxy, value_at_step
+from plots.core.plotting import BASELINE_STEP, figure_path, mark_baseline, plot_series
 
 ROOT = Path(__file__).resolve().parents[3]
 RUNS = ROOT / "plots" / "runs"

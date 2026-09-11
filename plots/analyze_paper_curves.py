@@ -2,10 +2,9 @@
 """M1 on the paper's digitized curves: tail forms, alpha(t), and hump tests.
 
 Inputs : plots/paper_curves/*.csv (from extract_paper_figures.py)
-Outputs: plots/derived/paper_analysis.json
-         plots/figures/paper_tail_fits.png   (4 runs, log-log + fits)
-         plots/figures/alpha_comparison.png  (paper L1 alpha(t) vs ours, KL proxy)
-         plots/figures/hump_check.png        (H3a lr-fold / H3b frozen-state)
+Outputs: plots/derived/paper_analysis.json + stdout tables; the matching
+         figures are produced by plots/pipelines/paper/plots.py under
+         figures/paper/
 
 Series identity (curve colors are stable across the paper's figures):
   00-3e-75 dark blue = Full-Data (fig9) / On-Policy (5.3) / lr arm (see below)
@@ -92,7 +91,7 @@ def rate_curve(df: pd.DataFrame, t_start: int = T_START) -> pd.DataFrame:
     steps = df["step"].to_numpy(dtype=float)
     dist = df["value"].to_numpy(dtype=float)
     mask = steps >= t_start
-    v = geometric_absorption(steps[mask], dist[mask], t_start, 1.4)
+    v = geometric_absorption(steps[mask], dist[mask])
     return pd.DataFrame({"step": steps[mask], "v": v}).dropna().reset_index(drop=True)
 
 

@@ -13,7 +13,7 @@ Validation: hold-out extrapolation onto the tail (fit [t0, t_split], predict
 [t_split, end]) against a power-law baseline fitted on the same train range.
 
 Outputs: plots/derived/spectrum__<name>.csv, plots/derived/inversion_summary.json,
-         plots/figures/spectrum__<name>.png
+         plots/figures/paper/spectrum-density_vs_rate__metric-<name>.png
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from plots.core.plotting import figure_path
+from plots.core.plotting import figure_path, load_plot_style
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, HERE)
@@ -129,20 +129,13 @@ def invert(name: str, df: pd.DataFrame, rate_factor: float, t_split: float) -> d
             for r, cc in sorted(zip(rho, c, strict=False), key=lambda kv: -kv[1])[:5]
             if cc > 0
         ],
-        "figure": str(fig_out),
+        "figure": str(fig_out.relative_to(HERE.parent)),
     }
 
 
 def plot(name, t, y, recon, t_split, rho, c, density, support):
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location(
-        "alignment_plot_style",
-        HERE.parent / ".agents/skills/plot-skill/scripts/style_presets.py",
-    )
-    style = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = style
-    spec.loader.exec_module(style)
+    """Render measured distance, reconstruction, and the inverted spectrum."""
+    style = load_plot_style()
     theme = style.apply_rc("tableau-paper")
     colors = style.series_colors("tableau-paper", 3)
     styles = style.line_styles(theme.line_preset)

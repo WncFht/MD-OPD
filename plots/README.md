@@ -36,9 +36,9 @@ plots/
 │   └── paper/plots.py             # 论文曲线对照
 ├── pull_wandb_metrics.py   # W&B history → runs/*.csv
 ├── compute_alignment.py    # runs/*.csv → derived/*__alignment.csv
-├── fit_tail.py             # derived/ → tail_fits.json
-├── extract_paper_figures.py / analyze_paper_curves.py / plot_paper_analysis.py
-├── invert_spectrum.py      # 谱反演
+├── fit_tail.py             # derived/ → tail_fits.json + figures/tail/
+├── extract_paper_figures.py / analyze_paper_curves.py
+├── invert_spectrum.py      # 谱反演 → derived/ + figures/paper/
 ├── runs/             # W&B 原始 history 和 metadata
 ├── derived/          # 指标表、拟合参数、谱反演结果
 ├── paper_curves/     # 从论文 PDF 提取的 tidy 曲线
@@ -169,11 +169,13 @@ $$
 ### 2. 计算标准指标表
 
 ```bash
-.venv/bin/python plots/compute_alignment.py \
+.venv/bin/python -m plots.compute_alignment \
   --runs-dir plots/runs --out-dir plots/derived --t-start 30
 ```
 
 输出 `derived/<run_id>__alignment.csv` 和 `derived/summary.json`。入口脚本负责遍历输入和写文件，真正的计算在 `core/metrics.py`。
+
+注意 `d_rel` 有两个来源：CSV 里的 `d_rel` 是把 `--t-start`（默认 30）烤进文件的存档快照；pipeline 里随时可以用 `normalize_at_step(steps, d, t0)` 换 baseline。改 baseline 不需要重新生成 CSV。
 
 ### 3. 画基础图
 
@@ -185,20 +187,20 @@ $$
 ### 4. 尾部拟合
 
 ```bash
-.venv/bin/python plots/fit_tail.py --derived-dir plots/derived --plot
+.venv/bin/python -m plots.fit_tail --derived-dir plots/derived --plot
 ```
 
-比较幂律、拉伸指数和 floor+指数，写入 `derived/tail_fits.json`。
+比较幂律、拉伸指数和 floor+指数，写入 `derived/tail_fits.json`，每个 run 一张拟合图到 `figures/tail/`。
 
 ### 5. 各 topic
 
 ```bash
-.venv/bin/python -m plots.pipelines.lr_ablation.baselines   # figure19 + norm-d30/d60 + grad
-.venv/bin/python -m plots.pipelines.lr_ablation.panels      # 六联图 + validation
-.venv/bin/python -m plots.pipelines.lr_ablation.supplement  # CE/entropy/KL 分解等
+.venv/bin/python -m plots.pipelines.lr_ablation.main        # 全部 lr-ablation 图
+.venv/bin/python -m plots.pipelines.lr_ablation.baselines   # 或按模块单跑
 .venv/bin/python -m plots.pipelines.offpolicy_exp.main
 .venv/bin/python -m plots.pipelines.md_opd.main
 .venv/bin/python -m plots.pipelines.theory.main
+.venv/bin/python -m plots.pipelines.paper.plots
 ```
 
 lr-ablation 的 run 配置集中在 `config/runs.py`（label、颜色、effective-time scale）。论文曲线和 Qwen3 诊断有独立数据源，不为了形式统一而强行塞进同一种 history schema：

@@ -1,5 +1,10 @@
 """Named experiment groups used by analysis entry points."""
 
+REFERENCE_RUNS = {
+    "student": "6uorrk2k",
+    "teacher": "u87buult",
+}
+
 M4_RUNS = {
     "ybi7q89v": {"label": r"lr $5\times10^{-7}$", "scale": 0.5, "color": "#b07a00"},
     "mdxt04lm": {"label": r"lr $1\times10^{-6}$", "scale": 1.0, "color": "#1f8a9a"},

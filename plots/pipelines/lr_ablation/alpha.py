@@ -18,17 +18,13 @@ def lr_runs():
     return ((run_id, spec) for run_id, spec in M4_RUNS.items() if run_id not in excluded)
 
 
-def alpha_series(run_id: str, column: str):
-    """Return step and local alpha from the canonical metrics table."""
-    _, metrics = load_run_metrics(run_id, RUNS, column=column)
-    return metrics["step"].to_numpy(dtype=float), metrics["alpha_local"].to_numpy(dtype=float)
-
-
 def plot_metric(column: str, metric_name: str, suffix: str, folded: bool = False) -> Path:
     """Render one estimator's alpha curves for all learning-rate runs."""
     fig, ax = plt.subplots(figsize=(11, 5.2))
     for run_id, spec in lr_runs():
-        step, alpha = alpha_series(run_id, column)
+        _, metrics = load_run_metrics(run_id, RUNS, column=column)
+        step = metrics["step"].to_numpy(dtype=float)
+        alpha = metrics["alpha_local"].to_numpy(dtype=float)
         x = effective_step(step, spec["scale"]) if folded else step
         baseline = effective_step(BASELINE_STEP, spec["scale"]) if folded else BASELINE_STEP
         plot_series(ax, x, alpha, color=spec["color"], linewidth=1.8, label=spec["label"], baseline=baseline)
@@ -62,7 +58,9 @@ def plot_normalized_folded(column: str, metric_name: str, suffix: str) -> Path:
     """
     fig, ax = plt.subplots(figsize=(11, 5.2))
     for run_id, spec in lr_runs():
-        step, alpha = alpha_series(run_id, column)
+        _, metrics = load_run_metrics(run_id, RUNS, column=column)
+        step = metrics["step"].to_numpy(dtype=float)
+        alpha = metrics["alpha_local"].to_numpy(dtype=float)
         x = effective_step(step, spec["scale"])
         baseline_x = effective_step(BASELINE_STEP, spec["scale"])
         plot_series(ax, x, alpha, color=spec["color"], linewidth=1.8, label=spec["label"], baseline=baseline_x)

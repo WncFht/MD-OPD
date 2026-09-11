@@ -4,14 +4,13 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
-import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from plots.core.plotting import figure_path, load_plot_style
 from plots.core.tail import (
     fit_floor_exp,
     fit_power_law,
@@ -20,18 +19,6 @@ from plots.core.tail import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-STYLE_PATH = ROOT / ".agents/skills/plot-skill/scripts/style_presets.py"
-
-
-def load_plot_style():
-    """Load the repository plotting preset."""
-    spec = importlib.util.spec_from_file_location("alignment_plot_style", STYLE_PATH)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Unable to load plot style: {STYLE_PATH}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
 
 
 def analyze_run(csv_path: Path, t_start: int, plot: bool) -> dict:
@@ -104,8 +91,7 @@ def plot_fits(run_id: str, steps, distance, fits: list[dict]) -> None:
     style.apply_grid(ax, theme.grid, axis="both")
     ax.legend(loc="lower left", fontsize=8)
     fig.tight_layout()
-    out = ROOT / "plots/figures" / f"tail_fits__{run_id}.png"
-    out.parent.mkdir(parents=True, exist_ok=True)
+    out = figure_path("tail", "tail-fits", "step", run_id)
     fig.savefig(out, dpi=300, bbox_inches="tight")
     plt.close(fig)
 

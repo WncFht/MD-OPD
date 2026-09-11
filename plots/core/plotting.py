@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
-import importlib.util
-import sys
 from pathlib import Path
 
 import numpy as np
 
 FIGURES_ROOT = Path(__file__).resolve().parents[1] / "figures"
-REPO_ROOT = FIGURES_ROOT.parents[1]
-STYLE_PRESETS_PATH = REPO_ROOT / ".agents/skills/plot-skill/scripts/style_presets.py"
 
 BASELINE_STEP = 30  # analysis baseline; also the gradient-clipping boundary
 FADED_ALPHA = 0.25
@@ -27,14 +23,10 @@ def figure_path(
 
 
 def load_plot_style():
-    """Import the plot-skill ``style_presets`` module from outside the package."""
-    spec = importlib.util.spec_from_file_location("alignment_plot_style", STYLE_PRESETS_PATH)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Unable to load plot style: {STYLE_PRESETS_PATH}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    """Import the plot-skill ``style_presets`` module (path set up in ``plots.core``)."""
+    import style_presets
+
+    return style_presets
 
 
 def mark_baseline(axis, step: float = BASELINE_STEP, *, shaded: bool = True) -> None:

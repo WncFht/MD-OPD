@@ -10,13 +10,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from plots.config.runs import REFERENCE_RUNS
+
 from .data import VALIDATION_TASKS
 
 DEFAULT_RUNS_DIR = Path(__file__).resolve().parents[1] / "runs"
-BASELINE_RUNS = {
-    "student": "6uorrk2k",
-    "teacher": "u87buult",
-}
+BASELINE_RUNS = REFERENCE_RUNS
 TASK_COLUMNS = VALIDATION_TASKS
 TASK_ALIASES = {
     "AIME25": "AIME25",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 
 import pandas as pd
@@ -24,8 +25,13 @@ class RunHistory:
     meta: dict
 
 
+@cache
 def load_run_history(run_id: str, runs_dir: Path) -> RunHistory:
-    """Load ``<run_id>__history.csv`` and its optional metadata JSON."""
+    """Load ``<run_id>__history.csv`` and its optional metadata JSON.
+
+    Cached per process: pipelines load the same history for several panels.
+    Callers must not mutate ``history.frame`` in place.
+    """
     csv_path = runs_dir / f"{run_id}__history.csv"
     meta_path = runs_dir / f"{run_id}__meta.json"
     frame = pd.read_csv(csv_path).sort_values("_step").reset_index(drop=True)

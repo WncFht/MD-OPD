@@ -21,6 +21,7 @@ import argparse
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_KEYS = [
@@ -151,6 +152,9 @@ def pull_run(
 
     meta = {
         "run_id": run_id,
+        "entity": entity,
+        "project": project,
+        "pulled_at": datetime.now(timezone.utc).isoformat(),
         "name": run.name,
         "display_name": run.display_name,
         "state": run.state,
