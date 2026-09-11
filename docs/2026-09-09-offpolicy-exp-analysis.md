@@ -8,8 +8,8 @@
 
 本地可以直接判断已经拉取过的 run 的 ID、名称、状态和配置。判断依据是：
 
-- `alignment/runs/<run_id>__meta.json`：保存 W&B run 元数据和扁平化配置 `config_flat`；
-- `alignment/runs/<run_id>__history.csv`：保存按 step 拉取的指标历史；
+- `plots/runs/<run_id>__meta.json`：保存 W&B run 元数据和扁平化配置 `config_flat`；
+- `plots/runs/<run_id>__history.csv`：保存按 step 拉取的指标历史；
 - 文件名中的 `<run_id>` 就是 W&B 的短 run ID，不需要从 run 名称反推。
 
 本次 3 个目标 run 已全部落盘。它们不是同条件重复实验：
@@ -26,9 +26,9 @@
 
 当前目标 run 的本地文件为：
 
-- [5aub1k4h history](../alignment/runs/5aub1k4h__history.csv)；[metadata](../alignment/runs/5aub1k4h__meta.json)
-- [ceejzu26 history](../alignment/runs/ceejzu26__history.csv)；[metadata](../alignment/runs/ceejzu26__meta.json)
-- [mdxt04lm history](../alignment/runs/mdxt04lm__history.csv)；[metadata](../alignment/runs/mdxt04lm__meta.json)
+- [5aub1k4h history](../plots/runs/5aub1k4h__history.csv)；[metadata](../plots/runs/5aub1k4h__meta.json)
+- [ceejzu26 history](../plots/runs/ceejzu26__history.csv)；[metadata](../plots/runs/ceejzu26__meta.json)
+- [mdxt04lm history](../plots/runs/mdxt04lm__history.csv)；[metadata](../plots/runs/mdxt04lm__meta.json)
 
 配置核对得到以下结果：
 
@@ -50,15 +50,15 @@
 
 ## 图表
 
-![distance、验证集和 entropy 对比](../alignment/figures/offpolicy-exp/distance-validation_vs_step__offpolicy-exp__overview.png)
+![distance、验证集和 entropy 对比](../plots/figures/offpolicy-exp/distance-validation_vs_step__offpolicy-exp__overview.png)
 
-![按任务拆分的 validation](../alignment/figures/offpolicy-exp/validation-tasks_vs_step__offpolicy-exp__mean16.png)
+![按任务拆分的 validation](../plots/figures/offpolicy-exp/validation-tasks_vs_step__offpolicy-exp__mean16.png)
 
-![吸收率和 alpha](../alignment/figures/offpolicy-exp/absorption-alpha_vs_step__offpolicy-exp__signed-adv-proxy.png)
+![吸收率和 alpha](../plots/figures/offpolicy-exp/absorption-alpha_vs_step__offpolicy-exp__signed-adv-proxy.png)
 
-![OPD 与系统诊断](../alignment/figures/offpolicy-exp/opd-diagnostics_vs_step__offpolicy-exp__overview.png)
+![OPD 与系统诊断](../plots/figures/offpolicy-exp/opd-diagnostics_vs_step__offpolicy-exp__overview.png)
 
-图由 [offpolicy_exp.py](../alignment/pipelines/offpolicy_exp/main.py) 生成，并满足项目约定：absolute 曲线从 step 0 展开；normalized 曲线也从 step 0 展开，在 step 30 画 baseline 竖线，并将左侧区间淡化。可复现的机器可读摘要在 [offpolicy_exp_summary.json](../alignment/derived/offpolicy_exp_summary.json)。
+图由 [offpolicy_exp.py](../plots/pipelines/offpolicy_exp/main.py) 生成，并满足项目约定：absolute 曲线从 step 0 展开；normalized 曲线也从 step 0 展开，在 step 30 画 baseline 竖线，并将左侧区间淡化。可复现的机器可读摘要在 [offpolicy_exp_summary.json](../plots/derived/offpolicy_exp_summary.json)。
 
 ## Distance 与验证集
 
@@ -130,18 +130,18 @@ $$
 本次 W&B 拉取命令：
 
 ```bash
-.venv/bin/python alignment/pull_wandb_metrics.py \
+.venv/bin/python plots/pull_wandb_metrics.py \
   --entity wncfht \
   --project One-Shot-OPD \
   --run-id 5aub1k4h ceejzu26 mdxt04lm \
-  --out alignment/runs \
+  --out plots/runs \
   --force
 ```
 
 重新生成图表和摘要：
 
 ```bash
-.venv/bin/python -m alignment.pipelines.offpolicy_exp.main
+.venv/bin/python -m plots.pipelines.offpolicy_exp.main
 ```
 
 W&B 凭据由本地 `~/.netrc` 提供；本次没有访问远程开发机或 GPU 集群。

@@ -176,7 +176,7 @@ $$
 - $\alpha$ **上升** $\Rightarrow$ 衰减在 log-log 上是凹的（比任何幂律都快地弯下去）$\Rightarrow$ $v_{50}/v_{200}<4$；带边截断的宽谱、对数正态谱、或玻璃态（KWW）弛豫都产生这种形状；
 - $\alpha$ **下降** $\Rightarrow$ 逼近噪声底/谱中 $\lambda=0$ 的原子 $\Rightarrow$ $v_{50}/v_{200}>4$。
 
-（我们的实现里 $\alpha(t)$ 由滑窗 log-log 回归直接测，`alignment/fit_tail.py` 的 `local_alpha`；论文的 $v_{50}/v_{200}=4.2\text{–}6.4\ge4$ 即 $\alpha$ 下降型，我们的两个 run 是 $2.5\text{–}3.1<4$，$\alpha$ 上升型——见 §4 的对照与解释。）
+（我们的实现里 $\alpha(t)$ 由滑窗 log-log 回归直接测，`plots/fit_tail.py` 的 `local_alpha`；论文的 $v_{50}/v_{200}=4.2\text{–}6.4\ge4$ 即 $\alpha$ 下降型，我们的两个 run 是 $2.5\text{–}3.1<4$，$\alpha$ 上升型——见 §4 的对照与解释。）
 
 **与谱密度渐近的对应（Watson 引理）。** $d(t)=d_0\int e^{-\eta\lambda t}\,\mu(d\lambda)$，被积函数在 $\lambda\sim1/(\eta t)$ 附近支配积分，所以 $\alpha(t)$ 由谱测度在该处附近的局部形状决定：
 
@@ -365,7 +365,7 @@ $$
 
 ## 4. 本文数据的谱读数（top16 vs sampled-token，2026-09-06）
 
-两个 run：`be00rj9e`（top16：`log_prob_top_k=16`、策略 `only_stu`）与 `mdxt04lm`（sampled-token：全分布 k1），均 279 步、full-data、AdamW lr $10^{-6}$（config 已核对）。距离代理 $d^{\mathrm{proxy}}_t=-\texttt{opd/token\_reward\_mean}$（逐 token reverse-KL，nats/token；top16 为其 top-16 截断版）。全部数字由 `alignment/` 流水线产出（数据、脚本、图见该目录 README）。
+两个 run：`be00rj9e`（top16：`log_prob_top_k=16`、策略 `only_stu`）与 `mdxt04lm`（sampled-token：全分布 k1），均 279 步、full-data、AdamW lr $10^{-6}$（config 已核对）。距离代理 $d^{\mathrm{proxy}}_t=-\texttt{opd/token\_reward\_mean}$（逐 token reverse-KL，nats/token；top16 为其 top-16 截断版）。全部数字由 `plots/` 流水线产出（数据、脚本、图见该目录 README）。
 
 | 量                                 | top16       | sampled-token |
 | ---------------------------------- | ----------- | ------------- |
@@ -386,7 +386,7 @@ $$
 
 ### 4.1 M1/M2 首轮结果（2026-09-06 晚，§6 测量程序的第一批交付，全部零 GPU）
 
-**M1（论文曲线数字化 + 尾部诊断）。** 论文图 9 / §5.3 / C.2 的矢量 PDF 曲线已逐点提取（`alignment/paper_curves/`，提取器 `extract_paper_figures.py`；图 9 右面板的 $v_{50}/v_{200}$ 读数 6.39/4.15/5.19/5.42 对论文表 7 的 6.4/4.2/5.2/5.6，提取可信）。四个发现：
+**M1（论文曲线数字化 + 尾部诊断）。** 论文图 9 / §5.3 / C.2 的矢量 PDF 曲线已逐点提取（`plots/paper_curves/`，提取器 `extract_paper_figures.py`；图 9 右面板的 $v_{50}/v_{200}$ 读数 6.39/4.15/5.19/5.42 对论文表 7 的 6.4/4.2/5.2/5.6，提取可信）。四个发现：
 
 1. **论文 L1 口径下，四个 run 的距离曲线全部最优拟合为纯幂律**；滑窗 $\alpha(t)$ 在 0.44–0.67 之间、无系统性漂移（Full-Data 0.52→0.55，4-Shot 0.61→0.61）。对比我们的 KL 代理（0.7→1.3 系统上升）：**$\alpha(t)$ 上升目前只存在于 KL 口径**——结合 §2.8 的 CE−H 分解，它有多大成分是熵相消伪影，由 M3 裁决；H7（带边/对数正态谱）在 L1 口径暂无证据。
 2. **H3a（lr 折叠）**：论文 C.2 的 collapsed 轴曲线与实时曲线做经验尺度匹配，$k^{*}=0.50/1.00/2.00$、对数空间 rmse≈0——论文的 $u$-坍缩被精确复现。M4 首轮的 Figure-19 风格复画显示：把 $d_t$ 改写到 $u=(lr/10^{-6})t$ 后，三个 lr 臂的早期曲线明显靠拢，但尾部仍分叉；因此当前结论是**近似有效时间缩放，而非严格全程坍缩**。凸起是否严格按 $1/\mathrm{lr}$ 移动，仍需更长、更多 seed 的 run 才能定量检验。
@@ -403,21 +403,21 @@ $$
 
 读法：**我们的 KL 曲线需要"幂律+弯曲"的多模式谱才能外推尾部，论文的 L1 曲线用单幂律即可**——与发现 1 的 α(t) 对比完全自洽。这不是谁对谁错：两口径对同一谱的加权不同（§2.8），KL 的 λ-加权放大了高曲率端的弯曲。M3 落地后应在同一 run 内用 L1/KL/CE 三口径各做一次反演（M2 的复跑清单已加）。
 
-**图（`alignment/figures/`，由 `plot_paper_analysis.py` / `invert_spectrum.py` 生成）：**
+**图（`plots/figures/`，由 `plot_paper_analysis.py` / `invert_spectrum.py` 生成）：**
 
-![论文图9四条L1曲线的尾部形态拟合](../alignment/figures/paper/tail-distance_vs_step__source-paper__fits.png)
+![论文图9四条L1曲线的尾部形态拟合](../plots/figures/paper/tail-distance_vs_step__source-paper__fits.png)
 
 _图 M1-a：数字化的论文图 9 距离曲线（L1 口径，log-log）与三种尾部形态拟合。四个 run 全部幂律最优（括号内为对数空间 rmse），floor+exp 被拒——L1 口径下"幂律谱×幂律振幅"仍是可用近似。_
 
-![alpha(t) 对比：论文 L1 vs 我们的 KL 代理](../alignment/figures/paper/local-alpha_vs_step__source-paper-vs-ours.png)
+![alpha(t) 对比：论文 L1 vs 我们的 KL 代理](../plots/figures/paper/local-alpha_vs_step__source-paper-vs-ours.png)
 
 _图 M1-b：局部指数 α(t) 对比。实线为论文四个 run（L1 口径，0.44–0.67、无系统漂移），虚线为我们的两个 run（KL 代理，0.7→1.3 系统上升）。两条虚线的上升是当前所有"偏离纯幂律"读数的唯一来源，其口径归属由 M3 裁决。_
 
-![H3a/H3b 凸起判别](../alignment/figures/paper/absorption_vs_step__source-paper__hump-check.png)
+![H3a/H3b 凸起判别](../plots/figures/paper/absorption_vs_step__source-paper__hump-check.png)
 
 _图 M1-c：左——三个 lr 臂的 v_t（实时轴），凸起位置 {63, 40, 42} 不随 1/lr 缩放 → 凸起锚定在优化器步数（支持 H3a）；右——论文 v_t 与 §5.3 advantage 率读数，论文 L1 口径的凸起几乎不存在（rise≈1.0）。_
 
-![top16 run 的 NNLS 谱反演](../alignment/figures/paper/spectrum-density_vs_rate__metric-ours_top16_kl.png)
+![top16 run 的 NNLS 谱反演](../plots/figures/paper/spectrum-density_vs_rate__metric-ours_top16_kl.png)
 
 _图 M2-a：top16 run 的谱反演。左：测量 d_t 与 NNLS 重构（竖线右侧为 hold-out 外推区）；右：反演出的谱密度 μ'(ρ)（对数-对数），斜率 ≈ −0.42。sampled-token 与论文 Full-Data 的同款图见 `figures/spectrum__ours_sampled_token_kl.png` / `figures/spectrum__paper_fulldata_l1.png`。_
 
@@ -493,7 +493,7 @@ _图 M2-a：top16 run 的谱反演。左：测量 d_t 与 NNLS 重构（竖线�
 
 ### 6.0 共享基线 setting（全部实测口径）
 
-来源：`be00rj9e`/`mdxt04lm` 的 config（`alignment/runs/*__meta.json`）与论文 §3.1/表 3。**除写明的 delta 外，所有 M 项沿用本表。**
+来源：`be00rj9e`/`mdxt04lm` 的 config（`plots/runs/*__meta.json`）与论文 §3.1/表 3。**除写明的 delta 外，所有 M 项沿用本表。**
 
 | 项             | 值                                                                                                                                                                                                                             |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -509,13 +509,13 @@ _图 M2-a：top16 run 的谱反演。左：测量 d_t 与 NNLS 重构（竖线�
 | 硬件/耗时参照  | 8×GPU 单机，实测 $\approx160$ s/step → $\approx13.5$ h/300 步；响应长度均值实测 $\approx5761$ token/序列（→ 每步 $\approx3.7\times10^5$ 响应 token）                                                                           |
 | 度量口径       | $t\ge30$ 起；L1（论文 $d_t$）与 KL（日志代理 $-\texttt{opd/token\_reward\_mean}$）**双口径**；$v_t$ 几何窗口 $[t/1.4,1.4t]$（论文=端点 median，我们的实现=窗口 OLS，两者都报）；归一化 $d/d_{30}$；cumulant/α 读数按 §2.2/§2.3 |
 | seeds          | 结论性数字 ≥3 seeds；探索性 1 seed；**只有同 config 才跨 seed 平均**（top16 与 sampled-token 分开处理）                                                                                                                        |
-| 日志基线       | `alignment/pull_wandb_metrics.py` 的 24 键（`DEFAULT_KEYS`），逐 run 存 CSV + 完整 config                                                                                                                                      |
+| 日志基线       | `plots/pull_wandb_metrics.py` 的 24 键（`DEFAULT_KEYS`），逐 run 存 CSV + 完整 config                                                                                                                                      |
 
 ### M1 尾部形态与 $\alpha(t)$ 诊断（零 GPU）——✅ 已完成（2026-09-06，结果见 §4.1）
 
 - **目标假设**：H1、H3a/b（零成本部分）。
-- **setting**：纯日志，无新 run。输入 A：我们的两个 run（279 步，已拉取，`alignment/runs/`）。输入 B：**论文数据**——图 9 曲线数字化（WebPlotDigitizer）或作者代码/数据（[thunlp/OPD](https://github.com/thunlp/OPD)），需要 §5.3 off-policy run、C.2 三个 lr 的逐步 $d_t$（L1 口径）。
-- **分析口径**：$t\ge30$；三形态 log-space 拟合（`alignment/fit_tail.py`：幂律精确 OLS、拉伸指数 γ∈[0.2,2] 网格、floor+exp (τ,d∞) 双网格）；$\alpha(t)$ 滑窗 log-log 回归（±0.12 dex，≥8 点）；$t\cdot v_t$ 与 $\alpha(t)$ 叠画做恒等式自检；论文数据是 L1 口径，换算按 §2.8。
+- **setting**：纯日志，无新 run。输入 A：我们的两个 run（279 步，已拉取，`plots/runs/`）。输入 B：**论文数据**——图 9 曲线数字化（WebPlotDigitizer）或作者代码/数据（[thunlp/OPD](https://github.com/thunlp/OPD)），需要 §5.3 off-policy run、C.2 三个 lr 的逐步 $d_t$（L1 口径）。
+- **分析口径**：$t\ge30$；三形态 log-space 拟合（`plots/fit_tail.py`：幂律精确 OLS、拉伸指数 γ∈[0.2,2] 网格、floor+exp (τ,d∞) 双网格）；$\alpha(t)$ 滑窗 log-log 回归（±0.12 dex，≥8 点）；$t\cdot v_t$ 与 $\alpha(t)$ 叠画做恒等式自检；论文数据是 L1 口径，换算按 §2.8。
 - **判据**：见 H1/H3'。特别地：论文 off-policy run 的 $v_t$ 在 30–100 步**有无凸起**直接判 H3b；C.2 折叠 run 的凸起位置是否按 $u=\eta t$ 对齐直接判 H3a。
 - **成本**：0 GPU；论文曲线数字化约半天。
 - **坑**：数字化曲线只有 O(100) 个点，滑窗 $\alpha(t)$ 的自由度要相应放宽；论文 median-端点估计器与我们的 OLS 在小窗口有偏差，对比时统一成一种。
@@ -554,7 +554,7 @@ _图 M2-a：top16 run 的谱反演。左：测量 d_t 与 NNLS 重构（竖线�
 | C2  | lr ×2 → $2\times10^{-6}$                             | `actor_rollout_ref.actor.optim.lr=2e-6`                              | H1 折叠复验 + H3a  | vs 基线 + C1    |
 
 - **启动**：`bash scripts/run_m4_adam_ablation.sh [arm|all]`（arm 名 `a_beta2_0p95 | b_eps_1e6 | b_eps_1e4 | c_lr_5e7 | c_lr_2e6`）；run 名 `m4_<arm>_<MMDD-HHMM>`；单节点顺序执行，单臂 ≈13.5 h @ 8 GPU，5 臂 ≈ 2.8 天；`--dry-run` 只打印组合配置不启动 ray。
-- **launch 前校验**：`bash scripts/run_m4_adam_ablation.sh --dry-run <arm>`，在打印的 config 里核对 `actor_rollout_ref.actor.optim.{lr,betas,override_optimizer_config}` 恰有对应一键偏离基线（基线三键实测值见 `alignment/runs/mdxt04lm__meta.json`）；上线后在 wandb config 面板再复核一次。
+- **launch 前校验**：`bash scripts/run_m4_adam_ablation.sh --dry-run <arm>`，在打印的 config 里核对 `actor_rollout_ref.actor.optim.{lr,betas,override_optimizer_config}` 恰有对应一键偏离基线（基线三键实测值见 `plots/runs/mdxt04lm__meta.json`）；上线后在 wandb config 面板再复核一次。
 - **代码前置项（不阻塞上表 5 臂）**：
     - **sharpness 探针（H3c）**：trainer 每 10 步在当前 batch 上幂迭代 20 次 HVP（对 OPD 损失双反向）估 $\lambda_{\max}(H)$，记 `debug/lambda_max`，≈ +3–5% 步时；实现后搭任意 M4 臂（建议先基线 + β₂ 两臂），并同时记录 Adam 二阶矩 $\|\hat v\|$ 的分位数统计。
     - **(d) step-150 切 SGD-with-decay**：step 150 起换 SGD（动量 0、wd 0.01、grad-clip 不变）；判读时把"切点前 Adam 已铺好的等效步长遗产"与"切后的纯一阶动力学"分开。需要 trainer 的中途换优化器 hook，可与探针一起实现。

@@ -1,7 +1,7 @@
 # Qwen3 师生对 OPD 平坦 gap 诊断：eval setting 对照与"学生太强"假说检验
 
 > 状态：诊断完成（2026-09-07，单 run 单 seed 口径）。run `um5vzc6m`（`0906-opd_math_full_Qwen3-1.7B-sampled_adv_direct-T_1.0-0728`）158 步时 OPD gap 无衰减迹象。
-> 配套图由 `alignment/pipelines/qwen3/main.py` 生成，位于 `alignment/figures/qwen3/`。
+> 配套图由 `plots/pipelines/qwen3/main.py` 生成，位于 `plots/figures/qwen3/`。
 
 ## 0. 结论（TL;DR）
 
@@ -37,13 +37,13 @@ Qwen3-1.7B（学生）→ Qwen3-4B（教师）[^qwen3] 的 full-data run `um5vzc
 
 用 justrl 的逐题 jsonl（`justrl_eval_outputs/thinking/`）+ 其规则判分函数（`grade_answer_verl`，复算均值与官方 `grading_results.json` 完全一致）得到逐题 pass@16：
 
-![Qwen3 三档模型解题成绩](../alignment/figures/qwen3/eval_score_vs_task__models-qwen3.png)
+![Qwen3 三档模型解题成绩](../plots/figures/qwen3/eval_score_vs_task__models-qwen3.png)
 
 - 学生 Qwen3-1.7B：AIME24 0.46、AIME25 0.31、AMC23 0.75。**这不是一个"没法学"的弱学生，但也绝不强到与教师无差**。
 - 教师 Qwen3-4B：AIME24 0.76、AIME25 0.61、AMC23 0.86。AIME 段领先 +30pp/+31pp，AMC 段只领先 +10pp。
 - Qwen3-8B 与 4B 基本持平（AIME25 0.62 vs 0.61）——**教师侧横向升级空间不大**，4B 的天花板就是 8B 的地板。
 
-![逐题难度分布](../alignment/figures/qwen3/problem_pass_student_vs_teacher__models-qwen3.png)
+![逐题难度分布](../plots/figures/qwen3/problem_pass_student_vs_teacher__models-qwen3.png)
 
 逐题看（上图，学生 pass@16 × 教师 pass@16）：
 
@@ -57,7 +57,7 @@ Qwen3-1.7B（学生）→ Qwen3-4B（教师）[^qwen3] 的 full-data run `um5vzc
 
 ## 4. OPD 关键指标：gap 大且平，overlap 不升
 
-![OPD 训练关键指标对照](../alignment/figures/qwen3/opd_metrics_vs_step__pair-qwen3-deepseek.png)
+![OPD 训练关键指标对照](../plots/figures/qwen3/opd_metrics_vs_step__pair-qwen3-deepseek.png)
 
 与 DeepSeek 对基线 `mdxt04lm`（同 lr=1e-6、同 betas/eps、同数据 pipeline）对照：
 
@@ -65,7 +65,7 @@ Qwen3-1.7B（学生）→ Qwen3-4B（教师）[^qwen3] 的 full-data run `um5vzc
 - **top-k 重叠率（`opd/top_k_overlap_ratio`，k=16）**：Qwen3 对 0.76 → 0.77（+0.01/150 步）；DeepSeek 对 0.82 → 0.94（+0.12/200 步）。
 - `opd/teacher_logp_mean` 两对接近（Qwen3 对 ≈ −0.50，DeepSeek 对 ≈ −0.65–0.73），说明教师侧置信度同量级，gap 差异来自学生侧分布的位置。
 
-![训练中验证成绩对照](../alignment/figures/qwen3/validation_vs_step__pair-qwen3-deepseek.png)
+![训练中验证成绩对照](../plots/figures/qwen3/validation_vs_step__pair-qwen3-deepseek.png)
 
 valid 口径（T=0.7, top_p=0.9, n=16）的佐证：Qwen3 学生 **step 20 即平台**（MATH-500 ≈0.89、AMC23 ≈0.84、AIME25 ≈0.36，140 步内波动 ±0.02）；DeepSeek 学生被训练持续抬升（AMC23 0.75→0.86、AIME25 0.25→0.33）。注意我们 val 的 AMC23 分数（0.84）高于 justrl 口径（0.75），正是 §2 所说题集/口径差异，不影响"平台 vs 上升"的形态对比。
 
@@ -90,8 +90,8 @@ valid 口径（T=0.7, top_p=0.9, n=16）的佐证：Qwen3 学生 **step 20 即�
 
 ## 7. 复现
 
-- 判分与作图：`alignment/pipelines/qwen3/main.py`（依赖 `OPD/scripts/val/eval/utils.py` 的 `grade_answer_verl`；逐题 pass 缓存在 `alignment/figures/qwen3/per_problem_pass_cache.json`）。
-- OPD 训练指标：`alignment/runs/{um5vzc6m,mdxt04lm}__history.csv`（`alignment/pull_wandb_metrics.py` 拉取）。
+- 判分与作图：`plots/pipelines/qwen3/main.py`（依赖 `OPD/scripts/val/eval/utils.py` 的 `grade_answer_verl`；逐题 pass 缓存在 `plots/figures/qwen3/per_problem_pass_cache.json`）。
+- OPD 训练指标：`plots/runs/{um5vzc6m,mdxt04lm}__history.csv`（`plots/pull_wandb_metrics.py` 拉取）。
 - val 成绩：wandb `val-core/{task}/acc/mean@16`（`val_kwargs: T=0.7, top_p=0.9, n=16`）。
 - 注意：repo 根目录的 `wandb/` 本地目录会遮蔽 `import wandb`，一律用 `.venv/bin/python` 并在 repo 外运行跨仓脚本。
 
