@@ -1,20 +1,74 @@
-# Plots pipeline
+# plots/
 
-`plots/` 是 One-Shot-OPD 的离线分析与画图代码。设计目标不是管理每一张图片，而是让**数据如何进入系统**、**指标如何计算**成为稳定的代码接口；绘图脚本只是这些指标的一个消费者。
-
-## 设计理念
+One-Shot-OPD 的离线分析与画图包。设计目标不是管理每一张图片，而是让**数据如何进入系统**、**指标如何计算**、**图怎么画**成为三层稳定接口；每个 pipeline 只是这些接口的一个消费者。
 
 ```text
-外部数据 / 本地文件
-        ↓
-数据层：读取、排序、保留原始字段和 metadata
-        ↓
-指标层：distance、absorption、tail fit、spectrum、validation
-        ↓
-绘图和报告：展示指标表
+W&B / 本地文件
+      ↓  core/data.py       读 history CSV + meta，不解释含义
+      ↓  core/metrics.py    distance / absorption / validation / fold
+      ↓  core/tail.py       tail-form 拟合、local alpha
+      ↓  core/accuracy.py   student/teacher baseline、自适应纵轴
+      ↓  pipelines/<topic>/ 编排 panel，不重复实现指标
+      ↓  figures/<topic>/ + derived/<topic>_summary.json
 ```
 
-数据层不解释科学含义。例如 W&B 的 `opd/token_reward_mean` 只是原始字段；它被解释成正的 distance proxy 是指标层的职责。这样更换数据来源时不必重写绘图，更换指标口径时也不必修改 loader。
+数据层不解释科学含义：W&B 的 `opd/token_reward_mean` 只是原始字段，把它解释成正的 distance proxy 是指标层的职责。换数据源不用重写绘图，换指标口径也不用改 loader。
+
+## 目录结构
+
+```text
+plots/
+├── core/
+│   ├── data.py       # RunHistory、history loader、VALIDATION_TASKS
+│   ├── metrics.py    # 指标表：d / d_rel / v_direct / v_geo / alpha_local 等
+│   ├── tail.py       # 幂律/拉伸指数/floor+exp 拟合、local_alpha
+│   ├── accuracy.py   # accuracy 纵轴自适应、student/teacher baseline
+│   └── plotting.py   # figure_path、plot_series、mark_baseline、style_axis
+├── config/
+│   └── runs.py       # 实验组配置：M4 run 的 label、颜色、effective-time scale
+├── pipelines/        # 每个 topic 一个目录
+│   ├── alignment/main.py          # 基础 d/v 图（读 derived/ 指标表）
+│   ├── theory/main.py             # 理论合成图 + 真实数据诊断
+│   ├── qwen3/main.py              # Qwen3 eval + W&B 联合诊断
+│   ├── offpolicy_exp/main.py      # off-policy 对比实验
+│   ├── md_opd/main.py             # PPO epochs / MDPO 对比
+│   ├── lr_ablation/*.py           # M4 lr 消融（原 m4 模块）
+│   └── paper/plots.py             # 论文曲线对照
+├── pull_wandb_metrics.py   # W&B history → runs/*.csv
+├── compute_alignment.py    # runs/*.csv → derived/*__alignment.csv
+├── fit_tail.py             # derived/ → tail_fits.json
+├── extract_paper_figures.py / analyze_paper_curves.py / plot_paper_analysis.py
+├── invert_spectrum.py      # 谱反演
+├── runs/             # W&B 原始 history 和 metadata
+├── derived/          # 指标表、拟合参数、谱反演结果
+├── paper_curves/     # 从论文 PDF 提取的 tidy 曲线
+└── figures/          # 绘图输出，按 topic 建子目录
+```
+
+## Topic 约定
+
+- 一个 topic = `pipelines/<topic>/` 目录 + `figures/<topic>/` 输出目录 + `derived/<topic>_summary.json` 摘要，三处共用同一标识。例如 `pipelines/offpolicy_exp/` → `figures/offpolicy-exp/` + `derived/offpolicy_exp_summary.json`。
+- 新增对比实验：先定 topic 名 → `pipelines/<topic>/` 下放代码 → `figure_path("<topic>", ...)` 生成文件名。文件名约定为 `<metric>_vs_<x_axis>__<scope>[__<variant>].png`，scope 标记数据范围（如 `runs-m4`），variant 标记同族变体（如 `norm-d30`）。
+- pipeline 必须是可重复执行的入口：`python -m plots.pipelines.<topic>.<module>` 从 `runs/` 重算出全部输出；不要在 import 时画图。
+
+## 共享件速查
+
+topic 代码只编排 panel；下面这些操作一律用 `core/` 的现成函数，不要自己再写一遍：
+
+| 需求                        | 入口                                                                     |
+| --------------------------- | ------------------------------------------------------------------------ |
+| 加载 + 算指标一次完成       | `load_run_metrics(run_id, runs_dir)` → `(history, metrics)`              |
+| 选 d_t 口径                 | `compute_alignment_metrics(..., column=)` / `distance_proxy(..., column=)` |
+| 取某 step 的值 / 归一化     | `value_at_step` / `normalize_at_step` / `metrics.d_rel`                  |
+| fold 时间轴                 | `effective_step(steps, scale)` / `folded_baseline(ax, step, scale, color)` |
+| 画 step 序列（含淡化）      | `plot_series`                                                            |
+| baseline 阴影 + 竖线        | `mark_baseline(ax, step)`                                                |
+| 轴收尾（y 网格/去边框/x=0） | `style_axis`                                                             |
+| validation 均值 / 分任务    | `validation_mean` / `ce_entropy_kl`                                      |
+| accuracy 纵轴 / 参考线      | `accuracy_ylim` / `add_accuracy_baselines`                               |
+| 输出文件名                  | `figure_path`                                                            |
+| 图内 d_t 定义标注           | `distance_definition`                                                    |
+| plot-skill 风格             | `load_plot_style()`                                                      |
 
 ## 指标口径
 
@@ -32,7 +86,7 @@ $$
 | `opd/adv_abs_mean`      | `mean(abs(A_t))`                                         | L1 型 log-prob 缺口诊断 |
 | `opd/token_reward_mean` | `mean(r_t)`；当前 sampled-token 配置中与 `adv_mean` 对齐 | OPD reward 的原始均值   |
 
-因此，alignment 当前标准表中的距离不是 `adv_abs_mean`，而是：
+因此标准表中的距离不是 `adv_abs_mean`，而是：
 
 $$
 d_t^{\mathrm{KL\ proxy}}
@@ -46,20 +100,20 @@ $$
 d_t^{\mathrm{L1}}=\operatorname{mean}(|A_t|)
 $$
 
-并在列名、图例和图内公式中显式写出；不能把 `adv_abs_mean` 静默替换当前 `d_t`。
+并在列名、图例和图内公式中显式写出；不能把 `adv_abs_mean` 静默替换当前 `d_t`。换口径时给 `compute_alignment_metrics` 传 `column=`（如 `opd/top_k_reward_mean`），不要在 pipeline 里另造指标表。
 
-指标层输出表格或 JSON，而不是直接输出图片。当前 alignment 的标准逐步表为：
+指标层输出表格或 JSON，而不是直接输出图片。标准逐步表（`compute_alignment_metrics`）的列：
 
 | 列            | 含义                                                                |
 | ------------- | ------------------------------------------------------------------- |
 | `step`        | 训练步                                                              |
-| `d_nats`      | 当前 signed-advantage reverse-KL proxy，即 `-opd/token_reward_mean` |
-| `d_rel`       | 相对于分析 baseline（默认 step 30）的距离                           |
-| `v_direct`    | $ (d*t-d*{t+1})/d_t $ 的原始单步吸收率                              |
+| `d_nats`      | 当前口径的 distance，即 `-<column>`                                  |
+| `d_rel`       | 相对于分析 baseline（默认 step 30，插值取）的距离                    |
+| `v_direct`    | $ (d_t-d_{t+1})/d_t $ 的原始单步吸收率                              |
 | `v_geo`       | 在 $[t/1.4,1.4t]$ 上拟合 $\log d_t$ 得到的几何窗口吸收率            |
 | `alpha_local` | $-\mathrm d\log d_t/\mathrm d\log t$ 的局部 log-log 指数            |
 
-`v_geo` 和 `alpha_local` 都继承上面的 `d_nats` 口径。几何窗口吸收率写成
+`v_geo` 和 `alpha_local` 都继承 `d_nats` 的口径。几何窗口吸收率写成
 
 $$
 v_t^{\mathrm{geo}}=1-\exp(\hat\beta_t),
@@ -73,69 +127,30 @@ $$
 \alpha(t)=-\frac{\mathrm d\log d_t}{\mathrm d\log t},
 $$
 
-并可用 $\alpha(t)\approx t\,v_t$ 作几何窗口近似。由于 sampled-token 的距离估计可能在单个 step 受噪声影响而非正，`v_geo` 和 `alpha_local` 的 log 拟合会跳过非正 `d_t` 样本；这不是把它们改成 `adv_abs_mean`。
+并可用 $\alpha(t)\approx t\,v_t$ 作几何窗口近似。由于 sampled-token 的距离估计可能在单个 step 受噪声影响而非正，`v_geo` 和 `alpha_local` 的 log 拟合会跳过非正 `d_t` 样本。
 
-指标计算保留完整 step 范围。是否从 step 0 展示、哪个 baseline 用于归一化、baseline 前如何淡化，属于绘图层的决定。
+指标计算保留完整 step 范围。是否从 step 0 展示、哪个 step 作 baseline、baseline 前如何淡化，属于绘图层的决定，不由指标表截断。
 
-## 目录结构
+## 绘图约定
 
-```text
-plots/
-├── core/
-│   ├── data.py       # RunHistory 和本地 history loader
-│   ├── metrics.py    # distance / absorption / validation / CE-entropy-KL / folding / summary
-│   ├── tail.py       # tail-form 拟合和 local alpha
-│   ├── accuracy.py   # student/teacher baseline、自适应 accuracy 纵轴
-│   └── plotting.py   # figure_path、baseline 标记/淡化、plot-skill 加载
-├── config/
-│   └── runs.py       # M4 run 的 label、颜色、effective-time scale
-├── pull_wandb_metrics.py
-├── compute_alignment.py
-├── fit_tail.py
-├── extract_paper_figures.py
-├── analyze_paper_curves.py
-├── plot_paper_analysis.py
-├── invert_spectrum.py
-├── pipelines/        # 每个 topic 一个目录
-│   ├── alignment/main.py
-│   ├── theory/main.py
-│   ├── qwen3/main.py
-│   ├── offpolicy_exp/main.py
-│   ├── md_opd/main.py
-│   ├── lr_ablation/{baselines,panels,supplement,eval_fit,absorption,alpha,advantage,topk}.py
-│   └── paper/plots.py
-├── runs/             # W&B 原始 history 和 metadata
-├── derived/          # 指标表、拟合参数、谱反演结果
-├── paper_curves/     # 从论文 PDF 提取的 tidy 曲线
-└── figures/          # 绘图输出，按 topic 建子目录
-```
+### step 轴
 
-`core/` 是可复用的数据和指标代码，`config/` 是实验组配置；根目录脚本是面向研究流程的可执行入口。新代码应从 `core` 和 `config` 导入，不在脚本之间复制指标实现。`core/plotting.py` 还提供 baseline 淡化（`plot_series`）、baseline 标记（`mark_baseline`）、距离定义标注（`distance_definition`）和 `figure_path` 文件名约定，topic 代码只编排 panel。
+- absolute 和 normalized 图都从 step 0 画起，不截断。
+- normalized 图在 baseline step 处画竖线、给 `[0, baseline]` 加阴影，baseline 左侧的曲线段淡化（`plot_series` 的 `fade`）；absolute 图整条曲线保持正常透明度，baseline 仅作参考线。
+- 折叠轴（`u=scale·t`）上每个 run 的 baseline 位置不同，用 `folded_baseline` 画各自的 dotted 竖线，不加阴影。
+- 需要另一个 baseline step 时改 `baseline=` 参数（如 60），不要手写 `step >= t0` 过滤。
 
-`figures/` 下每个 topic 一个子目录，目录名、`pipelines/` 下的 topic 目录名和 derived 摘要文件名共用同一个 topic 标识，例如 `pipelines/offpolicy_exp/` 输出到 `figures/offpolicy-exp/` 和 `derived/offpolicy_exp_summary.json`，`pipelines/md_opd/` 输出到 `figures/md-opd/` 和 `derived/md_opd_summary.json`。新增对比实验时先定 topic 名，再让三处命名保持一致。
+### 图中定义
 
-### 图中定义要求
+任何包含 `d_t`、`d_t/d_{t_0}`、`v_t`、`alpha(t)` 或其派生指标的图，都必须在图内标注实际使用的 `d_t` 定义（`distance_definition` 一次写全）。L1 口径必须写成 $d_t=\operatorname{mean}(|A_t|)$ 并明确标注。图中还应区分 raw one-step `v_direct`、几何窗口 `v_geo` 和 local `alpha`，避免画成同一个指标。定义和注释放在空白区域、图例区或底部脚注，不得覆盖曲线、marker、坐标轴标签或图例；空间不足时拆行或增加底部留白。
 
-任何包含 `d_t`、`d_t/d_{t_0}`、`v_t`、`alpha(t)` 或其派生指标的图片，都必须在图内标注实际使用的 `d_t` 定义。当前日志口径至少写成：
+### Accuracy 图
 
-$$
-A_t=\log\pi_T-\log\pi_\theta,
-\qquad
-d_t=-\operatorname{mean}(A_t)=-\texttt{opd/token\_reward\_mean}.
-$$
-
-如果图片使用 L1 口径，则必须改为 $d_t=\operatorname{mean}(|A_t|)$ 并明确标注。图中还应区分 raw one-step `v_direct`、几何窗口 `v_geo` 和 local `alpha`，避免把它们画成同一个指标。
-定义和注释必须放在空白区域、图例区域或底部脚注，不得覆盖数据曲线、marker、坐标轴标签或图例；空间不足时应拆行或增加底部留白。
-
-### Accuracy 图规则
-
-- accuracy 图的横轴从 step 0 开始；纵轴范围由 `plots/pipelines/offpolicy_exp/main.py` 顶部的 `ACCURACY_Y_LIMITS` 控制，单位是百分比；自适应和手动校验都由 `core/accuracy.py` 的 `accuracy_ylim` 实现，其他 pipeline 直接复用。
-- valid/accuracy 保留 step 30 左侧的有效点和连线，不截断、不淡化；baseline 阴影和竖线仅作参考。
-- `ACCURACY_Y_LIMITS = None` 时按所有有效观测点自动留边；设为 `(下限, 上限)` 可手动缩放。手动范围必须覆盖全部有效点，不得裁掉数据；只有需要展示完整概率域时才设为 `(0, 100)`。
-- 分任务小图默认分别按各自 task 的有效观测点自动缩放；设置 `ACCURACY_Y_LIMITS` 后才使用同一组全局上下限。
-- accuracy 图统一用 `6uorrk2k`（student）和 `u87buult`（teacher）的横向虚线作参考；均值图使用三项 validation 的均值，分任务图使用对应 task 的基准值。
-- 有多个 step 时用折线连接实际的非空观测点，可保留小 marker；只有一个 step 时才画单点。
-- W&B 稀疏日志中的空值不当作 0，也不连到空值位置。
+- 横轴从 step 0 开始；纵轴一律百分比单位，范围由 `accuracy_ylim` 给出：默认按全部有效观测点 + student/teacher baseline 自动留边；`ACCURACY_Y_LIMITS=(下限, 上限)` 可手动指定，但必须覆盖全部有效点（`accuracy_ylim` 会校验），只有展示完整概率域时才用 `(0, 100)`。
+- 分任务小图默认各自按 task 缩放；设了全局 limits 才共用同一组上下限。
+- 有效点和连线在 baseline 左侧**不淡化**（这是 step 轴规则的显式例外，`plot_series(..., fade=False)`）。
+- 参考线统一用 `add_accuracy_baselines`：`6uorrk2k`（student）和 `u87buult`（teacher）的横向虚线；均值图用三任务均值，分任务图用对应 task 的基准值。
+- 稀疏日志：有多个观测 step 时用折线连实际非空点，可带小 marker；只有一个 step 才画单点；空值不当 0、不连线。
 
 ## 常用流程
 
@@ -147,11 +162,11 @@ $$
   --run-id mdxt04lm be00rj9e --out plots/runs
 ```
 
-这个步骤只做外部数据落盘，不计算 alignment 指标。已有文件默认不会重复拉取；需要更新时使用 `--force`。
+这个步骤只做外部数据落盘，不计算指标。已有文件默认不会重复拉取；需要更新时用 `--force`。
 
 这些 run 是离线 `wandb sync` 上来的：任务在集群跑完后才把日志同步到 W&B，所以 `run.state`（以及 meta.json 里的 `state`）可能是 `failed`/`crashed`，即使训练本身正常完成或被抢占后已续跑。**不要**用 `state` 判断一个 run 是否失败或数据是否完整；以实际拉到的 history 步数为准。
 
-### 2. 计算标准 alignment 指标
+### 2. 计算标准指标表
 
 ```bash
 .venv/bin/python plots/compute_alignment.py \
@@ -160,14 +175,12 @@ $$
 
 输出 `derived/<run_id>__alignment.csv` 和 `derived/summary.json`。入口脚本负责遍历输入和写文件，真正的计算在 `core/metrics.py`。
 
-### 3. 画基础 alignment 图
+### 3. 画基础图
 
 ```bash
 .venv/bin/python -m plots.pipelines.alignment.main \
   --derived-dir plots/derived --figures-dir plots/figures
 ```
-
-基础图会保留 step 0 到末尾。step 30 以前使用浅色，step 30 用竖线标注为分析 baseline / clipping boundary。
 
 ### 4. 尾部拟合
 
@@ -175,37 +188,36 @@ $$
 .venv/bin/python plots/fit_tail.py --derived-dir plots/derived --plot
 ```
 
-会比较幂律、拉伸指数和 floor+指数，并写入 `derived/tail_fits.json`。
+比较幂律、拉伸指数和 floor+指数，写入 `derived/tail_fits.json`。
 
-### 5. lr-ablation（M4）、论文和 Qwen3 分析
-
-lr-ablation 图共享 `config/runs.py` 的 M4 run 配置，并通过 `core.data` 和 `core.metrics` 取得数据和 distance：
+### 5. 各 topic
 
 ```bash
-.venv/bin/python -m plots.pipelines.lr_ablation.baselines
-.venv/bin/python -m plots.pipelines.lr_ablation.supplement
-.venv/bin/python -m plots.pipelines.lr_ablation.panels
+.venv/bin/python -m plots.pipelines.lr_ablation.baselines   # figure19 + norm-d30/d60 + grad
+.venv/bin/python -m plots.pipelines.lr_ablation.panels      # 六联图 + validation
+.venv/bin/python -m plots.pipelines.lr_ablation.supplement  # CE/entropy/KL 分解等
+.venv/bin/python -m plots.pipelines.offpolicy_exp.main
+.venv/bin/python -m plots.pipelines.md_opd.main
+.venv/bin/python -m plots.pipelines.theory.main
 ```
 
-论文曲线和 Qwen3 诊断有独立数据源，不为了形式统一而强行塞进同一种 history schema：
+lr-ablation 的 run 配置集中在 `config/runs.py`（label、颜色、effective-time scale）。论文曲线和 Qwen3 诊断有独立数据源，不为了形式统一而强行塞进同一种 history schema：
 
 ```text
 论文 PDF → extract_paper_figures.py → paper_curves/*.csv
 Qwen3 eval JSONL + W&B history → pipelines/qwen3/main.py
 ```
 
-它们可以共享 tail fitting、absorption 和 plotting style，但保留各自 loader 更清楚。
+它们共享 tail fitting、absorption 和 plotting style，但保留各自 loader 更清楚。
 
 ## 修改代码时的约定
 
 1. 新数据源先加 loader，不要在绘图脚本里直接读取原始文件。
-2. 新指标先加到 `core/metrics.py`，返回数组、DataFrame 或 JSON-compatible 结果。
-3. 绘图函数接收已经计算好的数据，绘图层负责 baseline、坐标轴、颜色和输出路径。
-4. 不要在多个脚本重复定义 run id、label、color 和 scale；M4 配置放在 `config/runs.py`。
-5. 保留现有脚本作为可执行入口，但新功能应避免 import 时自动画图。
-6. step 轴上的图一律用 `core.plotting` 的 `plot_series`（step 0 起、baseline 前淡化）和 `mark_baseline`（baseline 阴影加竖线），不要手写 `step >= t0` 截断或重复的淡化逻辑。
-7. 指标口径发生变化时，先在 docstring 和 README 说明，不要默默改变已有 derived 文件的含义。
+2. 新指标先加到 `core/metrics.py`，返回数组、DataFrame 或 JSON-compatible 结果；绘图函数只消费已算好的数据。
+3. step 序列、baseline、fold、归一化、accuracy 纵轴走共享件（见速查表），不要在 pipeline 里重复实现。
+4. 不要在多个脚本重复定义 run id、label、color 和 scale；实验组配置放在 `config/runs.py`。
+5. 指标口径发生变化时，先在 docstring 和 README 说明，不要默默改变已有 derived 文件的含义。
 
-## 当前边界
+## 边界
 
-`plots/ 是离线分析工具，不负责 GPU 训练、远程集群提交或 checkpoint 修改。`spectral_effopd.py` 是 trainer-agnostic 的算法原型，和离线绘图 pipeline 共享研究背景，但不应被误认为是数据分析入口。
+`plots/` 是离线分析工具，不负责 GPU 训练、远程集群提交或 checkpoint 修改。`spectral_effopd.py` 是 trainer-agnostic 的算法原型，和离线绘图 pipeline 共享研究背景，但不是数据分析入口。
