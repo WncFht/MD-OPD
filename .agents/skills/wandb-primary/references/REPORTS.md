@@ -3,6 +3,7 @@ SPDX-FileCopyrightText: 2026 CoreWeave, Inc.
 SPDX-License-Identifier: Apache-2.0
 SPDX-PackageName: skills
 -->
+
 # W&B Reports - wandb-workspaces v2
 
 Use `wandb-workspaces` for programmatic W&B Report authoring. The fast recipe

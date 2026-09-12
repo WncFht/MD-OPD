@@ -26,10 +26,10 @@ python3 reflection/lexical_count.py \
   以及模型级的均值和分类计数。
 - `word_stats.csv`：逐词细粒度统计（语料级）。词表中的每个词在每个 `(mode, model)`
   下都有一行（计数为 0 的词也保留），字段为 `mode, model, word, category, count,
-  rate_per_1k_words`。
+rate_per_1k_words`。
 - `word_response_stats.csv`：逐词 × 逐 response 细粒度统计。同样覆盖词表中每个词
   （含 0 计数），字段为 `mode, model, word, category, count, responses_with_word,
-  share_of_responses`（包含该词的 response 占比）、`mean_count_per_response`（每条
+share_of_responses`（包含该词的 response 占比）、`mean_count_per_response`（每条
   response 平均出现次数）、`mean_count_when_present`（出现时的平均次数）和
   `mean_rate_per_1k_words`（per-response 口径的平均每千词 rate）。
 - `top_keywords.csv`：每个 `(mode, model)` 出现次数最高的 top-k 词（默认 30）。

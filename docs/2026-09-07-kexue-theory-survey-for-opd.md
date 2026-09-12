@@ -9,7 +9,7 @@
 
 **上游文档**：[2026-09-07-opd-efficiency-theory-brief.md](2026-09-07-opd-efficiency-theory-brief.md)（谱吸收模型最小摘要）与同目录四篇源头文档（完整推导、H1–H7、M1–M6、P1–P6）。本文不重复实验程序，只在 §4 用几行话衔接。
 **方法**：509 篇按主题分 15 批并行精读提取（覆盖清单见附录 B），逐篇提取定理/恒等式/推导链/假设；公式忠实原文，OPD 映射经本轮综合校对并补全了推导。
-**引用格式**：正文在作者-年份或论文名后紧跟脚注标记（小写 ASCII 键）；全部文献列于文末「参考文献」，编号由渲染器按首次引用自动生成。
+**引用格式**：正文在作者 - 年份或论文名后紧跟脚注标记（小写 ASCII 键）；全部文献列于文末「参考文献」，编号由渲染器按首次引用自动生成。
 
 ---
 
@@ -190,13 +190,13 @@ $$\mathbb E\Big[L\Big(\frac1{v_{1:T}}\sum_tv_t\theta_t\Big)-L(\theta^*)\Big]\le\
 
 **OPD 视角：改什么、拿到什么**
 
-*改动（落到训练器与日志的具体位置）：*
+_改动（落到训练器与日志的具体位置）：_
 
 1. **把 $\beta_1$ 从超参升级为方差预算旋钮**。OPD 的 Adam 配置按 $(\eta,B_{\rm eff})$ 而非 $(\eta,B)$ 书写：底预算确定后由 $B_{\rm eff}=B\frac{1+\beta_1}{1-\beta_1}$ 反解 $\beta_1=\frac{B_{\rm eff}-B}{B_{\rm eff}+B}$——显存与真实 batch 都不变，等效 batch 是免费的。
 2. **出口换权重平均**：取 EMA 系数 $\bar\gamma$ 使窗口 $(1-\bar\gamma)^{-1}\sim$ 平台时标；weight decay 与 $\eta$ 锁比（$\lambda_{\rm wd}=c\,\eta$），避免退火期权重漂移（[^k11307][^k11404]）。
 3. **日志双轨**：同一 run 对 raw $\theta$ 与 EMA $\theta$ 各记一份 $d(t),v_t$——两者的差本身是读数（命题 2.1.3）。
 
-*理论收益：*
+_理论收益：_
 
 - **命题 2.1.1（底的动量缩减，过阻尼区）**：$d_\infty(\beta_1)=\kappa\,d_\infty(0)$，$\lambda_{\rm crit}$ 同比缩 $\sqrt{(1+\beta_1)/(1-\beta_1)}$，谱形状与 lr 折叠不变（推导：本节 $\mathrm{Cov}[m_t]$ 代入 §1.3 的 OU 平衡；准静态近似下成立，欠阻尼修正见 E5）。**反向用法**：若实测底降幅 $\ll\kappa^{-1}$，则底的主导成分不是梯度噪声（指向 $d_{\rm gap}$ 或 §2.6 软底）——底成分分解的第一个判据。归属：旋钮 3（连带 2）。
 - **命题 2.1.2（免费退火定理）**：EMA 终点的期望损失 $\le$ 以 $w_t$ 加权的单点界（[^k11804]），等价于调度乘 $\frac{v_{t+1:T}}{v_{1:T}}$——**在不触碰 $\eta\lambda$ 谱的前提下拿到衰减级终点**。归属：旋钮 3 的"免费份额"。
@@ -231,13 +231,13 @@ $$\eta_{t+1}\ \propto\ \frac1{G_t^2}\ \propto\ \frac1{d(t)\,\langle\lambda\rangl
 
 **OPD 视角：改什么、拿到什么**
 
-*改动：*
+_改动：_
 
 1. **反馈律落地为两段式**：中期 $\eta_{t+1}\propto\eta/(d(t)\,v_t)$（活性曲率读数驱动），末端乘 $(1-t/T)$ 线性退火（T2）；梯度模长形式 $\eta_t\propto G_t^{-2}$ 与读数形式等价（$G_t^2=2\,d\,\langle\lambda\rangle$），二选一以日志质量定。
 2. **先 Refinement 后在线化**：对已有 run 的日志离线重算 $\eta_{\rm opt}(t)\propto G_t^{-2}(1-Q_t/Q_T)$ 并与实际调度对照（零风险）；一致性通过后再上在线反馈。
 3. **反馈是一个干预包**：升 lr 必须同时按命题 2.1.1 配 $\beta_1$（压 $\kappa$）、$\lambda_{\rm wd}\propto\eta$（防坍缩，[^k11404]）——三件事捆绑，不是三个独立开关。
 
-*理论收益：*
+_理论收益：_
 
 - **命题 2.2.1（P1 的界与最优律）**：OPD 二次化域内，闭环 lr 的终点界为 $\frac{R^2}{2\eta_{1:T}}+\frac{G^2}2\sum_t\frac{\eta_t^2}{\eta_{\min(t+1,T):T}}$，最优解即 $\eta_t=\frac{RG_t^{-2}}{\sqrt{Q_T}}(1-\frac{Q_t}{Q_T})$（[^k11530][^k11540]）。归属：旋钮 1（同形状曲线上的超线性前进）。
 - **命题 2.2.2（P1 净收益的不等式）**：升 lr 使底 $\propto\eta$ 同步抬升，P1 的净收益 $=$ 中段加速 $-$ 底抬升；配 EMA（$\kappa$ 压底）后净收益转正的条件可写成显式不等式（底项被 $\kappa$ 压制的倍数 vs 加速倍数）——把 brief"P1 必须配方差工程"从直觉变成不等式。归属：旋钮 1×3 的耦合。
@@ -262,13 +262,13 @@ $$q_T=\frac1T\sum_{t=1}^Tq_t+\sum_{k=1}^{T-1}\frac1{k(k+1)}\sum_{t=T-k}^T\big(q_
 
 **OPD 视角：改什么、拿到什么**
 
-*改动：*
+_改动：_
 
 1. **读数替换**：日志后处理把单点 $d(t)$ 补充为尾窗读数 $\hat q_T=\frac1T\sum_tq_t+\sum_k\frac1{k(k+1)}\sum_{t=T-k}^T(q_t-q_{T-k})$——零训练成本，纯后处理；权重可换 $v_t$（双权版）。
 2. **平台估计器**：对候选 $d_\infty$ 解恒等式两端的一致性（一维求根），配合窗口方差给置信区间；无需等 run 收敛。
 3. **与谱反演互锁**：恒等式给"轨迹 $\to$ 终点"，NNLS 反演给"轨迹 $\to$ 谱"；把反演谱代回恒等式做残差检验，两套估计互相约束。
 
-*理论收益：*
+_理论收益：_
 
 - **命题 2.3.1（谱模型下的早停外推界）**：恒等式对每个模式分别成立（对 $\{a_i,\lambda_i\}$ 线性）；用 $t\le T/2$ 的窗口预测 $d(T)$，误差由窗口外谱尾的质量 $\int_0^{\lambda(T/2)}\rho(\lambda)\,\mathrm d\lambda$ 决定——**外推精度有谱判据**，且与 §2.5 的谱尾指数衔接（尾越平越难外推）。
 - **命题 2.3.2（读数方差的显式缩减）**：权重 $\frac1{k(k+1)}$ 的有效窗口 $\sim$ 若干个弛豫时标，方差缩减因子 $\approx$ 有效窗口大小——把 A6"无噪读数"假设放松为"已知窗口方差"；$v_t$ 作权的双权版在吸收模型下与谱读数自洽。归属：读数。
@@ -293,14 +293,14 @@ $$q_T=\frac1T\sum_{t=1}^Tq_t+\sum_{k=1}^{T-1}\frac1{k(k+1)}\sum_{t=T-k}^T\big(q_
 
 **OPD 视角：改什么、拿到什么**
 
-*改动：*
+_改动：_
 
 1. **旋钮 1 的连续化**：冻结态窗口内把更新改为阻尼白化 $\delta=-\eta(F+\lambda_{\rm damp}I)^{-1}g$（实现用「动量的新理解」的 $Z^{-1}M$ 形式或 SOAP 型结构化近似[^vyas24]），扫 $\lambda_{\rm damp}$——**不在 {SGD, Adam, Muon} 里离散选优化器，而是在单参数族上连续调**。
 2. **输出层单独处理**：lm_head 按逐列 normalized SGD（步长 $\eta/d$、初始 $\sigma=\Theta(1/d)$，[^k11647]），避免大词表层的谱各向异性污染全局读数。
 3. **在线谱测量**：流式幂迭代（每步一次 QR，误差不累积[^k11710]）在线测 $b=\mathbb E[J^{\top}Fr]$ 的主子空间与 $\Sigma_t$；msign 用 Polar Express 系数（按预算定价 $\varepsilon_T$）；mclip 封顶防 $\eta\lambda_{\max}$ 过冲。
 4. **谱读数族进日志**：Stable rank、$q{=}2$ 奇异值熵、各向异性度（[^k10847][^k11767][^k11772]）。
 
-*理论收益：*
+_理论收益：_
 
 - **命题 2.4.1（阻尼白化的速率族）**：对角 Fisher 模型 $+$ Tikhonov 阻尼下，逐模式
   $$\eta\lambda_i^{\rm eff}(\lambda_{\rm damp})=\eta\,\frac{\lambda_i}{\lambda_i+\lambda_{\rm damp}}$$
@@ -334,21 +334,22 @@ $$\alpha=\frac\gamma\beta,\qquad \rho(\lambda)\propto\lambda^{\alpha-1}\ \ (\lam
 
 **OPD 视角：改什么、拿到什么**
 
-*改动：*
+_改动：_
 
 1. **反演顺序倒转**：先按 T3 闭式从实测 $\alpha$ 读谱尾（$\rho\propto\lambda^{\alpha-1}$），NNLS 反演降级为残差检查与形状分类（幂律/带边/stretched）。
 2. **数据侧按量子频率分配**：监督（token/题目）按 $p_k$ 排序与加权，使可吸收集最大化；数据规模实验的解释框架固定为"只移截断点、不改 $\gamma,\beta$"。
-3. **事前审计**：用教师-学生 advantage 分布估 $\sigma_i/c_i$，把 $\lambda_{\rm crit}$ 的两个截断（数据侧 $\tau/D$、优化侧 SNR）合并成一个预算公式，事前标记"喂多少数据都吃不到"的监督段。
+3. **事前审计**：用教师 - 学生 advantage 分布估 $\sigma_i/c_i$，把 $\lambda_{\rm crit}$ 的两个截断（数据侧 $\tau/D$、优化侧 SNR）合并成一个预算公式，事前标记"喂多少数据都吃不到"的监督段。
 
-*理论收益：*
+_理论收益：_
 
 - **命题 2.5.1（$\alpha$ 的三重身份）**：$\alpha=\gamma/\beta$ 同时是 (i) 吸收曲线指数、(ii) 谱尾指数、(iii) quanta 频率尾/曲率标度比——三个可独立测量的量被一个等式锁定，任意两个对上第三个即模型的强证据。
 - **命题 2.5.2（OPD 的底缩放律）**：被吸收模式集为 $k\le\min\{k_{\rm data},k_{\rm opt}\}$，其中
-  $$k_{\rm data}\sim\Big(\frac{D}{\tau Z_\gamma}\Big)^{\frac1{\gamma+1}}\ \ (\text{数据侧：}p_k\ge\tau/D),\qquad
-  k_{\rm opt}\sim\Big(\frac{\lambda_1}{\lambda_{\rm crit}}\Big)^{\frac1\beta}\ \ (\text{优化侧：}\lambda_k\ge\lambda_{\rm crit}),$$
-  由 Zipf 尾部积分 $\sum_{k>K}p_k\approx K^{-\gamma}/(\gamma Z_\gamma)$ 得
-  $$d_\infty\ \propto\ \big[\min(k_{\rm data},k_{\rm opt})\big]^{-\gamma}+d_{\rm gap}.$$
-  **收益**：数据规模与 $(\eta,B)$ 的边际收益曲线闭式可预测——$D\to\infty$ 时底被优化侧钉住（"data-overfed, algorithm-starved"的量化形式）；反之 $B\uparrow/\eta\downarrow$ 时底由数据侧钉住。哪侧在钉，直接决定该往哪个旋钮花钱。
+    $$ k_{\rm data}\sim\Big(\frac{D}{\tau Z_\gamma}\Big)^{\frac1{\gamma+1}}\ \ (\text{数据侧：}p_k\ge\tau/D),\qquad
+    k_{\rm opt}\sim\Big(\frac{\lambda_1}{\lambda_{\rm crit}}\Big)^{\frac1\beta}\ \ (\text{优化侧：}\lambda_k\ge\lambda_{\rm crit}),$$
+    由 Zipf 尾部积分 $\sum_{k>K}p_k\approx K^{-\gamma}/(\gamma Z_\gamma)$ 得
+    $$d_\infty\ \propto\ \big[\min(k_{\rm data},k_{\rm opt})\big]^{-\gamma}+d_{\rm gap}.$$
+    **收益**：数据规模与 $(\eta,B)$ 的边际收益曲线闭式可预测——$D\to\infty$ 时底被优化侧钉住（"data-overfed, algorithm-starved"的量化形式）；反之 $B\uparrow/\eta\downarrow$ 时底由数据侧钉住。哪侧在钉，直接决定该往哪个旋钮花钱。
+    $$
 - **命题 2.5.3（形状分类学）**：幂律 / 带边弯曲 / stretched exponential $\leftrightarrow$ 纯幂律谱 / 双截断谱 / 对数正态分层谱（T4，[^palmer84]）——形状判别即谱类型判别，给谱反演一个先验分类。
 
 ### 2.6 Adam 的两个软底（A4 的定量化）
@@ -380,13 +381,13 @@ $$d_\infty\ =\ d_{\rm gap}+\underbrace{\tfrac{\eta}{4B}\sum_i\sigma_i^2}_{\text{
 
 **OPD 视角：改什么、拿到什么**
 
-*改动：*
+_改动：_
 
 1. **$(\beta_1,B)$ 联合底预算**：底预算 $d_\infty^{\rm target}$ 给定后，在 $(\beta_1,B)$ 平面解最便宜的组合——$\beta_1$ 免费（只改记忆）、$B$ 昂贵（改显存/吞吐），故先压 $\kappa(\beta_1)$ 再动 $B$。
 2. **在线 SNR 读数**：按[^k11267] 从 update RMS 反解 $\Vert\mu\Vert/\Vert\sigma\Vert$（$\mathrm{SNR}=\frac{\kappa-\Vert u\Vert^2}{\Vert u\Vert^2-1}$ 的反函数），逐层监控 $N_{\rm low\text{-}SNR}(t)$——软底分量的实时估计，零额外开销。
 3. **正交消融预登记**：$\beta_1$ 扫描（理论上只动软底）$\times$ $B$ 扫描（理论上只动 SGD 底）——一次实验分离 E2 的三个成分。
 
-*理论收益：*
+_理论收益：_
 
 - **命题 2.6.1（软底公式）**：$d_\infty^{\rm Adam}=\frac{\eta\kappa(\beta_1)}4\,N_{\rm low\text{-}SNR}$——$B$ 无关、谱平权、$\kappa$ 律（$\kappa$ 从 $1$（$\beta_1{=}0$）缩到 $0.01$（$\beta_1{=}0.98$），软底缩 99 倍）。
 - **命题 2.6.2（双底的线性可分性）**：三成分在 $(\beta_1,B)$ 扫描平面上的响应方向两两正交：软底只随 $\beta_1$（$\kappa$ 律）、SGD 底只随 $B$（$1/B$ 律）、两者都不动的残差即 $d_{\rm gap}$（口径/容量决定）——**底成分分解从判据变成实验代数**，且与命题 2.1.1/2.1.3 的 EMA 分解交叉验证。
@@ -407,13 +408,13 @@ $$d_\infty\ =\ d_{\rm gap}+\underbrace{\tfrac{\eta}{4B}\sum_i\sigma_i^2}_{\text{
 
 **OPD 视角：改什么、拿到什么**
 
-*改动：*
+_改动：_
 
 1. **多口径并行读数**：逐 token 日志同时输出 L1/KL/CE 三个口径 $+$ 一个参数 RMS 口径；跨口径比较只经命题 2.7.1 换算，不直接比数值。
 2. **距离口径升级（可选）**：若读数方差过大，换巴氏/$\mathcal W_2$ 型对称口径（[^k8512] 的正态族对照显示其 $\lambda$-加权介于 KL 与 L1 之间）；改口径 $=$ 改 $d(t)$ 的模式分解（A5），谱反演按口径换算。
 3. **目标侧保持不动**：reverse-KL 的 score 依赖 $p$ 本身、不满足可采样公理（[^k11854]），OPD 维持 CE/advantage 型代理 $+$ 中心化；§1.1(b) 的曲率修正项 $C$ 作为**已知偏差记录**，不试图在目标里修掉。
 
-*理论收益：*
+_理论收益：_
 
 - **命题 2.7.1（口径换算律）**：$d_\infty^{(p)}\propto(\eta/B)^{\min(p,2)/2}$，且逐模式权随阶数从 $\sigma_i^2$（二次泛函）变到 $\sqrt{\lambda_i}\,\sigma_i$（线性泛函）——**幅度标度与谱加权的双重换算公式**（L1 $\leftrightarrow$ KL），D2 的两分支由此统一。
 - **命题 2.7.2（口径不变性判据）**：同曲率结构的口径预言同一 $v_t$ 形状；按 2.7.1 换算后的残差就是读数伪影（KL 的熵污染、CE$-$H 相减伪影）的定量证据——A5 的"跨口径只读方向不读数值"升级为可计算。
@@ -438,13 +439,13 @@ $$\mathbb E_{x_t}\Big[\mathbb E_{x_0|x_t}\Vert\nabla\log p(x_t|x_0)\Vert^2-\Vert
 
 **OPD 视角：改什么、拿到什么**
 
-*改动：*
+_改动：_
 
 1. **两步目标改写**：第一步（安全）：控制变量式 advantage 校正 $A\to A-\beta^{\top}(Z-\mathbb EZ)$，$Z$ 取可控特征（逐 token 曲率、教师熵、位置、温度），$\beta^*=\mathrm{Cov}(A,Z)\,\mathrm{Var}(Z)^{-1}$；第二步（需验证）：序列 KL 链式分解后检验后缀和 $\sum_{k\ge t}A_k-\text{centering}$ 是否为"给定前缀"的条件期望，若是，用 FGM 模板 $\mathcal L_4^{\rm(sg)}=2\mathcal L_2^{\rm(sg)}-\mathcal L_1^{\rm(sg)}$ 做单样本替换 $+$ sg 度规位（[^k10085][^k10567]）。
 2. **上线护栏**：sg 改写后等效 Hessian 不再是 Fisher（[^k10958] 的驻点警告）——上线条件：toy 序列上数值验证梯度等价 $+$ $\lambda_{\max}(\nabla^2J')\le2/\eta$。
 3. **基线工程**：中心化升级为曲率加权最优 baseline（[^k7737][^greensmith04]）。
 
-*理论收益：*
+_理论收益：_
 
 - **命题 2.8.1（方差缩减的控制变量上界）**：可控特征集 $Z$ 下，任何保持梯度的改写其逐 token 方差满足 $\mathrm{Var}(\hat A)\ge\mathrm{Var}(A)(1-R^2)$，$R^2$ 为 $A$ 对 $Z$ 回归的判定系数；最优改写即控制变量形式 $\hat A^*=A-\beta^{*\top}(Z-\mathbb EZ)$（标准控制变量理论；E9 的乘性加权——focal/TaiLr/EMO——只是其特例）。**收益**：P4 的理论收益上限由 $R^2$ 给出且可直接从日志估计——先测 $R^2$ 再决定是否值得做加权。
 - **命题 2.8.2（后缀和 $=$ 未用控制变量）**：immediate-token 近似与完整后缀和之差恰是"未来条件分布"这组控制变量；把后缀和表示为条件期望后，SiD 恒等式允许单样本替换，不动点不动（Vincent 判据，[^vincent11][^k9509]），方差收益受 2.8.1 的上界约束。
@@ -502,10 +503,10 @@ $$\mathbb E_{x_t}\Big[\mathbb E_{x_0|x_t}\Vert\nabla\log p(x_t|x_0)\Vert^2-\Vert
 
 ### A.2 lr × batch × 缩放律 × Adam 渐近
 
-- **11260**（2025）[^k11260] — $\eta^*\approx\frac{\eta_{\max}}{1+\mathcal B_{\rm noise}/B}$（$\mathcal B_{\rm noise}$ 记号承 McCandlish et al. 2018[^mccandlish18]）；数据-步数律 $(\frac S{S_{\min}}-1)(\frac E{E_{\min}}-1)=1$；SDE 视角[^li17sme]、batch–lr 实证[^smith18decay]。
+- **11260**（2025）[^k11260] — $\eta^*\approx\frac{\eta_{\max}}{1+\mathcal B_{\rm noise}/B}$（$\mathcal B_{\rm noise}$ 记号承 McCandlish et al. 2018[^mccandlish18]）；数据 - 步数律 $(\frac S{S_{\min}}-1)(\frac E{E_{\min}}-1)=1$；SDE 视角[^li17sme]、batch–lr 实证[^smith18decay]。
 - **11280**（2025）[^k11280] — $\mathbb E[\mathrm{sign}(\tilde g_B)]\approx\frac g{\sqrt{g^2+\sigma^2/B}}$；进度公式对预条件齐次（普适），$\eta^*$ 不齐次；Surge 现象[^li24surge]。
 - **11285**（2025）[^k11285] — $\mathbb E[\tilde\Phi_B]\approx\mathrm{msign}(G)(1+\mathcal B_{\rm simple}/B)^{-1/2}$：msign 输出正交 $\Rightarrow$ lr–$B$ 律与 SignSGD 同形。
-- **11301**（2025）[^k11301] — 动量等效 batch $\times\frac{1+\beta_1}{1-\beta_1}$；Adam+动量的 Surge 条件 $\beta_1>\frac13$。
+- **11301**（2025）[^k11301] — 动量等效 batch $\times\frac{1+\beta_1}{1-\beta_1}$；Adam+ 动量的 Surge 条件 $\beta_1>\frac13$。
 - **10542**（2024）[^k10542] — $\eta\propto\sqrt B$（方差守恒）/$\eta\propto B$（SDE）/$\eta^*(B)$ 饱和三推导并列；底标度两口径的源头。
 - **10563**（2024）[^k10563] — $\mathrm{softsign}(x,\epsilon)$ 插值：$|g_i|\ll\epsilon$ 的低 SNR 分量退回线性动力学（$\lambda_{\rm crit}$ 以下模式的机制刻画）。
 - **11833**（2026）[^k11833] — $F_{\rm opt}\sim\alpha_1(T\eta)^{-\gamma_1}+\alpha_2B^{-\gamma_2}+\alpha_3\eta^{\gamma_3}$（SignSGD/Muon 型 $\gamma_1=\gamma_3=1,\gamma_2=1/2$）；异幂不等式闭式；"指数 $=$ 普适类、系数 $=$ 工程水平"。对照[^bahri21][^mrs22][^kaplan20]。
@@ -916,416 +917,416 @@ $$\mathbb E_{x_t}\Big[\mathbb E_{x_0|x_t}\Vert\nabla\log p(x_t|x_0)\Vert^2-\Vert
 
 [^bengio15ss]: S. Bengio, O. Vinyals, N. Jaitly, N. Shazeer. Scheduled Sampling for Sequence Prediction with Recurrent Neural Networks. NeurIPS 2015. [arXiv:1506.03099](https://arxiv.org/abs/1506.03099)
 
-[^k9902]: 苏剑林. 让炼丹更科学一些（一）：SGD的平均损失收敛. kexue.fm 2023. [https://kexue.fm/archives/9902](https://kexue.fm/archives/9902)
+[^k9902]: 苏剑林。让炼丹更科学一些（一）：SGD 的平均损失收敛。kexue.fm 2023. [https://kexue.fm/archives/9902](https://kexue.fm/archives/9902)
 
-[^k11469]: 苏剑林. 让炼丹更科学一些（二）：将结论推广到无界域. kexue.fm 2025. [https://kexue.fm/archives/11469](https://kexue.fm/archives/11469)
+[^k11469]: 苏剑林。让炼丹更科学一些（二）：将结论推广到无界域。kexue.fm 2025. [https://kexue.fm/archives/11469](https://kexue.fm/archives/11469)
 
-[^k11480]: 苏剑林. 让炼丹更科学一些（三）：SGD的终点损失收敛. kexue.fm 2025. [https://kexue.fm/archives/11480](https://kexue.fm/archives/11480)
+[^k11480]: 苏剑林。让炼丹更科学一些（三）：SGD 的终点损失收敛。kexue.fm 2025. [https://kexue.fm/archives/11480](https://kexue.fm/archives/11480)
 
-[^k11494]: 苏剑林. 让炼丹更科学一些（四）：新恒等式，新学习率. kexue.fm 2025. [https://kexue.fm/archives/11494](https://kexue.fm/archives/11494)
+[^k11494]: 苏剑林。让炼丹更科学一些（四）：新恒等式，新学习率。kexue.fm 2025. [https://kexue.fm/archives/11494](https://kexue.fm/archives/11494)
 
-[^k11530]: 苏剑林. 让炼丹更科学一些（五）：基于梯度精调学习率. kexue.fm 2026. [https://kexue.fm/archives/11530](https://kexue.fm/archives/11530)
+[^k11530]: 苏剑林。让炼丹更科学一些（五）：基于梯度精调学习率。kexue.fm 2026. [https://kexue.fm/archives/11530](https://kexue.fm/archives/11530)
 
-[^k11540]: 苏剑林. 让炼丹更科学一些（六）：自上而下的精妙构造. kexue.fm 2026. [https://kexue.fm/archives/11540](https://kexue.fm/archives/11540)
+[^k11540]: 苏剑林。让炼丹更科学一些（六）：自上而下的精妙构造。kexue.fm 2026. [https://kexue.fm/archives/11540](https://kexue.fm/archives/11540)
 
-[^k11804]: 苏剑林. 让炼丹更科学一些（七）：步长调度与权重平均. kexue.fm 2026. [https://kexue.fm/archives/11804](https://kexue.fm/archives/11804)
+[^k11804]: 苏剑林。让炼丹更科学一些（七）：步长调度与权重平均。kexue.fm 2026. [https://kexue.fm/archives/11804](https://kexue.fm/archives/11804)
 
-[^k11879]: 苏剑林. 让炼丹更科学一些（八）：多阶段训练的学习率. kexue.fm 2026. [https://kexue.fm/archives/11879](https://kexue.fm/archives/11879)
+[^k11879]: 苏剑林。让炼丹更科学一些（八）：多阶段训练的学习率。kexue.fm 2026. [https://kexue.fm/archives/11879](https://kexue.fm/archives/11879)
 
-[^k11882]: 苏剑林. 让炼丹更科学一些（九）：经典自适应梯度算法. kexue.fm 2026. [https://kexue.fm/archives/11882](https://kexue.fm/archives/11882)
+[^k11882]: 苏剑林。让炼丹更科学一些（九）：经典自适应梯度算法。kexue.fm 2026. [https://kexue.fm/archives/11882](https://kexue.fm/archives/11882)
 
-[^k7787]: 苏剑林. 从动力学角度看优化算法（五）：为什么学习率不宜过小？ kexue.fm 2020. [https://kexue.fm/archives/7787](https://kexue.fm/archives/7787)
+[^k7787]: 苏剑林。从动力学角度看优化算法（五）：为什么学习率不宜过小？kexue.fm 2020. [https://kexue.fm/archives/7787](https://kexue.fm/archives/7787)
 
-[^k5655]: 苏剑林. 从动力学角度看优化算法（一）：从SGD到动量加速. kexue.fm 2018. [https://kexue.fm/archives/5655](https://kexue.fm/archives/5655)
+[^k5655]: 苏剑林。从动力学角度看优化算法（一）：从 SGD 到动量加速。kexue.fm 2018. [https://kexue.fm/archives/5655](https://kexue.fm/archives/5655)
 
-[^k6234]: 苏剑林. 从动力学角度看优化算法（二）：自适应学习率算法. kexue.fm 2019. [https://kexue.fm/archives/6234](https://kexue.fm/archives/6234)
+[^k6234]: 苏剑林。从动力学角度看优化算法（二）：自适应学习率算法。kexue.fm 2019. [https://kexue.fm/archives/6234](https://kexue.fm/archives/6234)
 
-[^k6261]: 苏剑林. 从动力学角度看优化算法（三）：一个更整体的视角. kexue.fm 2019. [https://kexue.fm/archives/6261](https://kexue.fm/archives/6261)
+[^k6261]: 苏剑林。从动力学角度看优化算法（三）：一个更整体的视角。kexue.fm 2019. [https://kexue.fm/archives/6261](https://kexue.fm/archives/6261)
 
-[^k6583]: 苏剑林. 从动力学角度看优化算法（四）：GAN的第三个阶段. kexue.fm 2019. [https://kexue.fm/archives/6583](https://kexue.fm/archives/6583)
+[^k6583]: 苏剑林。从动力学角度看优化算法（四）：GAN 的第三个阶段。kexue.fm 2019. [https://kexue.fm/archives/6583](https://kexue.fm/archives/6583)
 
-[^k7980]: 苏剑林. 从动力学角度看优化算法（六）：为什么SimSiam不退化？ kexue.fm 2021. [https://kexue.fm/archives/7980](https://kexue.fm/archives/7980)
+[^k7980]: 苏剑林。从动力学角度看优化算法（六）：为什么 SimSiam 不退化？kexue.fm 2021. [https://kexue.fm/archives/7980](https://kexue.fm/archives/7980)
 
-[^k8009]: 苏剑林. 从动力学角度看优化算法（七）：SGD ≈ SVM？ kexue.fm 2021. [https://kexue.fm/archives/8009](https://kexue.fm/archives/8009)
+[^k8009]: 苏剑林。从动力学角度看优化算法（七）：SGD ≈ SVM？kexue.fm 2021. [https://kexue.fm/archives/8009](https://kexue.fm/archives/8009)
 
-[^k9660]: 苏剑林. 梯度流：探索通向最小值之路. kexue.fm 2023. [https://kexue.fm/archives/9660](https://kexue.fm/archives/9660)
+[^k9660]: 苏剑林。梯度流：探索通向最小值之路。kexue.fm 2023. [https://kexue.fm/archives/9660](https://kexue.fm/archives/9660)
 
-[^k9359]: 苏剑林. 用热传导方程来指导自监督学习. kexue.fm 2022. [https://kexue.fm/archives/9359](https://kexue.fm/archives/9359)
+[^k9359]: 苏剑林。用热传导方程来指导自监督学习。kexue.fm 2022. [https://kexue.fm/archives/9359](https://kexue.fm/archives/9359)
 
-[^k7521]: 苏剑林. 从采样看优化：可导优化与不可导优化的统一视角. kexue.fm 2020. [https://kexue.fm/archives/7521](https://kexue.fm/archives/7521)
+[^k7521]: 苏剑林。从采样看优化：可导优化与不可导优化的统一视角。kexue.fm 2020. [https://kexue.fm/archives/7521](https://kexue.fm/archives/7521)
 
-[^k7737]: 苏剑林. 殊途同归的策略梯度与零阶优化. kexue.fm 2020. [https://kexue.fm/archives/7737](https://kexue.fm/archives/7737)
+[^k7737]: 苏剑林。殊途同归的策略梯度与零阶优化。kexue.fm 2020. [https://kexue.fm/archives/7737](https://kexue.fm/archives/7737)
 
-[^k4277]: 苏剑林. 梯度下降和EM算法：系出同源，一脉相承. kexue.fm 2017. [https://kexue.fm/archives/4277](https://kexue.fm/archives/4277)
+[^k4277]: 苏剑林。梯度下降和 EM 算法：系出同源，一脉相承。kexue.fm 2017. [https://kexue.fm/archives/4277](https://kexue.fm/archives/4277)
 
-[^k5239]: 苏剑林. 从最大似然到EM算法：一致的理解方式. kexue.fm 2018. [https://kexue.fm/archives/5239](https://kexue.fm/archives/5239)
+[^k5239]: 苏剑林。从最大似然到 EM 算法：一致的理解方式。kexue.fm 2018. [https://kexue.fm/archives/5239](https://kexue.fm/archives/5239)
 
-[^k5617]: 苏剑林. “噪声对比估计”杂谈：曲径通幽之妙. kexue.fm 2018. [https://kexue.fm/archives/5617](https://kexue.fm/archives/5617)
+[^k5617]: 苏剑林。“噪声对比估计”杂谈：曲径通幽之妙。kexue.fm 2018. [https://kexue.fm/archives/5617](https://kexue.fm/archives/5617)
 
-[^k8968]: 苏剑林. 指数梯度下降 + 元学习 = 自适应学习率. kexue.fm 2022. [https://kexue.fm/archives/8968](https://kexue.fm/archives/8968)
+[^k8968]: 苏剑林。指数梯度下降 + 元学习 = 自适应学习率。kexue.fm 2022. [https://kexue.fm/archives/8968](https://kexue.fm/archives/8968)
 
-[^k10592]: 苏剑林. Muon优化器赏析：从向量到矩阵的本质跨越. kexue.fm 2024. [https://kexue.fm/archives/10592](https://kexue.fm/archives/10592)
+[^k10592]: 苏剑林。Muon 优化器赏析：从向量到矩阵的本质跨越。kexue.fm 2024. [https://kexue.fm/archives/10592](https://kexue.fm/archives/10592)
 
-[^k10648]: 苏剑林. 从谱范数梯度到新式权重衰减的思考. kexue.fm 2024. [https://kexue.fm/archives/10648](https://kexue.fm/archives/10648)
+[^k10648]: 苏剑林。从谱范数梯度到新式权重衰减的思考。kexue.fm 2024. [https://kexue.fm/archives/10648](https://kexue.fm/archives/10648)
 
-[^k10739]: 苏剑林. Muon续集：为什么我们选择尝试Muon？ kexue.fm 2025. [https://kexue.fm/archives/10739](https://kexue.fm/archives/10739)
+[^k10739]: 苏剑林。Muon 续集：为什么我们选择尝试 Muon？kexue.fm 2025. [https://kexue.fm/archives/10739](https://kexue.fm/archives/10739)
 
-[^k11416]: 苏剑林. Muon优化器指南：快速上手与关键细节. kexue.fm 2025. [https://kexue.fm/archives/11416](https://kexue.fm/archives/11416)
+[^k11416]: 苏剑林。Muon 优化器指南：快速上手与关键细节。kexue.fm 2025. [https://kexue.fm/archives/11416](https://kexue.fm/archives/11416)
 
-[^k11549]: 苏剑林. 为什么我们偏爱各向同性？基于最速下降的理解. kexue.fm 2026. [https://kexue.fm/archives/11549](https://kexue.fm/archives/11549)
+[^k11549]: 苏剑林。为什么我们偏爱各向同性？基于最速下降的理解。kexue.fm 2026. [https://kexue.fm/archives/11549](https://kexue.fm/archives/11549)
 
-[^k11875]: 苏剑林. 动量的新理解：逼近特征层面的梯度下降. kexue.fm 2026. [https://kexue.fm/archives/11875](https://kexue.fm/archives/11875)
+[^k11875]: 苏剑林。动量的新理解：逼近特征层面的梯度下降。kexue.fm 2026. [https://kexue.fm/archives/11875](https://kexue.fm/archives/11875)
 
-[^k11126]: 苏剑林. QK-Clip：让Muon在Scaleup之路上更进一步. kexue.fm 2025. [https://kexue.fm/archives/11126](https://kexue.fm/archives/11126)
+[^k11126]: 苏剑林。QK-Clip：让 Muon 在 Scaleup 之路上更进一步。kexue.fm 2025. [https://kexue.fm/archives/11126](https://kexue.fm/archives/11126)
 
-[^k10795]: 苏剑林. 高阶MuP：更简明但更高明的谱条件缩放. kexue.fm 2025. [https://kexue.fm/archives/10795](https://kexue.fm/archives/10795)
+[^k10795]: 苏剑林。高阶 MuP：更简明但更高明的谱条件缩放。kexue.fm 2025. [https://kexue.fm/archives/10795](https://kexue.fm/archives/10795)
 
-[^k11772]: 苏剑林. 为什么官方版Muon比MuP版多出一个max(1, ⋅)？ kexue.fm 2026. [https://kexue.fm/archives/11772](https://kexue.fm/archives/11772)
+[^k11772]: 苏剑林。为什么官方版 Muon 比 MuP 版多出一个 max(1, ⋅)？kexue.fm 2026. [https://kexue.fm/archives/11772](https://kexue.fm/archives/11772)
 
-[^k10847]: 苏剑林. 矩阵的有效秩（Effective Rank）. kexue.fm 2025. [https://kexue.fm/archives/10847](https://kexue.fm/archives/10847)
+[^k10847]: 苏剑林。矩阵的有效秩（Effective Rank）. kexue.fm 2025. [https://kexue.fm/archives/10847](https://kexue.fm/archives/10847)
 
-[^k11767]: 苏剑林. 矩阵参数的奇异值熵越高越好吗？ kexue.fm 2026. [https://kexue.fm/archives/11767](https://kexue.fm/archives/11767)
+[^k11767]: 苏剑林。矩阵参数的奇异值熵越高越好吗？kexue.fm 2026. [https://kexue.fm/archives/11767](https://kexue.fm/archives/11767)
 
-[^k11784]: 苏剑林. 强制间隔投影（Margin-Enforcing Projection）. kexue.fm 2026. [https://kexue.fm/archives/11784](https://kexue.fm/archives/11784)
+[^k11784]: 苏剑林。强制间隔投影（Margin-Enforcing Projection）. kexue.fm 2026. [https://kexue.fm/archives/11784](https://kexue.fm/archives/11784)
 
-[^k10922]: 苏剑林. msign算子的Newton-Schulz迭代（上）. kexue.fm 2025. [https://kexue.fm/archives/10922](https://kexue.fm/archives/10922)
+[^k10922]: 苏剑林。msign 算子的 Newton-Schulz 迭代（上）. kexue.fm 2025. [https://kexue.fm/archives/10922](https://kexue.fm/archives/10922)
 
-[^k10996]: 苏剑林. msign算子的Newton-Schulz迭代（下）. kexue.fm 2025. [https://kexue.fm/archives/10996](https://kexue.fm/archives/10996)
+[^k10996]: 苏剑林。msign 算子的 Newton-Schulz 迭代（下）. kexue.fm 2025. [https://kexue.fm/archives/10996](https://kexue.fm/archives/10996)
 
-[^k11006]: 苏剑林. 通过msign来计算奇异值裁剪mclip（上）. kexue.fm 2025. [https://kexue.fm/archives/11006](https://kexue.fm/archives/11006)
+[^k11006]: 苏剑林。通过 msign 来计算奇异值裁剪 mclip（上）. kexue.fm 2025. [https://kexue.fm/archives/11006](https://kexue.fm/archives/11006)
 
-[^k11025]: 苏剑林. msign的导数. kexue.fm 2025. [https://kexue.fm/archives/11025](https://kexue.fm/archives/11025)
+[^k11025]: 苏剑林。msign 的导数。kexue.fm 2025. [https://kexue.fm/archives/11025](https://kexue.fm/archives/11025)
 
-[^k11059]: 苏剑林. 通过msign来计算奇异值裁剪mclip（下）. kexue.fm 2025. [https://kexue.fm/archives/11059](https://kexue.fm/archives/11059)
+[^k11059]: 苏剑林。通过 msign 来计算奇异值裁剪 mclip（下）. kexue.fm 2025. [https://kexue.fm/archives/11059](https://kexue.fm/archives/11059)
 
-[^k11335]: 苏剑林. 随机矩阵的谱范数的快速估计. kexue.fm 2025. [https://kexue.fm/archives/11335](https://kexue.fm/archives/11335)
+[^k11335]: 苏剑林。随机矩阵的谱范数的快速估计。kexue.fm 2025. [https://kexue.fm/archives/11335](https://kexue.fm/archives/11335)
 
-[^k11736]: 苏剑林. 如何更科学地估计矩阵的谱范数？ kexue.fm 2026. [https://kexue.fm/archives/11736](https://kexue.fm/archives/11736)
+[^k11736]: 苏剑林。如何更科学地估计矩阵的谱范数？kexue.fm 2026. [https://kexue.fm/archives/11736](https://kexue.fm/archives/11736)
 
-[^k11654]: 苏剑林. 基于流式幂迭代的Muon实现：1. 初识. kexue.fm 2026. [https://kexue.fm/archives/11654](https://kexue.fm/archives/11654)
+[^k11654]: 苏剑林。基于流式幂迭代的 Muon 实现：1. 初识。kexue.fm 2026. [https://kexue.fm/archives/11654](https://kexue.fm/archives/11654)
 
-[^k11673]: 苏剑林. 基于流式幂迭代的Muon实现：2. 加速. kexue.fm 2026. [https://kexue.fm/archives/11673](https://kexue.fm/archives/11673)
+[^k11673]: 苏剑林。基于流式幂迭代的 Muon 实现：2. 加速。kexue.fm 2026. [https://kexue.fm/archives/11673](https://kexue.fm/archives/11673)
 
-[^k11697]: 苏剑林. 基于流式幂迭代的Muon实现：3. 雕琢. kexue.fm 2026. [https://kexue.fm/archives/11697](https://kexue.fm/archives/11697)
+[^k11697]: 苏剑林。基于流式幂迭代的 Muon 实现：3. 雕琢。kexue.fm 2026. [https://kexue.fm/archives/11697](https://kexue.fm/archives/11697)
 
-[^k11710]: 苏剑林. 基于流式幂迭代的Muon实现：4. 原理. kexue.fm 2026. [https://kexue.fm/archives/11710](https://kexue.fm/archives/11710)
+[^k11710]: 苏剑林。基于流式幂迭代的 Muon 实现：4. 原理。kexue.fm 2026. [https://kexue.fm/archives/11710](https://kexue.fm/archives/11710)
 
-[^k11719]: 苏剑林. 基于流式幂迭代的Muon实现：5. 延伸. kexue.fm 2026. [https://kexue.fm/archives/11719](https://kexue.fm/archives/11719)
+[^k11719]: 苏剑林。基于流式幂迭代的 Muon 实现：5. 延伸。kexue.fm 2026. [https://kexue.fm/archives/11719](https://kexue.fm/archives/11719)
 
-[^k11196]: 苏剑林. 流形上的最速下降：1. SGD + 超球面. kexue.fm 2025. [https://kexue.fm/archives/11196](https://kexue.fm/archives/11196)
+[^k11196]: 苏剑林。流形上的最速下降：1. SGD + 超球面。kexue.fm 2025. [https://kexue.fm/archives/11196](https://kexue.fm/archives/11196)
 
-[^k11215]: 苏剑林. 流形上的最速下降：2. Muon + 正交. kexue.fm 2025. [https://kexue.fm/archives/11215](https://kexue.fm/archives/11215)
+[^k11215]: 苏剑林。流形上的最速下降：2. Muon + 正交。kexue.fm 2025. [https://kexue.fm/archives/11215](https://kexue.fm/archives/11215)
 
-[^k11221]: 苏剑林. 流形上的最速下降：3. Muon + Stiefel. kexue.fm 2025. [https://kexue.fm/archives/11221](https://kexue.fm/archives/11221)
+[^k11221]: 苏剑林。流形上的最速下降：3. Muon + Stiefel. kexue.fm 2025. [https://kexue.fm/archives/11221](https://kexue.fm/archives/11221)
 
-[^k11241]: 苏剑林. 流形上的最速下降：4. Muon + 谱球面. kexue.fm 2025. [https://kexue.fm/archives/11241](https://kexue.fm/archives/11241)
+[^k11241]: 苏剑林。流形上的最速下降：4. Muon + 谱球面。kexue.fm 2025. [https://kexue.fm/archives/11241](https://kexue.fm/archives/11241)
 
-[^k11260]: 苏剑林. 重新思考学习率与Batch Size（一）：现状. kexue.fm 2025. [https://kexue.fm/archives/11260](https://kexue.fm/archives/11260)
+[^k11260]: 苏剑林。重新思考学习率与 Batch Size（一）：现状。kexue.fm 2025. [https://kexue.fm/archives/11260](https://kexue.fm/archives/11260)
 
-[^k11280]: 苏剑林. 重新思考学习率与Batch Size（二）：平均场. kexue.fm 2025. [https://kexue.fm/archives/11280](https://kexue.fm/archives/11280)
+[^k11280]: 苏剑林。重新思考学习率与 Batch Size（二）：平均场。kexue.fm 2025. [https://kexue.fm/archives/11280](https://kexue.fm/archives/11280)
 
-[^k11285]: 苏剑林. 重新思考学习率与Batch Size（三）：Muon. kexue.fm 2025. [https://kexue.fm/archives/11285](https://kexue.fm/archives/11285)
+[^k11285]: 苏剑林。重新思考学习率与 Batch Size（三）：Muon. kexue.fm 2025. [https://kexue.fm/archives/11285](https://kexue.fm/archives/11285)
 
-[^k11301]: 苏剑林. 重新思考学习率与Batch Size（四）：EMA. kexue.fm 2025. [https://kexue.fm/archives/11301](https://kexue.fm/archives/11301)
+[^k11301]: 苏剑林。重新思考学习率与 Batch Size（四）：EMA. kexue.fm 2025. [https://kexue.fm/archives/11301](https://kexue.fm/archives/11301)
 
-[^k10542]: 苏剑林. 当Batch Size增大时，学习率该如何随之变化？ kexue.fm 2024. [https://kexue.fm/archives/10542](https://kexue.fm/archives/10542)
+[^k10542]: 苏剑林。当 Batch Size 增大时，学习率该如何随之变化？kexue.fm 2024. [https://kexue.fm/archives/10542](https://kexue.fm/archives/10542)
 
-[^k10563]: 苏剑林. Adam的epsilon如何影响学习率的Scaling Law？ kexue.fm 2024. [https://kexue.fm/archives/10563](https://kexue.fm/archives/10563)
+[^k10563]: 苏剑林。Adam 的 epsilon 如何影响学习率的 Scaling Law？kexue.fm 2024. [https://kexue.fm/archives/10563](https://kexue.fm/archives/10563)
 
-[^k11833]: 苏剑林. 解构Scaling Law：优化、架构、数据的三重奏. kexue.fm 2026. [https://kexue.fm/archives/11833](https://kexue.fm/archives/11833)
+[^k11833]: 苏剑林。解构 Scaling Law：优化、架构、数据的三重奏。kexue.fm 2026. [https://kexue.fm/archives/11833](https://kexue.fm/archives/11833)
 
-[^k9607]: 苏剑林. 基于量子化假设推导模型的尺度定律（Scaling Law）. kexue.fm 2023. [https://kexue.fm/archives/9607](https://kexue.fm/archives/9607)
+[^k9607]: 苏剑林。基于量子化假设推导模型的尺度定律（Scaling Law）. kexue.fm 2023. [https://kexue.fm/archives/9607](https://kexue.fm/archives/9607)
 
-[^k11267]: 苏剑林. 为什么Adam的Update RMS是0.2？ kexue.fm 2025. [https://kexue.fm/archives/11267](https://kexue.fm/archives/11267)
+[^k11267]: 苏剑林。为什么 Adam 的 Update RMS 是 0.2？kexue.fm 2025. [https://kexue.fm/archives/11267](https://kexue.fm/archives/11267)
 
-[^k11307]: 苏剑林. AdamW的Weight RMS的渐近估计（上）. kexue.fm 2025. [https://kexue.fm/archives/11307](https://kexue.fm/archives/11307)
+[^k11307]: 苏剑林。AdamW 的 Weight RMS 的渐近估计（上）. kexue.fm 2025. [https://kexue.fm/archives/11307](https://kexue.fm/archives/11307)
 
-[^k11404]: 苏剑林. AdamW的Weight RMS的渐近估计（下）. kexue.fm 2025. [https://kexue.fm/archives/11404](https://kexue.fm/archives/11404)
+[^k11404]: 苏剑林。AdamW 的 Weight RMS 的渐近估计（下）. kexue.fm 2025. [https://kexue.fm/archives/11404](https://kexue.fm/archives/11404)
 
-[^k11459]: 苏剑林. 滑动平均视角下的权重衰减和学习率. kexue.fm 2025. [https://kexue.fm/archives/11459](https://kexue.fm/archives/11459)
+[^k11459]: 苏剑林。滑动平均视角下的权重衰减和学习率。kexue.fm 2025. [https://kexue.fm/archives/11459](https://kexue.fm/archives/11459)
 
-[^k11593]: 苏剑林. Adam优化器的最优超参数是β1=β2 ？ kexue.fm 2026. [https://kexue.fm/archives/11593](https://kexue.fm/archives/11593)
+[^k11593]: 苏剑林。Adam 优化器的最优超参数是β1=β2？kexue.fm 2026. [https://kexue.fm/archives/11593](https://kexue.fm/archives/11593)
 
-[^k10588]: 苏剑林. 从Hessian近似看自适应学习率优化器. kexue.fm 2024. [https://kexue.fm/archives/10588](https://kexue.fm/archives/10588)
+[^k10588]: 苏剑林。从 Hessian 近似看自适应学习率优化器。kexue.fm 2024. [https://kexue.fm/archives/10588](https://kexue.fm/archives/10588)
 
-[^k7469]: 苏剑林. 为什么梯度裁剪能加速训练过程？一个简明的分析. kexue.fm 2020. [https://kexue.fm/archives/7469](https://kexue.fm/archives/7469)
+[^k7469]: 苏剑林。为什么梯度裁剪能加速训练过程？一个简明的分析。kexue.fm 2020. [https://kexue.fm/archives/7469](https://kexue.fm/archives/7469)
 
-[^k10657]: 苏剑林. 为什么梯度裁剪的默认模长是1？ kexue.fm 2025. [https://kexue.fm/archives/10657](https://kexue.fm/archives/10657)
+[^k10657]: 苏剑林。为什么梯度裁剪的默认模长是 1？kexue.fm 2025. [https://kexue.fm/archives/10657](https://kexue.fm/archives/10657)
 
-[^k7888]: 苏剑林. 也来谈谈RNN的梯度消失/爆炸问题. kexue.fm 2020. [https://kexue.fm/archives/7888](https://kexue.fm/archives/7888)
+[^k7888]: 苏剑林。也来谈谈 RNN 的梯度消失/爆炸问题。kexue.fm 2020. [https://kexue.fm/archives/7888](https://kexue.fm/archives/7888)
 
-[^k8796]: 苏剑林. 输入梯度惩罚与参数梯度惩罚的一个不等式. kexue.fm 2021. [https://kexue.fm/archives/8796](https://kexue.fm/archives/8796)
+[^k8796]: 苏剑林。输入梯度惩罚与参数梯度惩罚的一个不等式。kexue.fm 2021. [https://kexue.fm/archives/8796](https://kexue.fm/archives/8796)
 
-[^k6794]: 苏剑林. 用时间换取效果：Keras梯度累积优化器. kexue.fm 2019. [https://kexue.fm/archives/6794](https://kexue.fm/archives/6794)
+[^k6794]: 苏剑林。用时间换取效果：Keras 梯度累积优化器。kexue.fm 2019. [https://kexue.fm/archives/6794](https://kexue.fm/archives/6794)
 
-[^k8634]: 苏剑林. 隐藏在动量中的梯度累积：少更新几步，效果反而更好？ kexue.fm 2021. [https://kexue.fm/archives/8634](https://kexue.fm/archives/8634)
+[^k8634]: 苏剑林。隐藏在动量中的梯度累积：少更新几步，效果反而更好？kexue.fm 2021. [https://kexue.fm/archives/8634](https://kexue.fm/archives/8634)
 
-[^k6869]: 苏剑林. Keras实现两个优化器：Lookahead和LazyOptimizer. kexue.fm 2019. [https://kexue.fm/archives/6869](https://kexue.fm/archives/6869)
+[^k6869]: 苏剑林。Keras 实现两个优化器：Lookahead 和 LazyOptimizer. kexue.fm 2019. [https://kexue.fm/archives/6869](https://kexue.fm/archives/6869)
 
-[^k7094]: 苏剑林. 6个派生优化器的简单介绍及其实现. kexue.fm 2019. [https://kexue.fm/archives/7094](https://kexue.fm/archives/7094)
+[^k7094]: 苏剑林。6 个派生优化器的简单介绍及其实现。kexue.fm 2019. [https://kexue.fm/archives/7094](https://kexue.fm/archives/7094)
 
-[^k7302]: 苏剑林. AdaFactor优化器浅析（附开源实现）. kexue.fm 2020. [https://kexue.fm/archives/7302](https://kexue.fm/archives/7302)
+[^k7302]: 苏剑林。AdaFactor 优化器浅析（附开源实现）. kexue.fm 2020. [https://kexue.fm/archives/7302](https://kexue.fm/archives/7302)
 
-[^k7387]: 苏剑林. AdaX优化器浅析（附开源实现）. kexue.fm 2020. [https://kexue.fm/archives/7387](https://kexue.fm/archives/7387)
+[^k7387]: 苏剑林。AdaX 优化器浅析（附开源实现）. kexue.fm 2020. [https://kexue.fm/archives/7387](https://kexue.fm/archives/7387)
 
-[^k9473]: 苏剑林. Google新搜出的优化器Lion：效率与效果兼得的“训练狮”. kexue.fm 2023. [https://kexue.fm/archives/9473](https://kexue.fm/archives/9473)
+[^k9473]: 苏剑林。Google 新搜出的优化器 Lion：效率与效果兼得的“训练狮”. kexue.fm 2023. [https://kexue.fm/archives/9473](https://kexue.fm/archives/9473)
 
-[^k9512]: 苏剑林. Tiger：一个“抠”到极致的优化器. kexue.fm 2023. [https://kexue.fm/archives/9512](https://kexue.fm/archives/9512)
+[^k9512]: 苏剑林。Tiger：一个“抠”到极致的优化器。kexue.fm 2023. [https://kexue.fm/archives/9512](https://kexue.fm/archives/9512)
 
-[^k7196]: 苏剑林. 你的CRF层的学习率可能不够大. kexue.fm 2020. [https://kexue.fm/archives/7196](https://kexue.fm/archives/7196)
+[^k7196]: 苏剑林。你的 CRF 层的学习率可能不够大。kexue.fm 2020. [https://kexue.fm/archives/7196](https://kexue.fm/archives/7196)
 
-[^k9344]: 苏剑林. 基于Amos优化器思想推导出来的一些“炼丹策略”. kexue.fm 2022. [https://kexue.fm/archives/9344](https://kexue.fm/archives/9344)
+[^k9344]: 苏剑林。基于 Amos 优化器思想推导出来的一些“炼丹策略”. kexue.fm 2022. [https://kexue.fm/archives/9344](https://kexue.fm/archives/9344)
 
-[^k9590]: 苏剑林. 梯度视角下的LoRA：简介、分析、猜测及推广. kexue.fm 2023. [https://kexue.fm/archives/9590](https://kexue.fm/archives/9590)
+[^k9590]: 苏剑林。梯度视角下的 LoRA：简介、分析、猜测及推广。kexue.fm 2023. [https://kexue.fm/archives/9590](https://kexue.fm/archives/9590)
 
-[^k8870]: 苏剑林. 多任务学习漫谈（一）：以损失之名. kexue.fm 2022. [https://kexue.fm/archives/8870](https://kexue.fm/archives/8870)
+[^k8870]: 苏剑林。多任务学习漫谈（一）：以损失之名。kexue.fm 2022. [https://kexue.fm/archives/8870](https://kexue.fm/archives/8870)
 
-[^k8896]: 苏剑林. 多任务学习漫谈（二）：行梯度之事. kexue.fm 2022. [https://kexue.fm/archives/8896](https://kexue.fm/archives/8896)
+[^k8896]: 苏剑林。多任务学习漫谈（二）：行梯度之事。kexue.fm 2022. [https://kexue.fm/archives/8896](https://kexue.fm/archives/8896)
 
-[^k8907]: 苏剑林. 多任务学习漫谈（三）：分主次之序. kexue.fm 2022. [https://kexue.fm/archives/8907](https://kexue.fm/archives/8907)
+[^k8907]: 苏剑林。多任务学习漫谈（三）：分主次之序。kexue.fm 2022. [https://kexue.fm/archives/8907](https://kexue.fm/archives/8907)
 
-[^k10226]: 苏剑林. 对齐全量微调！这是我看过最精彩的LoRA改进（一）. kexue.fm 2024. [https://kexue.fm/archives/10226](https://kexue.fm/archives/10226)
+[^k10226]: 苏剑林。对齐全量微调！这是我看过最精彩的 LoRA 改进（一）. kexue.fm 2024. [https://kexue.fm/archives/10226](https://kexue.fm/archives/10226)
 
-[^k10266]: 苏剑林. 对齐全量微调！这是我看过最精彩的LoRA改进（二）. kexue.fm 2024. [https://kexue.fm/archives/10266](https://kexue.fm/archives/10266)
+[^k10266]: 苏剑林。对齐全量微调！这是我看过最精彩的 LoRA 改进（二）. kexue.fm 2024. [https://kexue.fm/archives/10266](https://kexue.fm/archives/10266)
 
-[^k10001]: 苏剑林. 配置不同的学习率，LoRA还能再涨一点？ kexue.fm 2024. [https://kexue.fm/archives/10001](https://kexue.fm/archives/10001)
+[^k10001]: 苏剑林。配置不同的学习率，LoRA 还能再涨一点？kexue.fm 2024. [https://kexue.fm/archives/10001](https://kexue.fm/archives/10001)
 
-[^k10489]: 苏剑林. VQ的旋转技巧：梯度直通估计的一般推广. kexue.fm 2024. [https://kexue.fm/archives/10489](https://kexue.fm/archives/10489)
+[^k10489]: 苏剑林。VQ 的旋转技巧：梯度直通估计的一般推广。kexue.fm 2024. [https://kexue.fm/archives/10489](https://kexue.fm/archives/10489)
 
-[^k10770]: 苏剑林. 初探MuP：超参数的跨模型尺度迁移规律. kexue.fm 2025. [https://kexue.fm/archives/10770](https://kexue.fm/archives/10770)
+[^k10770]: 苏剑林。初探 MuP：超参数的跨模型尺度迁移规律。kexue.fm 2025. [https://kexue.fm/archives/10770](https://kexue.fm/archives/10770)
 
-[^k11340]: 苏剑林. MuP之上：1. 好模型的三个特征. kexue.fm 2025. [https://kexue.fm/archives/11340](https://kexue.fm/archives/11340)
+[^k11340]: 苏剑林。MuP 之上：1. 好模型的三个特征。kexue.fm 2025. [https://kexue.fm/archives/11340](https://kexue.fm/archives/11340)
 
-[^k11605]: 苏剑林. MuP之上：2. 线性层与最速下降. kexue.fm 2026. [https://kexue.fm/archives/11605](https://kexue.fm/archives/11605)
+[^k11605]: 苏剑林。MuP 之上：2. 线性层与最速下降。kexue.fm 2026. [https://kexue.fm/archives/11605](https://kexue.fm/archives/11605)
 
-[^k11647]: 苏剑林. MuP之上：3. 特殊情况特殊处理. kexue.fm 2026. [https://kexue.fm/archives/11647](https://kexue.fm/archives/11647)
+[^k11647]: 苏剑林。MuP 之上：3. 特殊情况特殊处理。kexue.fm 2026. [https://kexue.fm/archives/11647](https://kexue.fm/archives/11647)
 
-[^k11729]: 苏剑林. MuP之上：4. 坚守参数的稳定性. kexue.fm 2026. [https://kexue.fm/archives/11729](https://kexue.fm/archives/11729)
+[^k11729]: 苏剑林。MuP 之上：4. 坚守参数的稳定性。kexue.fm 2026. [https://kexue.fm/archives/11729](https://kexue.fm/archives/11729)
 
-[^k8620]: 苏剑林. 浅谈Transformer的初始化、参数化与标准化. kexue.fm 2021. [https://kexue.fm/archives/8620](https://kexue.fm/archives/8620)
+[^k8620]: 苏剑林。浅谈 Transformer 的初始化、参数化与标准化。kexue.fm 2021. [https://kexue.fm/archives/8620](https://kexue.fm/archives/8620)
 
-[^k8747]: 苏剑林. 模型优化漫谈：BERT的初始标准差为什么是0.02？ kexue.fm 2021. [https://kexue.fm/archives/8747](https://kexue.fm/archives/8747)
+[^k8747]: 苏剑林。模型优化漫谈：BERT 的初始标准差为什么是 0.02？kexue.fm 2021. [https://kexue.fm/archives/8747](https://kexue.fm/archives/8747)
 
-[^k7180]: 苏剑林. 从几何视角来理解模型参数的初始化策略. kexue.fm 2020. [https://kexue.fm/archives/7180](https://kexue.fm/archives/7180)
+[^k7180]: 苏剑林。从几何视角来理解模型参数的初始化策略。kexue.fm 2020. [https://kexue.fm/archives/7180](https://kexue.fm/archives/7180)
 
-[^k6992]: 苏剑林. BN究竟起了什么作用？一个闭门造车的分析. kexue.fm 2019. [https://kexue.fm/archives/6992](https://kexue.fm/archives/6992)
+[^k6992]: 苏剑林。BN 究竟起了什么作用？一个闭门造车的分析。kexue.fm 2019. [https://kexue.fm/archives/6992](https://kexue.fm/archives/6992)
 
-[^k10831]: 苏剑林. 通过梯度近似寻找Normalization的替代品. kexue.fm 2025. [https://kexue.fm/archives/10831](https://kexue.fm/archives/10831)
+[^k10831]: 苏剑林。通过梯度近似寻找 Normalization 的替代品。kexue.fm 2025. [https://kexue.fm/archives/10831](https://kexue.fm/archives/10831)
 
-[^k9119]: 苏剑林. 生成扩散模型漫谈（一）：DDPM = 拆楼 + 建楼. kexue.fm 2022. [https://kexue.fm/archives/9119](https://kexue.fm/archives/9119)
+[^k9119]: 苏剑林。生成扩散模型漫谈（一）：DDPM = 拆楼 + 建楼。kexue.fm 2022. [https://kexue.fm/archives/9119](https://kexue.fm/archives/9119)
 
-[^k9152]: 苏剑林. 生成扩散模型漫谈（二）：DDPM = 自回归式VAE. kexue.fm 2022. [https://kexue.fm/archives/9152](https://kexue.fm/archives/9152)
+[^k9152]: 苏剑林。生成扩散模型漫谈（二）：DDPM = 自回归式 VAE. kexue.fm 2022. [https://kexue.fm/archives/9152](https://kexue.fm/archives/9152)
 
-[^k9164]: 苏剑林. 生成扩散模型漫谈（三）：DDPM = 贝叶斯 + 去噪. kexue.fm 2022. [https://kexue.fm/archives/9164](https://kexue.fm/archives/9164)
+[^k9164]: 苏剑林。生成扩散模型漫谈（三）：DDPM = 贝叶斯 + 去噪。kexue.fm 2022. [https://kexue.fm/archives/9164](https://kexue.fm/archives/9164)
 
-[^k9181]: 苏剑林. 生成扩散模型漫谈（四）：DDIM = 高观点DDPM. kexue.fm 2022. [https://kexue.fm/archives/9181](https://kexue.fm/archives/9181)
+[^k9181]: 苏剑林。生成扩散模型漫谈（四）：DDIM = 高观点 DDPM. kexue.fm 2022. [https://kexue.fm/archives/9181](https://kexue.fm/archives/9181)
 
-[^k9209]: 苏剑林. 生成扩散模型漫谈（五）：一般框架之SDE篇. kexue.fm 2022. [https://kexue.fm/archives/9209](https://kexue.fm/archives/9209)
+[^k9209]: 苏剑林。生成扩散模型漫谈（五）：一般框架之 SDE 篇。kexue.fm 2022. [https://kexue.fm/archives/9209](https://kexue.fm/archives/9209)
 
-[^k9228]: 苏剑林. 生成扩散模型漫谈（六）：一般框架之ODE篇. kexue.fm 2022. [https://kexue.fm/archives/9228](https://kexue.fm/archives/9228)
+[^k9228]: 苏剑林。生成扩散模型漫谈（六）：一般框架之 ODE 篇。kexue.fm 2022. [https://kexue.fm/archives/9228](https://kexue.fm/archives/9228)
 
-[^k9280]: 苏剑林. 生成扩散模型漫谈（十二）：“硬刚”扩散ODE. kexue.fm 2022. [https://kexue.fm/archives/9280](https://kexue.fm/archives/9280)
+[^k9280]: 苏剑林。生成扩散模型漫谈（十二）：“硬刚”扩散 ODE. kexue.fm 2022. [https://kexue.fm/archives/9280](https://kexue.fm/archives/9280)
 
-[^k9305]: 苏剑林. 生成扩散模型漫谈（十三）：从万有引力到扩散模型. kexue.fm 2022. [https://kexue.fm/archives/9305](https://kexue.fm/archives/9305)
+[^k9305]: 苏剑林。生成扩散模型漫谈（十三）：从万有引力到扩散模型。kexue.fm 2022. [https://kexue.fm/archives/9305](https://kexue.fm/archives/9305)
 
-[^k9370]: 苏剑林. 生成扩散模型漫谈（十四）：构建ODE的一般步骤（上）. kexue.fm 2025. [https://kexue.fm/archives/9370](https://kexue.fm/archives/9370)
+[^k9370]: 苏剑林。生成扩散模型漫谈（十四）：构建 ODE 的一般步骤（上）. kexue.fm 2025. [https://kexue.fm/archives/9370](https://kexue.fm/archives/9370)
 
-[^k9379]: 苏剑林. 生成扩散模型漫谈（十五）：构建ODE的一般步骤（中）. kexue.fm 2025. [https://kexue.fm/archives/9379](https://kexue.fm/archives/9379)
+[^k9379]: 苏剑林。生成扩散模型漫谈（十五）：构建 ODE 的一般步骤（中）. kexue.fm 2025. [https://kexue.fm/archives/9379](https://kexue.fm/archives/9379)
 
-[^k9497]: 苏剑林. 生成扩散模型漫谈（十七）：构建ODE的一般步骤（下）. kexue.fm 2025. [https://kexue.fm/archives/9497](https://kexue.fm/archives/9497)
+[^k9497]: 苏剑林。生成扩散模型漫谈（十七）：构建 ODE 的一般步骤（下）. kexue.fm 2025. [https://kexue.fm/archives/9497](https://kexue.fm/archives/9497)
 
-[^k9467]: 苏剑林. 生成扩散模型漫谈（十六）：W距离 ≤ 得分匹配. kexue.fm 2023. [https://kexue.fm/archives/9467](https://kexue.fm/archives/9467)
+[^k9467]: 苏剑林。生成扩散模型漫谈（十六）：W 距离 ≤ 得分匹配。kexue.fm 2023. [https://kexue.fm/archives/9467](https://kexue.fm/archives/9467)
 
-[^k9509]: 苏剑林. 生成扩散模型漫谈（十八）：得分匹配 = 条件得分匹配. kexue.fm 2023. [https://kexue.fm/archives/9509](https://kexue.fm/archives/9509)
+[^k9509]: 苏剑林。生成扩散模型漫谈（十八）：得分匹配 = 条件得分匹配。kexue.fm 2023. [https://kexue.fm/archives/9509](https://kexue.fm/archives/9509)
 
-[^k9662]: 苏剑林. 生成扩散模型漫谈（十九）：作为扩散ODE的GAN. kexue.fm 2024. [https://kexue.fm/archives/9662](https://kexue.fm/archives/9662)
+[^k9662]: 苏剑林。生成扩散模型漫谈（十九）：作为扩散 ODE 的 GAN. kexue.fm 2024. [https://kexue.fm/archives/9662](https://kexue.fm/archives/9662)
 
-[^k9668]: 苏剑林. 生成扩散模型漫谈（二十）：从ReFlow到WGAN-GP. kexue.fm 2024. [https://kexue.fm/archives/9668](https://kexue.fm/archives/9668)
+[^k9668]: 苏剑林。生成扩散模型漫谈（二十）：从 ReFlow 到 WGAN-GP. kexue.fm 2024. [https://kexue.fm/archives/9668](https://kexue.fm/archives/9668)
 
-[^k9881]: 苏剑林. 生成扩散模型漫谈（二十一）：中值定理加速ODE采样. kexue.fm 2024. [https://kexue.fm/archives/9881](https://kexue.fm/archives/9881)
+[^k9881]: 苏剑林。生成扩散模型漫谈（二十一）：中值定理加速 ODE 采样。kexue.fm 2024. [https://kexue.fm/archives/9881](https://kexue.fm/archives/9881)
 
-[^k10047]: 苏剑林. 生成扩散模型漫谈（二十二）：信噪比与大图生成（上）. kexue.fm 2024. [https://kexue.fm/archives/10047](https://kexue.fm/archives/10047)
+[^k10047]: 苏剑林。生成扩散模型漫谈（二十二）：信噪比与大图生成（上）. kexue.fm 2024. [https://kexue.fm/archives/10047](https://kexue.fm/archives/10047)
 
-[^k10055]: 苏剑林. 生成扩散模型漫谈（二十三）：信噪比与大图生成（下）. kexue.fm 2024. [https://kexue.fm/archives/10055](https://kexue.fm/archives/10055)
+[^k10055]: 苏剑林。生成扩散模型漫谈（二十三）：信噪比与大图生成（下）. kexue.fm 2024. [https://kexue.fm/archives/10055](https://kexue.fm/archives/10055)
 
-[^k10077]: 苏剑林. 生成扩散模型漫谈（二十四）：少走捷径，更快到达. kexue.fm 2024. [https://kexue.fm/archives/10077](https://kexue.fm/archives/10077)
+[^k10077]: 苏剑林。生成扩散模型漫谈（二十四）：少走捷径，更快到达。kexue.fm 2024. [https://kexue.fm/archives/10077](https://kexue.fm/archives/10077)
 
-[^k10085]: 苏剑林. 生成扩散模型漫谈（二十五）：基于恒等式的蒸馏（上）. kexue.fm 2024. [https://kexue.fm/archives/10085](https://kexue.fm/archives/10085)
+[^k10085]: 苏剑林。生成扩散模型漫谈（二十五）：基于恒等式的蒸馏（上）. kexue.fm 2024. [https://kexue.fm/archives/10085](https://kexue.fm/archives/10085)
 
-[^k10567]: 苏剑林. 生成扩散模型漫谈（二十六）：基于恒等式的蒸馏（下）. kexue.fm 2025. [https://kexue.fm/archives/10567](https://kexue.fm/archives/10567)
+[^k10567]: 苏剑林。生成扩散模型漫谈（二十六）：基于恒等式的蒸馏（下）. kexue.fm 2025. [https://kexue.fm/archives/10567](https://kexue.fm/archives/10567)
 
-[^k10617]: 苏剑林. 生成扩散模型漫谈（二十七）：将步长作为条件输入. kexue.fm 2025. [https://kexue.fm/archives/10617](https://kexue.fm/archives/10617)
+[^k10617]: 苏剑林。生成扩散模型漫谈（二十七）：将步长作为条件输入。kexue.fm 2025. [https://kexue.fm/archives/10617](https://kexue.fm/archives/10617)
 
-[^k10633]: 苏剑林. 生成扩散模型漫谈（二十八）：分步理解一致性模型. kexue.fm 2025. [https://kexue.fm/archives/10633](https://kexue.fm/archives/10633)
+[^k10633]: 苏剑林。生成扩散模型漫谈（二十八）：分步理解一致性模型。kexue.fm 2025. [https://kexue.fm/archives/10633](https://kexue.fm/archives/10633)
 
-[^k10711]: 苏剑林. 生成扩散模型漫谈（二十九）：用DDPM来离散编码. kexue.fm 2025. [https://kexue.fm/archives/10711](https://kexue.fm/archives/10711)
+[^k10711]: 苏剑林。生成扩散模型漫谈（二十九）：用 DDPM 来离散编码。kexue.fm 2025. [https://kexue.fm/archives/10711](https://kexue.fm/archives/10711)
 
-[^k10958]: 苏剑林. 生成扩散模型漫谈（三十）：从瞬时速度到平均速度. kexue.fm 2025. [https://kexue.fm/archives/10958](https://kexue.fm/archives/10958)
+[^k10958]: 苏剑林。生成扩散模型漫谈（三十）：从瞬时速度到平均速度。kexue.fm 2025. [https://kexue.fm/archives/10958](https://kexue.fm/archives/10958)
 
-[^k11428]: 苏剑林. 生成扩散模型漫谈（三十一）：预测数据而非噪声. kexue.fm 2026. [https://kexue.fm/archives/11428](https://kexue.fm/archives/11428)
+[^k11428]: 苏剑林。生成扩散模型漫谈（三十一）：预测数据而非噪声。kexue.fm 2026. [https://kexue.fm/archives/11428](https://kexue.fm/archives/11428)
 
-[^k4439]: 苏剑林. 互怼的艺术：从零直达WGAN-GP. kexue.fm 2017. [https://kexue.fm/archives/4439](https://kexue.fm/archives/4439)
+[^k4439]: 苏剑林。互怼的艺术：从零直达 WGAN-GP. kexue.fm 2017. [https://kexue.fm/archives/4439](https://kexue.fm/archives/4439)
 
-[^k6016]: 苏剑林. f-GAN简介：GAN模型的生产车间. kexue.fm 2018. [https://kexue.fm/archives/6016](https://kexue.fm/archives/6016)
+[^k6016]: 苏剑林。f-GAN 简介：GAN 模型的生产车间。kexue.fm 2018. [https://kexue.fm/archives/6016](https://kexue.fm/archives/6016)
 
-[^k6051]: 苏剑林. 深度学习中的Lipschitz约束：泛化与生成模型. kexue.fm 2018. [https://kexue.fm/archives/6051](https://kexue.fm/archives/6051)
+[^k6051]: 苏剑林。深度学习中的 Lipschitz 约束：泛化与生成模型。kexue.fm 2018. [https://kexue.fm/archives/6051](https://kexue.fm/archives/6051)
 
-[^k6280]: 苏剑林. 从Wasserstein距离、对偶理论到WGAN. kexue.fm 2019. [https://kexue.fm/archives/6280](https://kexue.fm/archives/6280)
+[^k6280]: 苏剑林。从 Wasserstein 距离、对偶理论到 WGAN. kexue.fm 2019. [https://kexue.fm/archives/6280](https://kexue.fm/archives/6280)
 
-[^k8244]: 苏剑林. WGAN的成功，可能跟Wasserstein距离没啥关系. kexue.fm 2021. [https://kexue.fm/archives/8244](https://kexue.fm/archives/8244)
+[^k8244]: 苏剑林。WGAN 的成功，可能跟 Wasserstein 距离没啥关系。kexue.fm 2021. [https://kexue.fm/archives/8244](https://kexue.fm/archives/8244)
 
-[^k5716]: 苏剑林. 用变分推断统一理解生成模型（VAE、GAN、AAE、ALI）. kexue.fm 2018. [https://kexue.fm/archives/5716](https://kexue.fm/archives/5716)
+[^k5716]: 苏剑林。用变分推断统一理解生成模型（VAE、GAN、AAE、ALI）. kexue.fm 2018. [https://kexue.fm/archives/5716](https://kexue.fm/archives/5716)
 
-[^k6316]: 苏剑林. 能量视角下的GAN模型（一）：GAN＝“挖坑”＋“跳坑”. kexue.fm 2019. [https://kexue.fm/archives/6316](https://kexue.fm/archives/6316)
+[^k6316]: 苏剑林。能量视角下的 GAN 模型（一）：GAN＝“挖坑”＋“跳坑”. kexue.fm 2019. [https://kexue.fm/archives/6316](https://kexue.fm/archives/6316)
 
-[^k6331]: 苏剑林. 能量视角下的GAN模型（二）：GAN＝“分析”＋“采样”. kexue.fm 2019. [https://kexue.fm/archives/6331](https://kexue.fm/archives/6331)
+[^k6331]: 苏剑林。能量视角下的 GAN 模型（二）：GAN＝“分析”＋“采样”. kexue.fm 2019. [https://kexue.fm/archives/6331](https://kexue.fm/archives/6331)
 
-[^k6612]: 苏剑林. 能量视角下的GAN模型（三）：生成模型=能量模型. kexue.fm 2019. [https://kexue.fm/archives/6612](https://kexue.fm/archives/6612)
+[^k6612]: 苏剑林。能量视角下的 GAN 模型（三）：生成模型=能量模型。kexue.fm 2019. [https://kexue.fm/archives/6612](https://kexue.fm/archives/6612)
 
-[^k6705]: 苏剑林. 漫谈重参数：从正态分布到Gumbel Softmax. kexue.fm 2019. [https://kexue.fm/archives/6705](https://kexue.fm/archives/6705)
+[^k6705]: 苏剑林。漫谈重参数：从正态分布到 Gumbel Softmax. kexue.fm 2019. [https://kexue.fm/archives/6705](https://kexue.fm/archives/6705)
 
-[^k10289]: 苏剑林. 通向最优分布之路：概率空间的最小化. kexue.fm 2024. [https://kexue.fm/archives/10289](https://kexue.fm/archives/10289)
+[^k10289]: 苏剑林。通向最优分布之路：概率空间的最小化。kexue.fm 2024. [https://kexue.fm/archives/10289](https://kexue.fm/archives/10289)
 
-[^k8512]: 苏剑林. 两个多元正态分布的KL散度、巴氏距离和W距离. kexue.fm 2021. [https://kexue.fm/archives/8512](https://kexue.fm/archives/8512)
+[^k8512]: 苏剑林。两个多元正态分布的 KL 散度、巴氏距离和 W 距离。kexue.fm 2021. [https://kexue.fm/archives/8512](https://kexue.fm/archives/8512)
 
-[^k9039]: 苏剑林. GlobalPointer下的“KL散度”应该是怎样的？ kexue.fm 2022. [https://kexue.fm/archives/9039](https://kexue.fm/archives/9039)
+[^k9039]: 苏剑林。GlobalPointer 下的“KL 散度”应该是怎样的？kexue.fm 2022. [https://kexue.fm/archives/9039](https://kexue.fm/archives/9039)
 
-[^k11854]: 苏剑林. 除了交叉熵，LM Loss还有什么选择？ kexue.fm 2026. [https://kexue.fm/archives/11854](https://kexue.fm/archives/11854)
+[^k11854]: 苏剑林。除了交叉熵，LM Loss 还有什么选择？kexue.fm 2026. [https://kexue.fm/archives/11854](https://kexue.fm/archives/11854)
 
-[^k10145]: 苏剑林. 通向概率分布之路：盘点Softmax及其替代品. kexue.fm 2024. [https://kexue.fm/archives/10145](https://kexue.fm/archives/10145)
+[^k10145]: 苏剑林。通向概率分布之路：盘点 Softmax 及其替代品。kexue.fm 2024. [https://kexue.fm/archives/10145](https://kexue.fm/archives/10145)
 
-[^k11814]: 苏剑林. LogSumExp和Softmax的泰勒展开. kexue.fm 2026. [https://kexue.fm/archives/11814](https://kexue.fm/archives/11814)
+[^k11814]: 苏剑林。LogSumExp 和 Softmax 的泰勒展开。kexue.fm 2026. [https://kexue.fm/archives/11814](https://kexue.fm/archives/11814)
 
-[^k9526]: 苏剑林. 缓解交叉熵过度自信的一个简明方案. kexue.fm 2023. [https://kexue.fm/archives/9526](https://kexue.fm/archives/9526)
+[^k9526]: 苏剑林。缓解交叉熵过度自信的一个简明方案。kexue.fm 2023. [https://kexue.fm/archives/9526](https://kexue.fm/archives/9526)
 
-[^k9098]: 苏剑林. 如何训练你的准确率？ kexue.fm 2022. [https://kexue.fm/archives/9098](https://kexue.fm/archives/9098)
+[^k9098]: 苏剑林。如何训练你的准确率？kexue.fm 2022. [https://kexue.fm/archives/9098](https://kexue.fm/archives/9098)
 
-[^k9797]: 苏剑林. EMO：基于最优传输思想设计的分类损失函数. kexue.fm 2023. [https://kexue.fm/archives/9797](https://kexue.fm/archives/9797)
+[^k9797]: 苏剑林。EMO：基于最优传输思想设计的分类损失函数。kexue.fm 2023. [https://kexue.fm/archives/9797](https://kexue.fm/archives/9797)
 
-[^k4733]: 苏剑林. 从loss的硬截断、软化到focal loss. kexue.fm 2017. [https://kexue.fm/archives/4733](https://kexue.fm/archives/4733)
+[^k4733]: 苏剑林。从 loss 的硬截断、软化到 focal loss. kexue.fm 2017. [https://kexue.fm/archives/4733](https://kexue.fm/archives/4733)
 
-[^k8823]: 苏剑林. 从熵不变性看Attention的Scale操作. kexue.fm 2021. [https://kexue.fm/archives/8823](https://kexue.fm/archives/8823)
+[^k8823]: 苏剑林。从熵不变性看 Attention 的 Scale 操作。kexue.fm 2021. [https://kexue.fm/archives/8823](https://kexue.fm/archives/8823)
 
-[^k9034]: 苏剑林. 熵不变性Softmax的一个快速推导. kexue.fm 2022. [https://kexue.fm/archives/9034](https://kexue.fm/archives/9034)
+[^k9034]: 苏剑林。熵不变性 Softmax 的一个快速推导。kexue.fm 2022. [https://kexue.fm/archives/9034](https://kexue.fm/archives/9034)
 
-[^k9588]: 苏剑林. 从JL引理看熵不变性Attention. kexue.fm 2023. [https://kexue.fm/archives/9588](https://kexue.fm/archives/9588)
+[^k9588]: 苏剑林。从 JL 引理看熵不变性 Attention. kexue.fm 2023. [https://kexue.fm/archives/9588](https://kexue.fm/archives/9588)
 
-[^k9812]: 苏剑林. 从梯度最大化看Attention的Scale操作. kexue.fm 2023. [https://kexue.fm/archives/9812](https://kexue.fm/archives/9812)
+[^k9812]: 苏剑林。从梯度最大化看 Attention 的 Scale 操作。kexue.fm 2023. [https://kexue.fm/archives/9812](https://kexue.fm/archives/9812)
 
-[^k5448]: 苏剑林. 最小熵原理（一）：无监督学习的原理. kexue.fm 2018. [https://kexue.fm/archives/5448](https://kexue.fm/archives/5448)
+[^k5448]: 苏剑林。最小熵原理（一）：无监督学习的原理。kexue.fm 2018. [https://kexue.fm/archives/5448](https://kexue.fm/archives/5448)
 
-[^k5476]: 苏剑林. 最小熵原理（二）：“当机立断”之词库构建. kexue.fm 2018. [https://kexue.fm/archives/5476](https://kexue.fm/archives/5476)
+[^k5476]: 苏剑林。最小熵原理（二）：“当机立断”之词库构建。kexue.fm 2018. [https://kexue.fm/archives/5476](https://kexue.fm/archives/5476)
 
-[^k5577]: 苏剑林. 最小熵原理（三）：“飞象过河”之句模版和语言结构. kexue.fm 2018. [https://kexue.fm/archives/5577](https://kexue.fm/archives/5577)
+[^k5577]: 苏剑林。最小熵原理（三）：“飞象过河”之句模版和语言结构。kexue.fm 2018. [https://kexue.fm/archives/5577](https://kexue.fm/archives/5577)
 
-[^k6191]: 苏剑林. 最小熵原理（四）：“物以类聚”之从图书馆到词向量. kexue.fm 2019. [https://kexue.fm/archives/6191](https://kexue.fm/archives/6191)
+[^k6191]: 苏剑林。最小熵原理（四）：“物以类聚”之从图书馆到词向量。kexue.fm 2019. [https://kexue.fm/archives/6191](https://kexue.fm/archives/6191)
 
-[^k7695]: 苏剑林. 最小熵原理（六）：词向量的维度应该怎么选择？ kexue.fm 2020. [https://kexue.fm/archives/7695](https://kexue.fm/archives/7695)
+[^k7695]: 苏剑林。最小熵原理（六）：词向量的维度应该怎么选择？kexue.fm 2020. [https://kexue.fm/archives/7695](https://kexue.fm/archives/7695)
 
-[^k9595]: 苏剑林. 如何度量数据的稀疏程度？ kexue.fm 2023. [https://kexue.fm/archives/9595](https://kexue.fm/archives/9595)
+[^k9595]: 苏剑林。如何度量数据的稀疏程度？kexue.fm 2023. [https://kexue.fm/archives/9595](https://kexue.fm/archives/9595)
 
-[^k8679]: 苏剑林. 让人惊叹的Johnson-Lindenstrauss引理：理论篇. kexue.fm 2021. [https://kexue.fm/archives/8679](https://kexue.fm/archives/8679)
+[^k8679]: 苏剑林。让人惊叹的 Johnson-Lindenstrauss 引理：理论篇。kexue.fm 2021. [https://kexue.fm/archives/8679](https://kexue.fm/archives/8679)
 
-[^k8706]: 苏剑林. 让人惊叹的Johnson-Lindenstrauss引理：应用篇. kexue.fm 2021. [https://kexue.fm/archives/8706](https://kexue.fm/archives/8706)
+[^k8706]: 苏剑林。让人惊叹的 Johnson-Lindenstrauss 引理：应用篇。kexue.fm 2021. [https://kexue.fm/archives/8706](https://kexue.fm/archives/8706)
 
-[^k3534]: 苏剑林. “熵”不起：从熵、最大熵原理到最大熵模型（一）. kexue.fm 2015. [https://kexue.fm/archives/3534](https://kexue.fm/archives/3534)
+[^k3534]: 苏剑林。“熵”不起：从熵、最大熵原理到最大熵模型（一）. kexue.fm 2015. [https://kexue.fm/archives/3534](https://kexue.fm/archives/3534)
 
-[^k6181]: 苏剑林. 从变分编码、信息瓶颈到正态分布：论遗忘的重要性. kexue.fm 2018. [https://kexue.fm/archives/6181](https://kexue.fm/archives/6181)
+[^k6181]: 苏剑林。从变分编码、信息瓶颈到正态分布：论遗忘的重要性。kexue.fm 2018. [https://kexue.fm/archives/6181](https://kexue.fm/archives/6181)
 
-[^k8578]: 苏剑林. 概率视角下的线性模型：逻辑回归有解析解吗？ kexue.fm 2021. [https://kexue.fm/archives/8578](https://kexue.fm/archives/8578)
+[^k8578]: 苏剑林。概率视角下的线性模型：逻辑回归有解析解吗？kexue.fm 2021. [https://kexue.fm/archives/8578](https://kexue.fm/archives/8578)
 
-[^k6747]: 苏剑林. 简述无偏估计和有偏估计. kexue.fm 2019. [https://kexue.fm/archives/6747](https://kexue.fm/archives/6747)
+[^k6747]: 苏剑林。简述无偏估计和有偏估计。kexue.fm 2019. [https://kexue.fm/archives/6747](https://kexue.fm/archives/6747)
 
-[^k8978]: 苏剑林. 训练1000层的Transformer究竟有什么困难？ kexue.fm 2022. [https://kexue.fm/archives/8978](https://kexue.fm/archives/8978)
+[^k8978]: 苏剑林。训练 1000 层的 Transformer 究竟有什么困难？kexue.fm 2022. [https://kexue.fm/archives/8978](https://kexue.fm/archives/8978)
 
-[^k8994]: 苏剑林. 为什么需要残差？一个来自DeepNet的视角. kexue.fm 2022. [https://kexue.fm/archives/8994](https://kexue.fm/archives/8994)
+[^k8994]: 苏剑林。为什么需要残差？一个来自 DeepNet 的视角。kexue.fm 2022. [https://kexue.fm/archives/8994](https://kexue.fm/archives/8994)
 
-[^k9009]: 苏剑林. 为什么Pre Norm的效果不如Post Norm？ kexue.fm 2022. [https://kexue.fm/archives/9009](https://kexue.fm/archives/9009)
+[^k9009]: 苏剑林。为什么 Pre Norm 的效果不如 Post Norm？kexue.fm 2022. [https://kexue.fm/archives/9009](https://kexue.fm/archives/9009)
 
-[^k8444]: 苏剑林. 我们可以无损放大一个Transformer模型吗（一）. kexue.fm 2021. [https://kexue.fm/archives/8444](https://kexue.fm/archives/8444)
+[^k8444]: 苏剑林。我们可以无损放大一个 Transformer 模型吗（一）. kexue.fm 2021. [https://kexue.fm/archives/8444](https://kexue.fm/archives/8444)
 
-[^k11371]: 苏剑林. 低精度Attention可能存在有偏的舍入误差. kexue.fm 2025. [https://kexue.fm/archives/11371](https://kexue.fm/archives/11371)
+[^k11371]: 苏剑林。低精度 Attention 可能存在有偏的舍入误差。kexue.fm 2025. [https://kexue.fm/archives/11371](https://kexue.fm/archives/11371)
 
-[^k8128]: 苏剑林. Seq2Seq重复解码现象的理论分析尝试. kexue.fm 2021. [https://kexue.fm/archives/8128](https://kexue.fm/archives/8128)
+[^k8128]: 苏剑林。Seq2Seq 重复解码现象的理论分析尝试。kexue.fm 2021. [https://kexue.fm/archives/8128](https://kexue.fm/archives/8128)
 
-[^k7259]: 苏剑林. Seq2Seq中Exposure Bias现象的浅析与对策. kexue.fm 2020. [https://kexue.fm/archives/7259](https://kexue.fm/archives/7259)
+[^k7259]: 苏剑林。Seq2Seq 中 Exposure Bias 现象的浅析与对策。kexue.fm 2020. [https://kexue.fm/archives/7259](https://kexue.fm/archives/7259)
 
-[^k7500]: 苏剑林. 如何应对Seq2Seq中的“根本停不下来”问题？ kexue.fm 2020. [https://kexue.fm/archives/7500](https://kexue.fm/archives/7500)
+[^k7500]: 苏剑林。如何应对 Seq2Seq 中的“根本停不下来”问题？kexue.fm 2020. [https://kexue.fm/archives/7500](https://kexue.fm/archives/7500)
 
-[^k9617]: 苏剑林. NBCE：使用朴素贝叶斯扩展LLM的Context处理长度. kexue.fm 2023. [https://kexue.fm/archives/9617](https://kexue.fm/archives/9617)
+[^k9617]: 苏剑林。NBCE：使用朴素贝叶斯扩展 LLM 的 Context 处理长度。kexue.fm 2023. [https://kexue.fm/archives/9617](https://kexue.fm/archives/9617)
 
-[^k7430]: 苏剑林. Google新作Synthesizer：我们还不够了解自注意力. kexue.fm 2020. [https://kexue.fm/archives/7430](https://kexue.fm/archives/7430)
+[^k7430]: 苏剑林。Google 新作 Synthesizer：我们还不够了解自注意力。kexue.fm 2020. [https://kexue.fm/archives/7430](https://kexue.fm/archives/7430)
 
-[^k9019]: 苏剑林. 听说Attention与Softmax更配哦～ kexue.fm 2022. [https://kexue.fm/archives/9019](https://kexue.fm/archives/9019)
+[^k9019]: 苏剑林。听说 Attention 与 Softmax 更配哦～ kexue.fm 2022. [https://kexue.fm/archives/9019](https://kexue.fm/archives/9019)
 
-[^k9889]: 苏剑林. 注意力机制真的可以“集中注意力”吗？ kexue.fm 2023. [https://kexue.fm/archives/9889](https://kexue.fm/archives/9889)
+[^k9889]: 苏剑林。注意力机制真的可以“集中注意力”吗？kexue.fm 2023. [https://kexue.fm/archives/9889](https://kexue.fm/archives/9889)
 
-[^k11664]: 苏剑林. Attention Residuals 回忆录. kexue.fm 2026. [https://kexue.fm/archives/11664](https://kexue.fm/archives/11664)
+[^k11664]: 苏剑林。Attention Residuals 回忆录。kexue.fm 2026. [https://kexue.fm/archives/11664](https://kexue.fm/archives/11664)
 
-[^k10017]: 苏剑林. 时空之章：将Attention视为平方复杂度的RNN. kexue.fm 2024. [https://kexue.fm/archives/10017](https://kexue.fm/archives/10017)
+[^k10017]: 苏剑林。时空之章：将 Attention 视为平方复杂度的 RNN. kexue.fm 2024. [https://kexue.fm/archives/10017](https://kexue.fm/archives/10017)
 
-[^k10373]: 苏剑林. Softmax后传：寻找Top-K的光滑近似. kexue.fm 2024. [https://kexue.fm/archives/10373](https://kexue.fm/archives/10373)
+[^k10373]: 苏剑林。Softmax 后传：寻找 Top-K 的光滑近似。kexue.fm 2024. [https://kexue.fm/archives/10373](https://kexue.fm/archives/10373)
 
-[^k8069]: 苏剑林. 你可能不需要BERT-flow：一个线性变换媲美BERT-flow. kexue.fm 2021. [https://kexue.fm/archives/8069](https://kexue.fm/archives/8069)
+[^k8069]: 苏剑林。你可能不需要 BERT-flow：一个线性变换媲美 BERT-flow. kexue.fm 2021. [https://kexue.fm/archives/8069](https://kexue.fm/archives/8069)
 
-[^k9079]: 苏剑林. 当BERT-whitening引入超参数：总有一款适合你. kexue.fm 2022. [https://kexue.fm/archives/9079](https://kexue.fm/archives/9079)
+[^k9079]: 苏剑林。当 BERT-whitening 引入超参数：总有一款适合你。kexue.fm 2022. [https://kexue.fm/archives/9079](https://kexue.fm/archives/9079)
 
-[^k9698]: 苏剑林. 语言模型输出端共享Embedding的重新探索. kexue.fm 2023. [https://kexue.fm/archives/9698](https://kexue.fm/archives/9698)
+[^k9698]: 苏剑林。语言模型输出端共享 Embedding 的重新探索。kexue.fm 2023. [https://kexue.fm/archives/9698](https://kexue.fm/archives/9698)
 
-[^k9762]: 苏剑林. 大词表语言模型在续写任务上的一个问题及对策. kexue.fm 2023. [https://kexue.fm/archives/9762](https://kexue.fm/archives/9762)
+[^k9762]: 苏剑林。大词表语言模型在续写任务上的一个问题及对策。kexue.fm 2023. [https://kexue.fm/archives/9762](https://kexue.fm/archives/9762)
 
-[^k10699]: 苏剑林. MoE环游记：1、从几何意义出发. kexue.fm 2025. [https://kexue.fm/archives/10699](https://kexue.fm/archives/10699)
+[^k10699]: 苏剑林。MoE 环游记：1、从几何意义出发。kexue.fm 2025. [https://kexue.fm/archives/10699](https://kexue.fm/archives/10699)
 
-[^k10815]: 苏剑林. MoE环游记：4、难处应当多投入. kexue.fm 2025. [https://kexue.fm/archives/10815](https://kexue.fm/archives/10815)
+[^k10815]: 苏剑林。MoE 环游记：4、难处应当多投入。kexue.fm 2025. [https://kexue.fm/archives/10815](https://kexue.fm/archives/10815)
 
-[^k11619]: 苏剑林. MoE环游记：6、最优分配促均衡. kexue.fm 2026. [https://kexue.fm/archives/11619](https://kexue.fm/archives/11619)
+[^k11619]: 苏剑林。MoE 环游记：6、最优分配促均衡。kexue.fm 2026. [https://kexue.fm/archives/11619](https://kexue.fm/archives/11619)
 
-[^k11760]: 苏剑林. MoE环游记：8、强制序列级均衡. kexue.fm 2026. [https://kexue.fm/archives/11760](https://kexue.fm/archives/11760)
+[^k11760]: 苏剑林。MoE 环游记：8、强制序列级均衡。kexue.fm 2026. [https://kexue.fm/archives/11760](https://kexue.fm/archives/11760)
 
-[^k11782]: 苏剑林. MoE环游记：9、门控归一化之争. kexue.fm 2026. [https://kexue.fm/archives/11782](https://kexue.fm/archives/11782)
+[^k11782]: 苏剑林。MoE 环游记：9、门控归一化之争。kexue.fm 2026. [https://kexue.fm/archives/11782](https://kexue.fm/archives/11782)
 
-[^k11320]: 苏剑林. 为什么线性注意力要加Short Conv？ kexue.fm 2025. [https://kexue.fm/archives/11320](https://kexue.fm/archives/11320)
+[^k11320]: 苏剑林。为什么线性注意力要加 Short Conv？kexue.fm 2025. [https://kexue.fm/archives/11320](https://kexue.fm/archives/11320)
 
-[^k11486]: 苏剑林. 为什么DeltaNet要加L2 Normalize？ kexue.fm 2025. [https://kexue.fm/archives/11486](https://kexue.fm/archives/11486)
+[^k11486]: 苏剑林。为什么 DeltaNet 要加 L2 Normalize？kexue.fm 2025. [https://kexue.fm/archives/11486](https://kexue.fm/archives/11486)
 
-[^k11823]: 苏剑林. 将Softmax Attention线性化为Gated DeltaNet. kexue.fm 2026. [https://kexue.fm/archives/11823](https://kexue.fm/archives/11823)
+[^k11823]: 苏剑林。将 Softmax Attention 线性化为 Gated DeltaNet. kexue.fm 2026. [https://kexue.fm/archives/11823](https://kexue.fm/archives/11823)
 
-[^k10114]: 苏剑林. 重温SSM（一）：线性系统和HiPPO矩阵. kexue.fm 2024. [https://kexue.fm/archives/10114](https://kexue.fm/archives/10114)
+[^k10114]: 苏剑林。重温 SSM（一）：线性系统和 HiPPO 矩阵。kexue.fm 2024. [https://kexue.fm/archives/10114](https://kexue.fm/archives/10114)
 
-[^k10162]: 苏剑林. 重温SSM（三）：HiPPO的高效计算（S4）. kexue.fm 2024. [https://kexue.fm/archives/10162](https://kexue.fm/archives/10162)
+[^k10162]: 苏剑林。重温 SSM（三）：HiPPO 的高效计算（S4）. kexue.fm 2024. [https://kexue.fm/archives/10162](https://kexue.fm/archives/10162)
 
-[^k9783]: 苏剑林. 脑洞大开：非线性RNN居然也可以并行计算？ kexue.fm 2023. [https://kexue.fm/archives/9783](https://kexue.fm/archives/9783)
+[^k9783]: 苏剑林。脑洞大开：非线性 RNN 居然也可以并行计算？kexue.fm 2023. [https://kexue.fm/archives/9783](https://kexue.fm/archives/9783)
 
-[^k8601]: 苏剑林. Transformer升级之路：5、作为无限维的线性Attention. kexue.fm 2021. [https://kexue.fm/archives/8601](https://kexue.fm/archives/8601)
+[^k8601]: 苏剑林。Transformer 升级之路：5、作为无限维的线性 Attention. kexue.fm 2021. [https://kexue.fm/archives/8601](https://kexue.fm/archives/8601)
 
-[^k10091]: 苏剑林. 缓存与效果的极限拉扯：从MHA、MQA、GQA到MLA. kexue.fm 2024. [https://kexue.fm/archives/10091](https://kexue.fm/archives/10091)
+[^k10091]: 苏剑林。缓存与效果的极限拉扯：从 MHA、MQA、GQA 到 MLA. kexue.fm 2024. [https://kexue.fm/archives/10091](https://kexue.fm/archives/10091)
 
-[^k10907]: 苏剑林. Transformer升级之路：20、MLA好在哪里?（上）. kexue.fm 2025. [https://kexue.fm/archives/10907](https://kexue.fm/archives/10907)
+[^k10907]: 苏剑林。Transformer 升级之路：20、MLA 好在哪里？（上）. kexue.fm 2025. [https://kexue.fm/archives/10907](https://kexue.fm/archives/10907)
 
-[^k8373]: 苏剑林. GlobalPointer：用统一的方式处理嵌套和非嵌套NER. kexue.fm 2021. [https://kexue.fm/archives/8373](https://kexue.fm/archives/8373)
+[^k8373]: 苏剑林。GlobalPointer：用统一的方式处理嵌套和非嵌套 NER. kexue.fm 2021. [https://kexue.fm/archives/8373](https://kexue.fm/archives/8373)
 
-[^k8877]: 苏剑林. Efficient GlobalPointer：少点参数，多点效果. kexue.fm 2022. [https://kexue.fm/archives/8877](https://kexue.fm/archives/8877)
+[^k8877]: 苏剑林。Efficient GlobalPointer：少点参数，多点效果。kexue.fm 2022. [https://kexue.fm/archives/8877](https://kexue.fm/archives/8877)
 
-[^k4695]: 苏剑林. 果壳中的条件随机场(CRF In A Nutshell). kexue.fm 2017. [https://kexue.fm/archives/4695](https://kexue.fm/archives/4695)
+[^k4695]: 苏剑林。果壳中的条件随机场 (CRF In A Nutshell). kexue.fm 2017. [https://kexue.fm/archives/4695](https://kexue.fm/archives/4695)
 
-[^k7213]: 苏剑林. CRF用过了，不妨再了解下更快的MEMM？ kexue.fm 2020. [https://kexue.fm/archives/7213](https://kexue.fm/archives/7213)
+[^k7213]: 苏剑林。CRF 用过了，不妨再了解下更快的 MEMM？kexue.fm 2020. [https://kexue.fm/archives/7213](https://kexue.fm/archives/7213)
 
-[^k8671]: 苏剑林. 曾被嫌弃的预训练任务NSP，做出了优秀的Zero Shot效果. kexue.fm 2021. [https://kexue.fm/archives/8671](https://kexue.fm/archives/8671)
+[^k8671]: 苏剑林。曾被嫌弃的预训练任务 NSP，做出了优秀的 Zero Shot 效果。kexue.fm 2021. [https://kexue.fm/archives/8671](https://kexue.fm/archives/8671)
 
-[^k9046]: 苏剑林. 你的语言模型有没有“无法预测的词”？ kexue.fm 2022. [https://kexue.fm/archives/9046](https://kexue.fm/archives/9046)
+[^k9046]: 苏剑林。你的语言模型有没有“无法预测的词”？kexue.fm 2022. [https://kexue.fm/archives/9046](https://kexue.fm/archives/9046)
 
-[^k4299]: 苏剑林. 【不可思议的Word2Vec】 1.数学原理. kexue.fm 2017. [https://kexue.fm/archives/4299](https://kexue.fm/archives/4299)
+[^k4299]: 苏剑林。【不可思议的 Word2Vec】1.数学原理。kexue.fm 2017. [https://kexue.fm/archives/4299](https://kexue.fm/archives/4299)
 
-[^k4667]: 苏剑林. 更别致的词向量模型(一)：simpler glove. kexue.fm 2017. [https://kexue.fm/archives/4667](https://kexue.fm/archives/4667)
+[^k4667]: 苏剑林。更别致的词向量模型 (一)：simpler glove. kexue.fm 2017. [https://kexue.fm/archives/4667](https://kexue.fm/archives/4667)
 
-[^k4675]: 苏剑林. 更别致的词向量模型(四)：模型的求解. kexue.fm 2017. [https://kexue.fm/archives/4675](https://kexue.fm/archives/4675)
+[^k4675]: 苏剑林。更别致的词向量模型 (四)：模型的求解。kexue.fm 2017. [https://kexue.fm/archives/4675](https://kexue.fm/archives/4675)
 
-[^k8656]: 苏剑林. 从三角不等式到Margin Softmax. kexue.fm 2021. [https://kexue.fm/archives/8656](https://kexue.fm/archives/8656)
+[^k8656]: 苏剑林。从三角不等式到 Margin Softmax. kexue.fm 2021. [https://kexue.fm/archives/8656](https://kexue.fm/archives/8656)
 
-[^k9368]: 苏剑林. 从局部到全局：语义相似度的测地线距离. kexue.fm 2022. [https://kexue.fm/archives/9368](https://kexue.fm/archives/9368)
+[^k9368]: 苏剑林。从局部到全局：语义相似度的测地线距离。kexue.fm 2022. [https://kexue.fm/archives/9368](https://kexue.fm/archives/9368)
 
-[^k11818]: 苏剑林. 基于排序不等式的相似度指标. kexue.fm 2026. [https://kexue.fm/archives/11818](https://kexue.fm/archives/11818)
+[^k11818]: 苏剑林。基于排序不等式的相似度指标。kexue.fm 2026. [https://kexue.fm/archives/11818](https://kexue.fm/archives/11818)
 
-[^k7388]: 苏剑林. 从EMD、WMD到WRD：文本向量序列的相似度计算. kexue.fm 2020. [https://kexue.fm/archives/7388](https://kexue.fm/archives/7388)
+[^k7388]: 苏剑林。从 EMD、WMD 到 WRD：文本向量序列的相似度计算。kexue.fm 2020. [https://kexue.fm/archives/7388](https://kexue.fm/archives/7388)
 
-[^k9336]: 苏剑林. 利用CUR分解加速交互式相似度模型的检索. kexue.fm 2022. [https://kexue.fm/archives/9336](https://kexue.fm/archives/9336)
+[^k9336]: 苏剑林。利用 CUR 分解加速交互式相似度模型的检索。kexue.fm 2022. [https://kexue.fm/archives/9336](https://kexue.fm/archives/9336)

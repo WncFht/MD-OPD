@@ -3,6 +3,7 @@ SPDX-FileCopyrightText: 2026 CoreWeave, Inc.
 SPDX-License-Identifier: Apache-2.0
 SPDX-PackageName: skills
 -->
+
 # Synergistic Hypothesis Generation
 
 When asked to analyze an experiment, diagnose unexpected results, or recommend a next
@@ -17,6 +18,7 @@ Before touching the data, explicitly state what a domain expert would expect giv
 experimental setup described or inferred from the project name and run metadata.
 
 Answer these questions before running any code:
+
 - What metrics should **vary** across runs or groups? Which should be correlated?
 - What does the method class (SSL, RL, SFT, CPT, sweep, fine-tune) predict about
   baseline behavior?
@@ -104,12 +106,12 @@ a vacuum.
 For each candidate explanation, ask: does existing ML theory predict this behavior for
 the identified anomaly?
 
-| Anomaly type | Candidate mechanisms to evaluate |
-|---|---|
-| Metric is flat across all runs | Metric is a derived aggregate (computed at data-prep time, not at run time); shared upstream data artifact; logging error; metric definition mismatch |
-| Improvement on primary metric, degradation on secondary | Distribution shift; class imbalance masking; label noise concentrated in tail classes; representation collapse; model overfit to dominant group |
-| One source/group degrades the whole | Domain mismatch; systematic annotation error; noisy pseudo-labels; out-of-distribution unlabeled data; contamination |
-| Strong baseline, weak fine-tune | Catastrophic forgetting; learning rate too high; insufficient regularization; train/eval distribution gap |
+| Anomaly type                                            | Candidate mechanisms to evaluate                                                                                                                      |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Metric is flat across all runs                          | Metric is a derived aggregate (computed at data-prep time, not at run time); shared upstream data artifact; logging error; metric definition mismatch |
+| Improvement on primary metric, degradation on secondary | Distribution shift; class imbalance masking; label noise concentrated in tail classes; representation collapse; model overfit to dominant group       |
+| One source/group degrades the whole                     | Domain mismatch; systematic annotation error; noisy pseudo-labels; out-of-distribution unlabeled data; contamination                                  |
+| Strong baseline, weak fine-tune                         | Catastrophic forgetting; learning rate too high; insufficient regularization; train/eval distribution gap                                             |
 
 State the mechanism explicitly in plain language: "The flat X metric across all runs
 suggests it measures [invariant property], not [per-run outcome]" or "The high-acceptance
@@ -123,6 +125,7 @@ Generate a **single-variable experiment** that proves or disproves the mechanism
 Phase 3. This is the recommended next experiment.
 
 **Requirements for a valid probe:**
+
 - Holds all other variables constant: same model, optimizer, seed, training budget,
   labeled dataset, and evaluation protocol
 - Is the minimal viable test: a targeted data filter, a controlled ablation, a missing
@@ -135,6 +138,7 @@ constant. If [mechanism] is correct, we expect [specific measurable outcome]. If
 does not change, we rule out [mechanism] and should instead investigate [alternative]."
 
 **Anti-patterns — do not recommend these as the primary next step:**
+
 - Scaling to a larger model or longer training schedule (not a mechanism test)
 - Running a broad hyperparameter sweep (not targeted at the identified anomaly)
 - Adding more unlabeled data (does not isolate the cause)

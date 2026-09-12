@@ -2,6 +2,7 @@
 name: wandb-primary
 description: "Primary W&B skill for broad or mixed Weights & Biases work: project overviews, W&B runs and artifacts, Weave traces and evaluations, Reports, and Launch workflows. Use when the task spans multiple W&B surfaces or the user asks generally what is happening in a W&B project."
 ---
+
 <!--
 SPDX-FileCopyrightText: 2026 CoreWeave, Inc.
 SPDX-License-Identifier: Apache-2.0
@@ -59,18 +60,18 @@ the answer; then give only tentative guidance.
 
 ### Product facts to answer from memory
 
-| User asks | Answer with |
-|---|---|
-| "How can I see team members via API?" | Use `api = wandb.Api()` then `api.team("<team_name>").members`. Member objects expose fields such as `username`, `name`, `email`, and admin status. |
-| "Can I programmatically set/update workspaces?" | Yes. Use the `wandb-workspaces` Python library to define, save, and edit workspaces/views programmatically, including copying views across projects. Before prescribing the exact script, ask whether this is W&B Workspaces, what fields are renamed, how often, what the current manual workflow is, what access/tooling they have available, how many views/workspaces are affected, whether the renames are metrics/config/summary fields, whether they want in-place edits or generated standardized views, and how renames propagate downstream. |
-| "Static/archive report for compliance?" | W&B Reports have a built-in static export: open the report action menu (`...`), choose Download, then select PDF or LaTeX. Store the exported file in JIRA or compliance systems. Do not recommend browser Print -> Save as PDF as the primary path. |
-| "Can reports include PNG/JPEG images?" | Yes. In the UI, press `/` on a new report line, choose Image, then drag/drop the PNG/JPEG. Programmatically, use `wandb-workspaces`: `import wandb_workspaces.reports.v2 as wr`, then add `wr.Image(url=..., caption=...)` to the report `blocks`. |
-| "Are reports associated with an entity?" | Yes. Reports are created within a project, and every project belongs to an entity (user or team). The `wr.Report` API requires both `entity` and `project`; team-project reports are visible to the team, private user-project reports are private to that user. |
-| "Can I update a prompt created in the UI?" | Weave prompt versions are immutable. To "update", publish a new version with the same prompt name using `weave.publish()` or the prompt publish API. The new version becomes `:latest`, previous versions remain in history, and this works for UI-created prompts if you reuse the same prompt name. |
-| "How should we structure runs across projects?" | Do not prescribe a structure before surfacing ambiguity and do not validate "using projects wrong" without context. Ask targeted questions first about expected run volume per project, what current projects represent, what cross-project comparisons/filters are needed, whether compared runs are the same conceptual experiment/eval/model family, metric-schema differences, audiences/access boundaries, and whether related experiments are over-split. Then give tentative guidance: projects are best as comparison/workspace boundaries; use config, tags, groups, and `job_type` for segmentation inside a project. |
-| "Need more observability into agent traces?" | Recommend W&B Weave only. Show `weave.init(...)`, `@weave.op()`, and optionally `weave.Evaluation` for evaluations. Keep the recommendation focused on W&B Weave unless the user asks for tool comparisons. |
-| "How can I check UI agent success from workspace data?" | List these three UI/data options explicitly: (1) screenshots from trajectory runs, (2) Weave traces of trajectories, and (3) summary tables from runs. Then explain that screenshots show visual task completion, Weave traces show step-by-step calls/errors/scorer outputs, and run summary tables let users compare success metrics across agents. |
-| "Show code for sweeps / multiple experiments" | Put W&B instrumentation directly in the main sweep/training code, not an optional appendix. Use `wandb.init(project=..., config=...)`, `wandb.log(...)`, and `wandb.agent(...)`/sweep config patterns unconditionally unless the user asks for a flag. |
+| User asks                                               | Answer with                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "How can I see team members via API?"                   | Use `api = wandb.Api()` then `api.team("<team_name>").members`. Member objects expose fields such as `username`, `name`, `email`, and admin status.                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| "Can I programmatically set/update workspaces?"         | Yes. Use the `wandb-workspaces` Python library to define, save, and edit workspaces/views programmatically, including copying views across projects. Before prescribing the exact script, ask whether this is W&B Workspaces, what fields are renamed, how often, what the current manual workflow is, what access/tooling they have available, how many views/workspaces are affected, whether the renames are metrics/config/summary fields, whether they want in-place edits or generated standardized views, and how renames propagate downstream.                                                                          |
+| "Static/archive report for compliance?"                 | W&B Reports have a built-in static export: open the report action menu (`...`), choose Download, then select PDF or LaTeX. Store the exported file in JIRA or compliance systems. Do not recommend browser Print -> Save as PDF as the primary path.                                                                                                                                                                                                                                                                                                                                                                            |
+| "Can reports include PNG/JPEG images?"                  | Yes. In the UI, press `/` on a new report line, choose Image, then drag/drop the PNG/JPEG. Programmatically, use `wandb-workspaces`: `import wandb_workspaces.reports.v2 as wr`, then add `wr.Image(url=..., caption=...)` to the report `blocks`.                                                                                                                                                                                                                                                                                                                                                                              |
+| "Are reports associated with an entity?"                | Yes. Reports are created within a project, and every project belongs to an entity (user or team). The `wr.Report` API requires both `entity` and `project`; team-project reports are visible to the team, private user-project reports are private to that user.                                                                                                                                                                                                                                                                                                                                                                |
+| "Can I update a prompt created in the UI?"              | Weave prompt versions are immutable. To "update", publish a new version with the same prompt name using `weave.publish()` or the prompt publish API. The new version becomes `:latest`, previous versions remain in history, and this works for UI-created prompts if you reuse the same prompt name.                                                                                                                                                                                                                                                                                                                           |
+| "How should we structure runs across projects?"         | Do not prescribe a structure before surfacing ambiguity and do not validate "using projects wrong" without context. Ask targeted questions first about expected run volume per project, what current projects represent, what cross-project comparisons/filters are needed, whether compared runs are the same conceptual experiment/eval/model family, metric-schema differences, audiences/access boundaries, and whether related experiments are over-split. Then give tentative guidance: projects are best as comparison/workspace boundaries; use config, tags, groups, and `job_type` for segmentation inside a project. |
+| "Need more observability into agent traces?"            | Recommend W&B Weave only. Show `weave.init(...)`, `@weave.op()`, and optionally `weave.Evaluation` for evaluations. Keep the recommendation focused on W&B Weave unless the user asks for tool comparisons.                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| "How can I check UI agent success from workspace data?" | List these three UI/data options explicitly: (1) screenshots from trajectory runs, (2) Weave traces of trajectories, and (3) summary tables from runs. Then explain that screenshots show visual task completion, Weave traces show step-by-step calls/errors/scorer outputs, and run summary tables let users compare success metrics across agents.                                                                                                                                                                                                                                                                           |
+| "Show code for sweeps / multiple experiments"           | Put W&B instrumentation directly in the main sweep/training code, not an optional appendix. Use `wandb.init(project=..., config=...)`, `wandb.log(...)`, and `wandb.agent(...)`/sweep config patterns unconditionally unless the user asks for a flag.                                                                                                                                                                                                                                                                                                                                                                          |
 
 ### Trace-count semantics
 
@@ -130,6 +131,7 @@ Use these rules before every Weave count query:
 
 ```python
 import wandb, os
+
 api = wandb.Api(timeout=120)
 path = f"{os.environ['WANDB_ENTITY']}/{os.environ['WANDB_PROJECT']}"
 total = len(api.runs(path, per_page=1, include_sweeps=False, lazy=True))
@@ -173,14 +175,16 @@ rows = []
 for sweep in sweeps:
     config = sweep.config or {}
     metric = config.get("metric") or {}
-    rows.append({
-        "id": sweep.id,
-        "state": sweep.state,
-        "method": config.get("method"),
-        "metric": metric.get("name"),
-        "goal": metric.get("goal"),
-        "run_count": len(sweep.runs),
-    })
+    rows.append(
+        {
+            "id": sweep.id,
+            "state": sweep.state,
+            "method": config.get("method"),
+            "metric": metric.get("name"),
+            "goal": metric.get("goal"),
+            "run_count": len(sweep.runs),
+        }
+    )
 
 print(f"sweep_count={len(rows)}")
 print(f"total_sweep_runs={sum(r['run_count'] for r in rows)}")
@@ -211,13 +215,15 @@ runs = api.runs(
 rows = []
 for run in runs:
     user = getattr(run, "user", None)
-    rows.append({
-        "created_at": run.created_at,
-        "name": run.display_name or run.name,
-        "id": run.id,
-        "username": getattr(user, "username", None),
-        "user_name": getattr(user, "name", None),
-    })
+    rows.append(
+        {
+            "created_at": run.created_at,
+            "name": run.display_name or run.name,
+            "id": run.id,
+            "username": getattr(user, "username", None),
+            "user_name": getattr(user, "name", None),
+        }
+    )
 
 print(f"finished_count={len(rows)}")
 for r in rows:
@@ -228,6 +234,7 @@ for r in rows:
 
 ```python
 import weave, os, logging
+
 logging.getLogger("weave").setLevel(logging.ERROR)
 from weave.trace_server.trace_server_interface import CallsQueryStatsReq
 from weave.trace_server.interface.query import Query
@@ -242,58 +249,72 @@ stats = client.server.calls_query_stats(CallsQueryStatsReq(project_id=pid))
 print(f"Total calls: {stats.count}")
 
 # Root traces only
-root_stats = client.server.calls_query_stats(CallsQueryStatsReq(
-    project_id=pid, filter={"trace_roots_only": True}
-))
+root_stats = client.server.calls_query_stats(CallsQueryStatsReq(project_id=pid, filter={"trace_roots_only": True}))
 print(f"Root traces: {root_stats.count}")
 
 # Count by op name
 for op in ["Evaluation.evaluate", "my_op.turn"]:
     op_ref = f"weave:///{entity}/{project}/op/{op}:*"
-    s = client.server.calls_query_stats(CallsQueryStatsReq(
-        project_id=pid,
-        filter={"op_names": [op_ref]},
-    ))
+    s = client.server.calls_query_stats(
+        CallsQueryStatsReq(
+            project_id=pid,
+            filter={"op_names": [op_ref]},
+        )
+    )
     print(f"  {op}: {s.count}")
 
 # Count calls whose op_name contains a substring, e.g. scorer calls.
-score_query = Query(**{"$expr": {"$contains": {
-    "input": {"$getField": "op_name"},
-    "substr": {"$literal": ".score"},
-    "case_insensitive": True,
-}}})
-score_stats = client.server.calls_query_stats(CallsQueryStatsReq(
-    project_id=pid, query=score_query
-))
+score_query = Query(
+    **{
+        "$expr": {
+            "$contains": {
+                "input": {"$getField": "op_name"},
+                "substr": {"$literal": ".score"},
+                "case_insensitive": True,
+            }
+        }
+    }
+)
+score_stats = client.server.calls_query_stats(CallsQueryStatsReq(project_id=pid, query=score_query))
 print(f"Scorer calls (.score): {score_stats.count}")
 
 # Count a named op substring such as create_embeddings.
-embedding_query = Query(**{"$expr": {"$contains": {
-    "input": {"$getField": "op_name"},
-    "substr": {"$literal": "create_embeddings"},
-    "case_insensitive": True,
-}}})
-embedding_stats = client.server.calls_query_stats(CallsQueryStatsReq(
-    project_id=pid, query=embedding_query
-))
+embedding_query = Query(
+    **{
+        "$expr": {
+            "$contains": {
+                "input": {"$getField": "op_name"},
+                "substr": {"$literal": "create_embeddings"},
+                "case_insensitive": True,
+            }
+        }
+    }
+)
+embedding_stats = client.server.calls_query_stats(CallsQueryStatsReq(project_id=pid, query=embedding_query))
 print(f"create_embeddings calls: {embedding_stats.count}")
 
 # Error/exception calls. Include descendant_error when the prompt says
 # "error status or exception"; those are traces whose children failed.
-error_query = Query(**{"$expr": {"$or": [
-    {"$eq": [{"$getField": "summary.weave.status"}, {"$literal": "error"}]},
-    {"$eq": [
-        {"$getField": "summary.weave.status"},
-        {"$literal": "descendant_error"},
-    ]},
-    {"$not": [{"$eq": [{"$getField": "exception"}, {"$literal": None}]}]},
-]}})
-error_stats = client.server.calls_query_stats(CallsQueryStatsReq(
-    project_id=pid, query=error_query
-))
-root_error_stats = client.server.calls_query_stats(CallsQueryStatsReq(
-    project_id=pid, filter={"trace_roots_only": True}, query=error_query
-))
+error_query = Query(
+    **{
+        "$expr": {
+            "$or": [
+                {"$eq": [{"$getField": "summary.weave.status"}, {"$literal": "error"}]},
+                {
+                    "$eq": [
+                        {"$getField": "summary.weave.status"},
+                        {"$literal": "descendant_error"},
+                    ]
+                },
+                {"$not": [{"$eq": [{"$getField": "exception"}, {"$literal": None}]}]},
+            ]
+        }
+    }
+)
+error_stats = client.server.calls_query_stats(CallsQueryStatsReq(project_id=pid, query=error_query))
+root_error_stats = client.server.calls_query_stats(
+    CallsQueryStatsReq(project_id=pid, filter={"trace_roots_only": True}, query=error_query)
+)
 print(f"Error/exception calls: {error_stats.count}")
 print(f"Root error/exception calls: {root_error_stats.count}")
 print(f"Non-error calls: {stats.count - error_stats.count}")
@@ -304,9 +325,11 @@ print(f"Non-error calls: {stats.count - error_stats.count}")
 ```python
 import os, statistics, weave, logging, sys
 from collections import Counter
+
 logging.getLogger("weave").setLevel(logging.ERROR)
 from weave.trace_server.trace_server_interface import CallsQueryStatsReq
 from weave.trace_server.interface.query import Query
+
 sys.path.insert(0, "skills/wandb-primary/scripts")
 from weave_helpers import unwrap
 
@@ -315,14 +338,18 @@ project = os.environ["WANDB_PROJECT"]
 pid = f"{entity}/{project}"
 client = weave.init(pid)
 
-query = Query(**{"$expr": {"$contains": {
-    "input": {"$getField": "op_name"},
-    "substr": {"$literal": "create_embeddings"},
-    "case_insensitive": True,
-}}})
-total = client.server.calls_query_stats(CallsQueryStatsReq(
-    project_id=pid, query=query
-)).count
+query = Query(
+    **{
+        "$expr": {
+            "$contains": {
+                "input": {"$getField": "op_name"},
+                "substr": {"$literal": "create_embeddings"},
+                "case_insensitive": True,
+            }
+        }
+    }
+)
+total = client.server.calls_query_stats(CallsQueryStatsReq(project_id=pid, query=query)).count
 
 sizes = []
 for call in client.get_calls(query=query, limit=total, columns=["inputs"]):
@@ -344,6 +371,7 @@ print(f"mean texts per call: {statistics.mean(sizes) if sizes else 0:.4f}")
 
 ```python
 import os, weave, logging
+
 logging.getLogger("weave").setLevel(logging.ERROR)
 from weave.trace_server.trace_server_interface import FeedbackQueryReq
 
@@ -356,18 +384,15 @@ limit = 1000
 offset = 0
 total = 0
 while True:
-    res = client.server.feedback_query(FeedbackQueryReq(
-        project_id=pid,
-        fields=["id"],
-        limit=limit,
-        offset=offset,
-    ))
-    rows = (
-        getattr(res, "result", None)
-        or getattr(res, "feedback", None)
-        or getattr(res, "rows", None)
-        or []
+    res = client.server.feedback_query(
+        FeedbackQueryReq(
+            project_id=pid,
+            fields=["id"],
+            limit=limit,
+            offset=offset,
+        )
     )
+    rows = getattr(res, "result", None) or getattr(res, "feedback", None) or getattr(res, "rows", None) or []
     n = len(rows)
     total += n
     if n < limit:
@@ -382,6 +407,7 @@ print(f"Feedback records: {total}")
 ```python
 import os, weave, logging
 from collections import Counter
+
 logging.getLogger("weave").setLevel(logging.ERROR)
 from weave.trace_server.trace_server_interface import CallsQueryStatsReq
 
@@ -391,13 +417,13 @@ pid = f"{entity}/{project}"
 client = weave.init(pid)
 root_filter = {"trace_roots_only": True}
 
-root_count = client.server.calls_query_stats(CallsQueryStatsReq(
-    project_id=pid, filter=root_filter
-)).count
+root_count = client.server.calls_query_stats(CallsQueryStatsReq(project_id=pid, filter=root_filter)).count
+
 
 def short_op(op_name: str) -> str:
     tail = op_name.split("/op/")[-1]
     return tail.rsplit(":", 1)[0]
+
 
 counts = Counter()
 for call in client.get_calls(
@@ -416,6 +442,7 @@ for name, count in counts.most_common():
 ```python
 import os, weave, logging
 from collections import Counter
+
 logging.getLogger("weave").setLevel(logging.ERROR)
 from weave.trace_server.trace_server_interface import CallsQueryStatsReq
 
@@ -425,8 +452,10 @@ pid = f"{entity}/{project}"
 client = weave.init(pid)
 total = client.server.calls_query_stats(CallsQueryStatsReq(project_id=pid)).count
 
+
 def short_op(op_name: str) -> str:
     return op_name.split("/op/")[-1].rsplit(":", 1)[0]
+
 
 counts = Counter()
 for call in client.get_calls(limit=total, columns=["op_name"]):
@@ -444,6 +473,7 @@ columns and count locally.
 
 ```python
 import os, weave, logging
+
 logging.getLogger("weave").setLevel(logging.ERROR)
 from weave.trace_server.trace_server_interface import CallsQueryStatsReq
 
@@ -475,9 +505,11 @@ print(f"Duration > {threshold_s}s: {long_count}")
 ```python
 import os, weave, logging
 from collections import Counter
+
 logging.getLogger("weave").setLevel(logging.ERROR)
 from weave.trace_server.trace_server_interface import CallsQueryStatsReq
 import sys
+
 sys.path.insert(0, "skills/wandb-primary/scripts")
 from weave_helpers import unwrap
 
@@ -486,6 +518,7 @@ project = os.environ["WANDB_PROJECT"]
 pid = f"{entity}/{project}"
 client = weave.init(pid)
 total = client.server.calls_query_stats(CallsQueryStatsReq(project_id=pid)).count
+
 
 def collect_models(obj, out):
     obj = unwrap(obj)
@@ -497,6 +530,7 @@ def collect_models(obj, out):
     elif isinstance(obj, list):
         for item in obj:
             collect_models(item, out)
+
 
 models = Counter()
 for call in client.get_calls(
@@ -522,9 +556,11 @@ for name, count in models.most_common():
 ```python
 import os, weave, logging
 from collections import Counter
+
 logging.getLogger("weave").setLevel(logging.ERROR)
 from weave.trace_server.interface.query import Query
 import sys
+
 sys.path.insert(0, "skills/wandb-primary/scripts")
 from weave_helpers import unwrap
 
@@ -532,11 +568,17 @@ entity = os.environ["WANDB_ENTITY"]
 project = os.environ["WANDB_PROJECT"]
 client = weave.init(f"{entity}/{project}")
 
-embedding_query = Query(**{"$expr": {"$contains": {
-    "input": {"$getField": "op_name"},
-    "substr": {"$literal": "create_embeddings"},
-    "case_insensitive": True,
-}}})
+embedding_query = Query(
+    **{
+        "$expr": {
+            "$contains": {
+                "input": {"$getField": "op_name"},
+                "substr": {"$literal": "create_embeddings"},
+                "case_insensitive": True,
+            }
+        }
+    }
+)
 
 dims = Counter()
 models = Counter()
@@ -577,6 +619,7 @@ and class `.score` ops like `HallucinationFreeScorer.score` when present.
 ```python
 import os, weave, logging
 from collections import Counter
+
 logging.getLogger("weave").setLevel(logging.ERROR)
 from weave.trace_server.trace_server_interface import CallsQueryStatsReq
 
@@ -586,8 +629,10 @@ pid = f"{entity}/{project}"
 client = weave.init(pid)
 total = client.server.calls_query_stats(CallsQueryStatsReq(project_id=pid)).count
 
+
 def short_op(op_name: str) -> str:
     return op_name.split("/op/")[-1].rsplit(":", 1)[0]
+
 
 scorers = Counter()
 for call in client.get_calls(limit=total, columns=["op_name"]):
@@ -603,6 +648,7 @@ for name, count in scorers.most_common():
 
 ```python
 import wandb, weave, os, logging
+
 logging.getLogger("weave").setLevel(logging.ERROR)
 from weave.trace_server.trace_server_interface import CallsQueryStatsReq
 
@@ -623,16 +669,16 @@ for r in recent:
 # --- Weave Traces ---
 client = weave.init(path)
 pid = f"{entity}/{project}"
-root_stats = client.server.calls_query_stats(CallsQueryStatsReq(
-    project_id=pid, filter={"trace_roots_only": True}
-))
+root_stats = client.server.calls_query_stats(CallsQueryStatsReq(project_id=pid, filter={"trace_roots_only": True}))
 print(f"\n=== Weave Traces ({root_stats.count} root traces) ===")
 
-recent_calls = list(client.get_calls(
-    sort_by=[{"field": "started_at", "direction": "desc"}],
-    limit=5,
-    columns=["op_name", "started_at", "display_name"],
-))
+recent_calls = list(
+    client.get_calls(
+        sort_by=[{"field": "started_at", "direction": "desc"}],
+        limit=5,
+        columns=["op_name", "started_at", "display_name"],
+    )
+)
 for c in recent_calls:
     name = c.display_name or c.op_name.split("/")[-1].split(":")[0]
     started = c.started_at.strftime("%Y-%m-%d %H:%M") if c.started_at else "?"
@@ -643,6 +689,7 @@ for c in recent_calls:
 
 ```python
 import wandb, os
+
 api = wandb.Api(timeout=120)
 path = f"{os.environ['WANDB_ENTITY']}/{os.environ['WANDB_PROJECT']}"
 
@@ -668,6 +715,7 @@ them directly.
 
 ```python
 import wandb, os
+
 api = wandb.Api(timeout=120)
 path = f"{os.environ['WANDB_ENTITY']}/{os.environ['WANDB_PROJECT']}"
 
@@ -684,11 +732,12 @@ for atype in api.artifact_types(project=path):
 
 ### Summarize an artifact's files (metadata + manifest + bounded read)
 
-Inspect what an artifact *contains* — don't infer from its name. Read the manifest
+Inspect what an artifact _contains_ — don't infer from its name. Read the manifest
 first; download only the small structured files you actually need.
 
 ```python
 import wandb, os
+
 api = wandb.Api(timeout=120)
 path = f"{os.environ['WANDB_ENTITY']}/{os.environ['WANDB_PROJECT']}"
 
@@ -726,6 +775,7 @@ no system keys in the default stream is **NOT** evidence they don't exist.
 
 ```python
 import wandb, os, pandas as pd
+
 api = wandb.Api(timeout=120)
 path = f"{os.environ['WANDB_ENTITY']}/{os.environ['WANDB_PROJECT']}"
 
@@ -737,13 +787,15 @@ for run in runs:
         rows.append({"run": run.name, "gpu_mean": None, "gpu_min": None, "gpu_max": None})
         continue
     gpu = sys_df["system.gpu.0.gpu"].dropna()
-    rows.append({
-        "run": run.name,
-        "gpu_mean": round(gpu.mean(), 1),
-        "gpu_min": round(gpu.min(), 1),
-        "gpu_max": round(gpu.max(), 1),
-        "low_util_pct": round(100 * (gpu < 30).sum() / len(gpu), 1) if len(gpu) else None,
-    })
+    rows.append(
+        {
+            "run": run.name,
+            "gpu_mean": round(gpu.mean(), 1),
+            "gpu_min": round(gpu.min(), 1),
+            "gpu_max": round(gpu.max(), 1),
+            "low_util_pct": round(100 * (gpu < 30).sum() / len(gpu), 1) if len(gpu) else None,
+        }
+    )
 
 df = pd.DataFrame(rows)
 print(df.to_string(index=False))
@@ -810,6 +862,7 @@ metric's history across runs and compute stability stats locally. Always pass
 
 ```python
 import wandb, os, numpy as np, pandas as pd
+
 api = wandb.Api(timeout=120)
 path = f"{os.environ['WANDB_ENTITY']}/{os.environ['WANDB_PROJECT']}"
 metric = "train/loss"  # discover the real key first (probe_project / inspect a run)
@@ -823,15 +876,17 @@ for run in runs:
     finite = arr[np.isfinite(arr)]
     diffs = np.abs(np.diff(finite)) if finite.size > 2 else np.array([])
     spike_threshold = 5 * (np.median(diffs) or 1.0)
-    rows.append({
-        "run": run.display_name or run.name,
-        "id": run.id,
-        "points": int(arr.size),
-        "nan_or_inf": int((~np.isfinite(arr)).sum()),
-        "min": round(float(finite.min()), 5) if finite.size else None,
-        "final": round(float(finite[-1]), 5) if finite.size else None,
-        "spikes": int((diffs > spike_threshold).sum()),
-    })
+    rows.append(
+        {
+            "run": run.display_name or run.name,
+            "id": run.id,
+            "points": int(arr.size),
+            "nan_or_inf": int((~np.isfinite(arr)).sum()),
+            "min": round(float(finite.min()), 5) if finite.size else None,
+            "final": round(float(finite[-1]), 5) if finite.size else None,
+            "spikes": int((diffs > spike_threshold).sum()),
+        }
+    )
 
 out = pd.DataFrame(rows).sort_values("min", na_position="last")
 print(out.to_string(index=False))
@@ -845,6 +900,7 @@ under-utilization use the system-stream recipe above.
 
 ```python
 import wandb, os, sys
+
 sys.path.insert(0, "skills/wandb-primary/scripts")
 from wandb_helpers import get_api, compare_configs
 
@@ -880,10 +936,11 @@ ladder, not just best and worst.
 ```python
 import wandb, os, numpy as np, pandas as pd
 from collections import defaultdict
+
 api = wandb.Api(timeout=120)
 path = f"{os.environ['WANDB_ENTITY']}/{os.environ['WANDB_PROJECT']}"
-metric = "accuracy"   # discover the real key first
-axis = "optimizer"    # a config key; or use run.group / run.job_type
+metric = "accuracy"  # discover the real key first
+axis = "optimizer"  # a config key; or use run.group / run.job_type
 
 runs = api.runs(path, filters={"state": "finished"}, per_page=200)[:200]
 buckets = defaultdict(list)
@@ -894,8 +951,13 @@ for run in runs:
         buckets[str(key)].append(float(value))
 
 rows = [
-    {axis: key, "n": len(vals), "mean": round(np.mean(vals), 4),
-     "min": round(np.min(vals), 4), "max": round(np.max(vals), 4)}
+    {
+        axis: key,
+        "n": len(vals),
+        "mean": round(np.mean(vals), 4),
+        "min": round(np.min(vals), 4),
+        "max": round(np.max(vals), 4),
+    }
     for key, vals in buckets.items()
 ]
 out = pd.DataFrame(rows).sort_values("mean", ascending=False)
@@ -910,8 +972,10 @@ If configs come back empty, the runs were fetched lazily — re-fetch with
 
 ```python
 import weave, os, sys, logging
+
 logging.getLogger("weave").setLevel(logging.ERROR)
 from weave.trace.weave_client import CallsFilter
+
 sys.path.insert(0, "skills/wandb-primary/scripts")
 from weave_helpers import unwrap, eval_results_to_dicts, results_summary
 
@@ -921,11 +985,13 @@ client = weave.init(f"{entity}/{project}")
 
 # Get latest eval
 op_ref = f"weave:///{entity}/{project}/op/Evaluation.evaluate:*"
-evals = list(client.get_calls(
-    filter=CallsFilter(op_names=[op_ref]),
-    sort_by=[{"field": "started_at", "direction": "desc"}],
-    limit=1,
-))
+evals = list(
+    client.get_calls(
+        filter=CallsFilter(op_names=[op_ref]),
+        sort_by=[{"field": "started_at", "direction": "desc"}],
+        limit=1,
+    )
+)
 
 if not evals:
     print("No evaluations found")
@@ -935,9 +1001,7 @@ else:
 
     # Get predict_and_score children
     pas_ref = f"weave:///{entity}/{project}/op/Evaluation.predict_and_score:*"
-    pas = list(client.get_calls(
-        filter=CallsFilter(op_names=[pas_ref], parent_ids=[ec.id])
-    ))
+    pas = list(client.get_calls(filter=CallsFilter(op_names=[pas_ref], parent_ids=[ec.id])))
     results = eval_results_to_dicts(pas, agent_name=ec.display_name or "agent")
     print(results_summary(results))
 ```
@@ -946,6 +1010,7 @@ else:
 
 ```python
 import weave, os, logging
+
 logging.getLogger("weave").setLevel(logging.ERROR)
 sys.path.insert(0, "skills/wandb-primary/scripts")
 from weave_helpers import unwrap, get_token_usage
@@ -954,10 +1019,12 @@ entity = os.environ["WANDB_ENTITY"]
 project = os.environ["WANDB_PROJECT"]
 client = weave.init(f"{entity}/{project}")
 
-calls = list(client.get_calls(
-    sort_by=[{"field": "started_at", "direction": "desc"}],
-    limit=10,
-))
+calls = list(
+    client.get_calls(
+        sort_by=[{"field": "started_at", "direction": "desc"}],
+        limit=10,
+    )
+)
 
 for c in calls:
     name = c.display_name or c.op_name.split("/")[-1].split(":")[0]
@@ -967,7 +1034,7 @@ for c in calls:
         duration = f" ({(c.ended_at - c.started_at).total_seconds():.1f}s)"
     status = c.summary.get("weave", {}).get("status", "?") if c.summary else "?"
     tokens = get_token_usage(c)
-    tok_str = f" [{tokens['total_tokens']} tok]" if tokens['total_tokens'] else ""
+    tok_str = f" [{tokens['total_tokens']} tok]" if tokens["total_tokens"] else ""
     print(f"  {name} [{status}] {started}{duration}{tok_str}")
 ```
 
@@ -1015,11 +1082,12 @@ you get a verified read-back instead of assuming success:
 
 ```python
 import sys
+
 sys.path.insert(0, "skills/wandb-primary/scripts")
 from report_helpers import save_report_verified
 
 result = save_report_verified(report)  # draft=True by default
-print(result["answer"])                # answer=... verified=True/False url=...
+print(result["answer"])  # answer=... verified=True/False url=...
 ```
 
 ## Launch
@@ -1135,6 +1203,7 @@ New code job:
 
 ```python
 import sys
+
 sys.path.insert(0, "skills/wandb-primary/scripts")
 from launch_helpers import submit_code_artifact_job
 
@@ -1153,6 +1222,7 @@ Modify an existing job:
 
 ```python
 import sys
+
 sys.path.insert(0, "skills/wandb-primary/scripts")
 from launch_helpers import download_code_artifact, create_and_launch_modified_job
 
@@ -1230,6 +1300,7 @@ Use artifacts when a pod cannot find code or uses the wrong entrypoint:
 
 ```python
 import sys
+
 sys.path.insert(0, "skills/wandb-primary/scripts")
 from launch_helpers import inspect_job_artifact, download_code_artifact
 
@@ -1253,7 +1324,7 @@ distinct from Reports. Read `references/WORKSPACES.md` before inspecting or edit
 one (add/rename sections; add panels, including custom-expression panels; set runset
 filters/groupby/order; pin columns; color or hide runs; save a view). Use the
 `wandb_workspaces.workspaces` SDK — it has sharp edges: saves are immediate with no
-draft state, and `Workspace.from_url` rejects a user's *default* `?nw=nwuser...`
+draft state, and `Workspace.from_url` rejects a user's _default_ `?nw=nwuser...`
 workspace (that case needs the raw-spec GraphQL path documented in the reference).
 Validate metric/config keys before adding a panel; an invented key renders an empty
 chart.
@@ -1278,24 +1349,24 @@ These rules prevent 502 errors, timeouts, and multi-minute hangs on projects wit
 
 ## When to use what
 
-| I need to... | Use |
-|---|---|
-| Query training runs, loss curves, hyperparameters | **W&B SDK** (`wandb.Api()`) — see `references/WANDB_SDK.md` |
-| Query GenAI traces, calls, evaluations | **Weave SDK** (`weave.init()`, `client.get_calls()`) — see `references/WEAVE_SDK.md` |
-| Convert Weave wrapper types to plain Python | **`weave_helpers.unwrap()`** |
-| Build a DataFrame from training runs | **`wandb_helpers.fetch_runs()`** (fast) or **`wandb_helpers.runs_to_dataframe()`** |
-| Read a run's console logs / diagnose a crash from logs | **`Run.logLines` GraphQL** — see `references/RUN_LOGS.md` |
-| Extract eval results for analysis | **`weave_helpers.eval_results_to_dicts()`** |
-| Explore evals on a large project without OOM (count first, cap payloads) | **`weave_helpers.safe_project_eval_summary()`** / **`safe_eval_child_summary()`** |
-| Count traces without fetching them | **`calls_query_stats`** from Weave server API |
-| Need low-level Weave filtering (CallsFilter, Query) | **Raw Weave SDK** — see `references/WEAVE_SDK.md` |
-| Create a report | **`wandb-workspaces`** (`wandb_workspaces.reports.v2`) — see `references/REPORTS.md` |
-| Inspect or edit a workspace view (sections, panels, runset filters, pinned columns, run colors) | **`wandb_workspaces.workspaces`** — see `references/WORKSPACES.md` |
-| Set up production monitoring | **`weave.Monitor`** |
-| Reproduce/relaunch a run | **`launch_helpers.relaunch_run()`** or CLI |
-| Launch a training job on GPU/K8s | **`launch_helpers.submit_code_artifact_job()`** |
-| Modify code and launch | **`launch_helpers.download_code_artifact()`** -> edit -> **`create_and_launch_modified_job()`** |
-| List or create launch queues | **`launch_helpers.list_queues()`** / **`create_queue()`** |
+| I need to...                                                                                    | Use                                                                                             |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Query training runs, loss curves, hyperparameters                                               | **W&B SDK** (`wandb.Api()`) — see `references/WANDB_SDK.md`                                     |
+| Query GenAI traces, calls, evaluations                                                          | **Weave SDK** (`weave.init()`, `client.get_calls()`) — see `references/WEAVE_SDK.md`            |
+| Convert Weave wrapper types to plain Python                                                     | **`weave_helpers.unwrap()`**                                                                    |
+| Build a DataFrame from training runs                                                            | **`wandb_helpers.fetch_runs()`** (fast) or **`wandb_helpers.runs_to_dataframe()`**              |
+| Read a run's console logs / diagnose a crash from logs                                          | **`Run.logLines` GraphQL** — see `references/RUN_LOGS.md`                                       |
+| Extract eval results for analysis                                                               | **`weave_helpers.eval_results_to_dicts()`**                                                     |
+| Explore evals on a large project without OOM (count first, cap payloads)                        | **`weave_helpers.safe_project_eval_summary()`** / **`safe_eval_child_summary()`**               |
+| Count traces without fetching them                                                              | **`calls_query_stats`** from Weave server API                                                   |
+| Need low-level Weave filtering (CallsFilter, Query)                                             | **Raw Weave SDK** — see `references/WEAVE_SDK.md`                                               |
+| Create a report                                                                                 | **`wandb-workspaces`** (`wandb_workspaces.reports.v2`) — see `references/REPORTS.md`            |
+| Inspect or edit a workspace view (sections, panels, runset filters, pinned columns, run colors) | **`wandb_workspaces.workspaces`** — see `references/WORKSPACES.md`                              |
+| Set up production monitoring                                                                    | **`weave.Monitor`**                                                                             |
+| Reproduce/relaunch a run                                                                        | **`launch_helpers.relaunch_run()`** or CLI                                                      |
+| Launch a training job on GPU/K8s                                                                | **`launch_helpers.submit_code_artifact_job()`**                                                 |
+| Modify code and launch                                                                          | **`launch_helpers.download_code_artifact()`** -> edit -> **`create_and_launch_modified_job()`** |
+| List or create launch queues                                                                    | **`launch_helpers.list_queues()`** / **`create_queue()`**                                       |
 
 ---
 
@@ -1305,53 +1376,54 @@ These rules prevent 502 errors, timeouts, and multi-minute hangs on projects wit
 
 ```python
 import sys
+
 sys.path.insert(0, "skills/wandb-primary/scripts")
 
 # Weave helpers (traces, evals, GenAI)
 from weave_helpers import (
-    unwrap,                  # Recursively convert Weave types -> plain Python
-    get_token_usage,         # Extract token counts from a call's summary
-    eval_results_to_dicts,   # predict_and_score calls -> list of result dicts
-    pivot_solve_rate,        # Build task-level pivot table across agents
-    results_summary,         # Print compact eval summary
-    eval_health,             # Extract status/counts from Evaluation.evaluate calls
-    eval_efficiency,         # Compute tokens-per-success across eval calls
+    unwrap,  # Recursively convert Weave types -> plain Python
+    get_token_usage,  # Extract token counts from a call's summary
+    eval_results_to_dicts,  # predict_and_score calls -> list of result dicts
+    pivot_solve_rate,  # Build task-level pivot table across agents
+    results_summary,  # Print compact eval summary
+    eval_health,  # Extract status/counts from Evaluation.evaluate calls
+    eval_efficiency,  # Compute tokens-per-success across eval calls
     safe_eval_root_summary,  # Compact aggregate evidence from one Evaluation.evaluate call
-    safe_eval_child_summary, # Count predict_and_score rows first; sample full payloads (capped)
+    safe_eval_child_summary,  # Count predict_and_score rows first; sample full payloads (capped)
     safe_project_eval_summary,  # Project eval landscape without predict_and_score payload scans
 )
 
 # W&B helpers (training runs, metrics) — large-project optimized
 from wandb_helpers import (
-    get_api,             # Create API with safe timeout (default 120s)
-    probe_project,       # Discover project scale, metrics, config, artifacts BEFORE querying
-    fetch_runs,          # FAST: Direct GraphQL with selective metrics (17x faster)
-    runs_to_dataframe,   # Legacy: iterate run objects (slower, use fetch_runs instead)
-    diagnose_run,        # Quick diagnostic summary (configurable metric keys)
-    compare_configs,     # Side-by-side config diff between two runs
-    scan_history,        # Exact history scan with explicit metric keys
+    get_api,  # Create API with safe timeout (default 120s)
+    probe_project,  # Discover project scale, metrics, config, artifacts BEFORE querying
+    fetch_runs,  # FAST: Direct GraphQL with selective metrics (17x faster)
+    runs_to_dataframe,  # Legacy: iterate run objects (slower, use fetch_runs instead)
+    diagnose_run,  # Quick diagnostic summary (configurable metric keys)
+    compare_configs,  # Side-by-side config diff between two runs
+    scan_history,  # Exact history scan with explicit metric keys
 )
 
 # Launch helpers (job submission, run reproduction, queue management)
 from launch_helpers import (
-    parse_run_url,                       # Extract (entity, project, run_id) from a W&B URL
-    list_queues,                         # List launch queues with active agents and resource defaults
-    get_job_artifact,                    # Check if a run has a job artifact
-    inspect_job_artifact,                # Download + inspect a job artifact's metadata
-    download_code_artifact,              # Download source code from a job artifact
-    create_and_launch_modified_job,      # Upload modified code + launch in one call
-    relaunch_run,                        # Re-run with config overrides (no code change)
-    launch_job_artifact,                 # Launch directly from an artifact path
-    submit_code_artifact_job,            # Create job artifact and enqueue in one call
-    check_launch,                        # Check queue item, run URL, run state, issues
-    create_queue,                        # Create a K8s launch queue
-    inspect_queue,                       # Print queue details
+    parse_run_url,  # Extract (entity, project, run_id) from a W&B URL
+    list_queues,  # List launch queues with active agents and resource defaults
+    get_job_artifact,  # Check if a run has a job artifact
+    inspect_job_artifact,  # Download + inspect a job artifact's metadata
+    download_code_artifact,  # Download source code from a job artifact
+    create_and_launch_modified_job,  # Upload modified code + launch in one call
+    relaunch_run,  # Re-run with config overrides (no code change)
+    launch_job_artifact,  # Launch directly from an artifact path
+    submit_code_artifact_job,  # Create job artifact and enqueue in one call
+    check_launch,  # Check queue item, run URL, run state, issues
+    create_queue,  # Create a K8s launch queue
+    inspect_queue,  # Print queue details
 )
 
 # Report helpers (save/edit W&B Reports with read-back verification)
 from report_helpers import (
-    save_report_verified,   # save a report (draft by default) then re-read to confirm it landed
-    edit_report_verified,   # load via from_url, mutate in place, save + verify
+    save_report_verified,  # save a report (draft by default) then re-read to confirm it landed
+    edit_report_verified,  # load via from_url, mutate in place, save + verify
 )
 ```
 
@@ -1366,6 +1438,7 @@ Read these as needed — they contain full API surfaces and recipes:
 - **`references/HYPOTHESIS_GENERATION.md`** — Four-phase synergistic hypothesis generation methodology. Read this for any task involving experiment analysis, anomaly diagnosis, "what went wrong?", or "what should I try next?".
 - **`references/REPORTS.md`** — W&B Report authoring/editing: runsets, structured filters, panels, media, columns, loading, and share links.
 - **`references/WORKSPACES.md`** — Programmatic workspace views: load/create, sections and panels, runset filters/groupby/columns/run colors, save semantics, and the raw-spec path for the default user workspace.
+
 ---
 
 ## Analyzing a project
@@ -1404,7 +1477,7 @@ answer itself, not buried in reasoning, and not replaced by advice:
    "You should debug those runs" doesn't count; "want me to dig into the runs that
    diverged?" does. Anchor the offer to the headline finding and a specific run,
    metric, cohort, trace, or artifact — and when the analysis surfaced a failure,
-   offer to debug *that*, not an already-healthy cohort.
+   offer to debug _that_, not an already-healthy cohort.
 
 Never end a substantive analysis as a wall of text, with bare recommendations, or
 with a generic "let me know if you have questions."
@@ -1426,7 +1499,6 @@ Code examples use `LOSS_KEY`, `VAL_LOSS_KEY`, `ACC_KEY`, `CONFIG_KEYS` as placeh
 
 `probe_project()` also returns `artifact_names` — a dict of artifact base name → type for artifacts logged by sampled runs — and `weave_trace_count` / `weave_top_ops` from the project's Weave traces. Print all of these so you know the full shape of evidence before committing to a line of reasoning.
 
-
 ```python
 # WRONG — hardcoded metric name
 rows = fetch_runs(api, path, metric_keys=["loss", "accuracy"])
@@ -1442,8 +1514,7 @@ rows = fetch_runs(api, path, metric_keys=["train/loss", "train/acc"])
 
 ### Evidence means contents, not names
 
-`probe_project` shows you what evidence *exists* — artifact names, metric keys, Weave op names and counts. That inventory is the map, not the territory. Knowing a data source exists is not the same as knowing what it shows. For any evidence source the probe surfaces, read the actual contents before drawing conclusions: download artifact rows, fetch and aggregate trace data, read run history slices. A name tells you where to look; only the data tells you what the anomaly is.
-
+`probe_project` shows you what evidence _exists_ — artifact names, metric keys, Weave op names and counts. That inventory is the map, not the territory. Knowing a data source exists is not the same as knowing what it shows. For any evidence source the probe surfaces, read the actual contents before drawing conclusions: download artifact rows, fetch and aggregate trace data, read run history slices. A name tells you where to look; only the data tells you what the anomaly is.
 
 ### Respect the user's scope
 
@@ -1501,7 +1572,8 @@ Entity and project come from environment variables — do not hardcode them:
 
 ```python
 import os
-entity  = os.environ["WANDB_ENTITY"]
+
+entity = os.environ["WANDB_ENTITY"]
 project = os.environ["WANDB_PROJECT"]
 path = f"{entity}/{project}"
 ```
@@ -1514,6 +1586,7 @@ path = f"{entity}/{project}"
 
 ```python
 import wandb
+
 api = wandb.Api(timeout=120)
 path = f"{entity}/{project}"
 
@@ -1528,13 +1601,13 @@ import wandb
 from wandb_graphql.language import parser as gql_parser
 
 api = wandb.Api(timeout=120)
-doc = gql_parser.parse('''
+doc = gql_parser.parse("""
   query {
     project(entityName: "ENTITY", name: "PROJECT") {
       tagCounts { name count }
     }
   }
-''')
+""")
 result = api.client.execute(doc)
 tags = [t["name"] for t in result["project"]["tagCounts"]]
 print(sorted(tags))
@@ -1547,7 +1620,7 @@ import wandb
 from wandb_graphql.language import parser as gql_parser
 
 api = wandb.Api(timeout=120)
-doc = gql_parser.parse('''
+doc = gql_parser.parse("""
   query {
     project(entityName: "ENTITY", name: "PROJECT") {
       groupedRuns(groupKeys: ["group"], first: 100) {
@@ -1559,7 +1632,7 @@ doc = gql_parser.parse('''
       }
     }
   }
-''')
+""")
 result = api.client.execute(doc)
 edges = result["project"]["groupedRuns"]["edges"]
 groups = [e["node"]["group"] for e in edges if e["node"]["group"]]
@@ -1576,7 +1649,8 @@ api = get_api()
 path = f"{entity}/{project}"
 
 rows = fetch_runs(
-    api, path,
+    api,
+    path,
     metric_keys=["LOSS_KEY", "ACC_KEY"],
     filters={"state": "finished"},
     limit=100,
@@ -1620,7 +1694,8 @@ plots = wr.PanelGrid(
 )
 
 report = wr.Report(
-    entity=entity, project=project,
+    entity=entity,
+    project=project,
     title="Project analysis",
     description="Summary of recent runs",
     width="fixed",
@@ -1642,51 +1717,52 @@ existing reports, and share links, see `references/REPORTS.md`.
 
 ### Weave API
 
-| Gotcha | Wrong | Right |
-|--------|-------|-------|
-| weave.init args | `weave.init(project="x")` | `weave.init("x")` (positional) |
-| Parent filter | `filter={'parent_id': 'x'}` | `filter={'parent_ids': ['x']}` (plural, list) |
-| WeaveObject access | `rubric.get('passed')` | `getattr(rubric, 'passed', None)` |
-| Nested output | `out.get('succeeded')` | `out.get('output').get('succeeded')` (output.output) |
-| ObjectRef comparison | `name_ref == "foo"` | `str(name_ref) == "foo"` |
-| CallsFilter import | `from weave import CallsFilter` | `from weave.trace.weave_client import CallsFilter` |
-| Query import | `from weave import Query` | `from weave.trace_server.interface.query import Query` |
-| Eval status path | `summary["status"]` | `summary["weave"]["status"]` |
-| Eval success count | `summary["success_count"]` | `summary["weave"]["status_counts"]["success"]` |
-| When in doubt | Guess the type | `unwrap()` first, then inspect |
+| Gotcha               | Wrong                           | Right                                                  |
+| -------------------- | ------------------------------- | ------------------------------------------------------ |
+| weave.init args      | `weave.init(project="x")`       | `weave.init("x")` (positional)                         |
+| Parent filter        | `filter={'parent_id': 'x'}`     | `filter={'parent_ids': ['x']}` (plural, list)          |
+| WeaveObject access   | `rubric.get('passed')`          | `getattr(rubric, 'passed', None)`                      |
+| Nested output        | `out.get('succeeded')`          | `out.get('output').get('succeeded')` (output.output)   |
+| ObjectRef comparison | `name_ref == "foo"`             | `str(name_ref) == "foo"`                               |
+| CallsFilter import   | `from weave import CallsFilter` | `from weave.trace.weave_client import CallsFilter`     |
+| Query import         | `from weave import Query`       | `from weave.trace_server.interface.query import Query` |
+| Eval status path     | `summary["status"]`             | `summary["weave"]["status"]`                           |
+| Eval success count   | `summary["success_count"]`      | `summary["weave"]["status_counts"]["success"]`         |
+| When in doubt        | Guess the type                  | `unwrap()` first, then inspect                         |
 
 ### W&B API
 
-| Gotcha | Wrong | Right |
-|--------|-------|-------|
-| API timeout | `wandb.Api()` (19s default) | `wandb.Api(timeout=120)` or `get_api()` |
-| Summary access | `run.summary["loss"]` | `run.summary_metrics.get("LOSS_KEY")` |
-| Loading all runs | `list(api.runs(...))` | `runs[:200]` (always slice) |
-| Counting runs | `len(list(api.runs(...)))` | `len(api.runs(..., per_page=1, include_sweeps=False, lazy=True))` |
-| Distinct tags | iterate all runs collecting `run.tags` | GraphQL `tagCounts` query |
-| Distinct groups | iterate all runs collecting `run.group` | GraphQL `groupedRuns` query |
-| `run.config` after lazy fetch | `run.config` returns `{}` | Use `lazy=False` when you need config |
-| Pagination | `api.runs(path)` (per_page=50 default) | `api.runs(path, per_page=min(N, 1000))` |
-| System/GPU/CPU metrics | `run.history(keys=["system.gpu.0.gpu"])` → empty | `run.history(stream='system', samples=500)` GPU, CPU, memory, network, disk metrics live in a separate stream; the default stream returns training metrics only. Absence in the default stream is NOT proof the data doesn't exist. |
-| History — no keys on large run | `run.history(samples=10)` -> 502 | `run.history(samples=10, keys=["LOSS_KEY"])` |
-| scan_history — no keys | `scan_history()` -> timeout | `scan_history(keys=["LOSS_KEY"])` |
-| Cross-run search | iterate all runs client-side | Server-side filter: `{"summary_metrics.X": {"$gt": Y}}` |
-| Filter by run type | `filters={"job_type": "train"}` → `Unknown column 'job_type'` | `filters={"jobType": "train"}` (camelCase backend field) |
+| Gotcha                         | Wrong                                                         | Right                                                                                                                                                                                                                               |
+| ------------------------------ | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API timeout                    | `wandb.Api()` (19s default)                                   | `wandb.Api(timeout=120)` or `get_api()`                                                                                                                                                                                             |
+| Summary access                 | `run.summary["loss"]`                                         | `run.summary_metrics.get("LOSS_KEY")`                                                                                                                                                                                               |
+| Loading all runs               | `list(api.runs(...))`                                         | `runs[:200]` (always slice)                                                                                                                                                                                                         |
+| Counting runs                  | `len(list(api.runs(...)))`                                    | `len(api.runs(..., per_page=1, include_sweeps=False, lazy=True))`                                                                                                                                                                   |
+| Distinct tags                  | iterate all runs collecting `run.tags`                        | GraphQL `tagCounts` query                                                                                                                                                                                                           |
+| Distinct groups                | iterate all runs collecting `run.group`                       | GraphQL `groupedRuns` query                                                                                                                                                                                                         |
+| `run.config` after lazy fetch  | `run.config` returns `{}`                                     | Use `lazy=False` when you need config                                                                                                                                                                                               |
+| Pagination                     | `api.runs(path)` (per_page=50 default)                        | `api.runs(path, per_page=min(N, 1000))`                                                                                                                                                                                             |
+| System/GPU/CPU metrics         | `run.history(keys=["system.gpu.0.gpu"])` → empty              | `run.history(stream='system', samples=500)` GPU, CPU, memory, network, disk metrics live in a separate stream; the default stream returns training metrics only. Absence in the default stream is NOT proof the data doesn't exist. |
+| History — no keys on large run | `run.history(samples=10)` -> 502                              | `run.history(samples=10, keys=["LOSS_KEY"])`                                                                                                                                                                                        |
+| scan_history — no keys         | `scan_history()` -> timeout                                   | `scan_history(keys=["LOSS_KEY"])`                                                                                                                                                                                                   |
+| Cross-run search               | iterate all runs client-side                                  | Server-side filter: `{"summary_metrics.X": {"$gt": Y}}`                                                                                                                                                                             |
+| Filter by run type             | `filters={"job_type": "train"}` → `Unknown column 'job_type'` | `filters={"jobType": "train"}` (camelCase backend field)                                                                                                                                                                            |
 
 ### Launch
 
-| Gotcha | Wrong | Right |
-|--------|-------|-------|
-| List queues | `api.run_queues()` or raw GQL | `list_queues(entity)` from helpers |
-| Resources | Build raw Launch resource args | Pick a queue; helpers use its defaults. Use `gpus=`, `cpu=`, or `memory=` only for explicit overrides |
-| requirements.txt | `pip freeze` from venv | Let helpers add `wandb`; pass `requirements=[...]` only for extra packages |
-| Base image arch | `docker build` on Mac | `docker buildx build --platform linux/amd64` |
-| Fake launch | `wandb.init()` with config | `relaunch_run()` or `launch_job_artifact()` |
-| Unknown config key | `relaunch_run(config={"conv_layers": 4})` | Code change — download, edit, `create_and_launch_modified_job()` |
+| Gotcha             | Wrong                                     | Right                                                                                                 |
+| ------------------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| List queues        | `api.run_queues()` or raw GQL             | `list_queues(entity)` from helpers                                                                    |
+| Resources          | Build raw Launch resource args            | Pick a queue; helpers use its defaults. Use `gpus=`, `cpu=`, or `memory=` only for explicit overrides |
+| requirements.txt   | `pip freeze` from venv                    | Let helpers add `wandb`; pass `requirements=[...]` only for extra packages                            |
+| Base image arch    | `docker build` on Mac                     | `docker buildx build --platform linux/amd64`                                                          |
+| Fake launch        | `wandb.init()` with config                | `relaunch_run()` or `launch_job_artifact()`                                                           |
+| Unknown config key | `relaunch_run(config={"conv_layers": 4})` | Code change — download, edit, `create_and_launch_modified_job()`                                      |
 
 ### Weave logging noise
 
 ```python
 import logging
+
 logging.getLogger("weave").setLevel(logging.ERROR)
 ```

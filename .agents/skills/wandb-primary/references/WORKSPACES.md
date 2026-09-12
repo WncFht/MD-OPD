@@ -3,6 +3,7 @@ SPDX-FileCopyrightText: 2026 CoreWeave, Inc.
 SPDX-License-Identifier: Apache-2.0
 SPDX-PackageName: skills
 -->
+
 # W&B Workspaces - programmatic views, sections, and panels
 
 Reference for **workspace views**: the saved layouts of sections and panels on a
@@ -10,7 +11,7 @@ project's run page. Read this whenever a task involves inspecting or mutating a
 workspace - add/rename sections, add panels (including custom-expression panels
 like "loss scaled by 2"), set runset filters/groupby/order, pin columns, color or
 hide runs, or save a view. Don't write workspace code from memory; the SDK has
-sharp edges (see Gotchas) and the most common case (a user's *default* workspace)
+sharp edges (see Gotchas) and the most common case (a user's _default_ workspace)
 is not reachable through `Workspace.from_url`.
 
 Use `wandb-workspaces` for programmatic workspace edits. Install `wandb-workspaces`
@@ -53,7 +54,7 @@ ws_view.sections.append(
     )
 )
 
-ws_view.save()                 # overwrite the same saved view in place
+ws_view.save()  # overwrite the same saved view in place
 print(f"Saved: {ws_view.url}")
 
 # Or snapshot to a brand-new saved view instead of overwriting:
@@ -114,20 +115,20 @@ wr.LinePlot(
 Panel classes live in `wandb_workspaces.reports.v2` (`wr.*`) — the same types as
 Reports. Only these render in workspace sections:
 
-| Panel | When to use | Key params |
-|---|---|---|
-| `wr.LinePlot` | Metric over time / training curves | `x`, `y` (list), `metric_regex`, `custom_expressions`, `smoothing_factor`, `plot_type` |
-| `wr.BarPlot` | Compare final metrics across runs | `metrics` (list), `orientation` ("v"/"h"), `max_bars_to_show` |
-| `wr.ScatterPlot` | Correlations, hyperparameter vs metric | `x`, `y`, `z` (optional), `regression` |
-| `wr.ScalarChart` | A single summary metric | `metric` (singular, not a list) |
-| `wr.ParallelCoordinatesPlot` | Sweep overview, many hparams at once | `columns` (list of `wr.ParallelCoordinatesPlotColumn`) |
-| `wr.ParameterImportancePlot` | Which hparams matter most | `with_respect_to` (target metric) |
-| `wr.RunComparer` | Side-by-side config/summary diff | `diff_only` |
-| `wr.CodeComparer` | Side-by-side code diff | `diff` ("split"/"unified") |
-| `wr.MediaBrowser` | Images / audio / video / tables | `media_keys` (list), `num_columns`, `mode` |
-| `wr.MarkdownPanel` | Notes, annotations | `markdown` |
-| `wr.CustomChart` | Anything not native — arbitrary Vega (heatmaps, histograms, confusion matrices) | `query`, `chart_name`, `chart_fields`; or `CustomChart.from_table(...)` |
-| `wr.WeavePanelSummaryTable` | A `wandb.Table` logged to run summary | `table_name` |
+| Panel                        | When to use                                                                     | Key params                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `wr.LinePlot`                | Metric over time / training curves                                              | `x`, `y` (list), `metric_regex`, `custom_expressions`, `smoothing_factor`, `plot_type` |
+| `wr.BarPlot`                 | Compare final metrics across runs                                               | `metrics` (list), `orientation` ("v"/"h"), `max_bars_to_show`                          |
+| `wr.ScatterPlot`             | Correlations, hyperparameter vs metric                                          | `x`, `y`, `z` (optional), `regression`                                                 |
+| `wr.ScalarChart`             | A single summary metric                                                         | `metric` (singular, not a list)                                                        |
+| `wr.ParallelCoordinatesPlot` | Sweep overview, many hparams at once                                            | `columns` (list of `wr.ParallelCoordinatesPlotColumn`)                                 |
+| `wr.ParameterImportancePlot` | Which hparams matter most                                                       | `with_respect_to` (target metric)                                                      |
+| `wr.RunComparer`             | Side-by-side config/summary diff                                                | `diff_only`                                                                            |
+| `wr.CodeComparer`            | Side-by-side code diff                                                          | `diff` ("split"/"unified")                                                             |
+| `wr.MediaBrowser`            | Images / audio / video / tables                                                 | `media_keys` (list), `num_columns`, `mode`                                             |
+| `wr.MarkdownPanel`           | Notes, annotations                                                              | `markdown`                                                                             |
+| `wr.CustomChart`             | Anything not native — arbitrary Vega (heatmaps, histograms, confusion matrices) | `query`, `chart_name`, `chart_fields`; or `CustomChart.from_table(...)`                |
+| `wr.WeavePanelSummaryTable`  | A `wandb.Table` logged to run summary                                           | `table_name`                                                                           |
 
 Every panel accepts `layout=wr.Layout(x, y, w, h)` — width `w` in grid units (max 24,
 default 8), height `h` (default 6).
@@ -150,7 +151,7 @@ ws_view.runset_settings = ws.RunsetSettings(
     pinned_columns=["summary:accuracy", "summary:loss"],
     run_settings={
         "RUN_ID_A": ws.RunSettings(color="#FF0000"),  # keys are run IDs, not names
-        "RUN_ID_B": ws.RunSettings(disabled=True),     # hide a run
+        "RUN_ID_B": ws.RunSettings(disabled=True),  # hide a run
     },
 )
 ws_view.save()
@@ -177,10 +178,11 @@ Panel-level — override grouping and set the aggregation per panel:
 
 ```python
 wr.LinePlot(
-    x="Step", y=["loss"],
+    x="Step",
+    y=["loss"],
     groupby=wr.Config("learning_rate"),
-    groupby_aggfunc="mean",       # "mean", "min", "max", "median", "sum", "samples"
-    groupby_rangefunc="stddev",   # "minmax", "stddev", "stderr", "none", "samples"
+    groupby_aggfunc="mean",  # "mean", "min", "max", "median", "sum", "samples"
+    groupby_rangefunc="stddev",  # "minmax", "stddev", "stderr", "none", "samples"
 )
 ```
 
@@ -195,7 +197,7 @@ Per-run visibility and color go through `run_settings` (keys are run IDs):
 ```python
 ws.RunsetSettings(
     run_settings={
-        "abc123": ws.RunSettings(disabled=True),    # hide from all panels
+        "abc123": ws.RunSettings(disabled=True),  # hide from all panels
         "def456": ws.RunSettings(color="#00ff00"),  # visible, green
     },
 )
@@ -206,8 +208,8 @@ Pinned runs stay visible regardless of filters (max 20) and may be cross-project
 ```python
 ws.RunsetSettings(
     pinned_runs=[
-        "abc123",                                            # same project
-        "other-entity/other-project/def456",                 # cross-project
+        "abc123",  # same project
+        "other-entity/other-project/def456",  # cross-project
         ws.RunRef("ghi789", entity="team", project="proj"),  # typed ref
     ],
 )
@@ -237,25 +239,25 @@ guessing.
 
 ## Gotchas
 
-| Gotcha | Detail |
-|--------|--------|
-| No draft state | `save()` writes immediately. Be sure before you call it. |
-| `from_url` rejects `nwuser*` | The default user workspace raises `UnsupportedViewError`; use the raw-spec path or `save_as_new_view()`. |
-| Older spec shapes | `Workspace._from_model` can reject legacy specs (e.g. `panelConfigOverrides`); the raw-spec path is immune. |
-| `x` (U+00D7) reads as emoji | The Pydantic validator rejects it; use ASCII `x` or `*` in titles/names. |
-| Slash in metric names | Wrap in `${...}` inside custom expressions, else `a/b` parses as division. |
-| `run_settings` keys are run IDs | Not display names - use `run.id`. |
-| `auto_generate_panels` is set-once | Only at workspace creation; cannot be changed later. |
-| Panel metric params differ | `wr.BarPlot` uses `metrics` (list), `wr.ScalarChart` uses `metric` (singular), `wr.LinePlot` uses `y` (list). Not interchangeable. |
-| Raw-spec `id` required for updates | Omitting `id` in `upsertView` creates a NEW view instead of updating. Always fetch the view first to get its `id`. |
-| `inserted=False` is success | The `upsertView` mutation returns `inserted=False` when updating an existing view (vs `True` for a new one). Not an error. |
-| Verify raw-spec edits | A mutation can return success while a panel fails to render. Re-fetch the spec and assert your change landed before reporting done. |
-| Section grid layout | `ws.SectionLayoutSettings(columns=3, rows=2)` controls the panel grid; panels flow left-to-right, top-to-bottom. |
-| Don't mass-edit on ambiguity | If a target view/section is ambiguous, surface candidates before guessing. |
+| Gotcha                             | Detail                                                                                                                              |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| No draft state                     | `save()` writes immediately. Be sure before you call it.                                                                            |
+| `from_url` rejects `nwuser*`       | The default user workspace raises `UnsupportedViewError`; use the raw-spec path or `save_as_new_view()`.                            |
+| Older spec shapes                  | `Workspace._from_model` can reject legacy specs (e.g. `panelConfigOverrides`); the raw-spec path is immune.                         |
+| `x` (U+00D7) reads as emoji        | The Pydantic validator rejects it; use ASCII `x` or `*` in titles/names.                                                            |
+| Slash in metric names              | Wrap in `${...}` inside custom expressions, else `a/b` parses as division.                                                          |
+| `run_settings` keys are run IDs    | Not display names - use `run.id`.                                                                                                   |
+| `auto_generate_panels` is set-once | Only at workspace creation; cannot be changed later.                                                                                |
+| Panel metric params differ         | `wr.BarPlot` uses `metrics` (list), `wr.ScalarChart` uses `metric` (singular), `wr.LinePlot` uses `y` (list). Not interchangeable.  |
+| Raw-spec `id` required for updates | Omitting `id` in `upsertView` creates a NEW view instead of updating. Always fetch the view first to get its `id`.                  |
+| `inserted=False` is success        | The `upsertView` mutation returns `inserted=False` when updating an existing view (vs `True` for a new one). Not an error.          |
+| Verify raw-spec edits              | A mutation can return success while a panel fails to render. Re-fetch the spec and assert your change landed before reporting done. |
+| Section grid layout                | `ws.SectionLayoutSettings(columns=3, rows=2)` controls the panel grid; panels flow left-to-right, top-to-bottom.                    |
+| Don't mass-edit on ambiguity       | If a target view/section is ambiguous, surface candidates before guessing.                                                          |
 
 ## Raw-spec fallback for the default user workspace
 
-`from_url` cannot load `?nw=nwuser<username>` views, so to edit a user's *default*
+`from_url` cannot load `?nw=nwuser<username>` views, so to edit a user's _default_
 workspace, fetch the raw view spec over GraphQL, mutate the dict, and upsert it.
 This needs no extra dependencies beyond `wandb`.
 
@@ -266,6 +268,7 @@ import wandb
 
 def execute_graphql(api, query, variables):
     from wandb_graphql.language import parser as gql_parser
+
     return api.client.execute(gql_parser.parse(query), variable_values=variables)
 
 
@@ -279,12 +282,7 @@ api = wandb.Api(timeout=120)
 list_q = """query ($e:String!,$p:String!){
   project(entityName:$e,name:$p){ allViews(viewType:"project-view",first:100){
     edges{ node{ id name displayName spec } } } } }"""
-nodes = [
-    e["node"]
-    for e in execute_graphql(api, list_q, {"e": entity, "p": project})[
-        "project"
-    ]["allViews"]["edges"]
-]
+nodes = [e["node"] for e in execute_graphql(api, list_q, {"e": entity, "p": project})["project"]["allViews"]["edges"]]
 node = next(n for n in nodes if n["name"] in (f"nw-{token}-w", f"nw-{token}-v"))
 spec = json.loads(node["spec"])
 
@@ -309,12 +307,20 @@ section.setdefault("panels", []).append(panel)
 mutation = """mutation ($id:ID,$e:String,$p:String,$t:String,$n:String,$dn:String,$d:String,$s:String){
   upsertView(input:{id:$id,entityName:$e,projectName:$p,name:$n,displayName:$dn,description:$d,type:$t,spec:$s,createdUsing:WANDB_SDK}){
     view{ id name displayName } inserted } }"""
-execute_graphql(api, mutation, {
-    "id": node["id"], "e": entity, "p": project,
-    "n": node["name"], "dn": node["displayName"],
-    "d": "", "t": "project-view",
-    "s": json.dumps(spec, separators=(",", ":")),
-})
+execute_graphql(
+    api,
+    mutation,
+    {
+        "id": node["id"],
+        "e": entity,
+        "p": project,
+        "n": node["name"],
+        "dn": node["displayName"],
+        "d": "",
+        "t": "project-view",
+        "s": json.dumps(spec, separators=(",", ":")),
+    },
+)
 print(f"Updated workspace: https://wandb.ai/{entity}/{project}/?nw={token}")
 ```
 

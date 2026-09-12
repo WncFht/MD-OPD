@@ -267,17 +267,3 @@ $$
 ### 参考文献
 
 [^cai26]: Y. Cai, D. Cao, L. Lin, et al. _Learning to Foresee: Unveiling the Unlocking Efficiency of On-Policy Distillation_. arXiv 2026. [arXiv:2605.11739](https://arxiv.org/abs/2605.11739)
-
-[^fu26]: Z. Fu, B. He, Y. Zuo, et al. _Rethinking On-Policy Distillation of Large Language Models II: One Training Example_. arXiv 2026. [arXiv:2609.04172](https://arxiv.org/abs/2609.04172)
-
-[^amari98]: S. Amari. _Natural Gradient Works Efficiently in Learning_. Neural Computation 10(2):251--276, 1998.
-
-[^martens14]: J. Martens. _New Insights and Perspectives on the Natural Gradient Method_. JMLR 21(232), 2020. [arXiv:1412.1193](https://arxiv.org/abs/1412.1193)
-
-[^bordelon20]: A. Bordelon, A. Canatar, C. Pehlevan. _Spectrum Dependent Learning Curves in Kernel Regression and Wide Neural Networks_. ICML 2020. [arXiv:2002.02561](https://arxiv.org/abs/2002.02561)
-
-[^mandt17]: S. Mandt, M. Hoffman, D. Blei. _Stochastic Gradient Descent as Approximate Bayesian Inference_. JMLR 18(134):1--35, 2017. [arXiv:1704.04289](https://arxiv.org/abs/1704.04289)
-
-[^kingma15]: D. Kingma, J. Ba. _Adam: A Method for Stochastic Optimization_. ICLR 2015. [arXiv:1412.6980](https://arxiv.org/abs/1412.6980)
-
-[^cohen21]: J. Cohen, A. Kaur, Y. Li, J. Z. Kolter, A. Talwalkar. _Gradient Descent on Neural Networks Typically Occurs at the Edge of Stability_. ICLR 2021. [arXiv:2103.00065](https://arxiv.org/abs/2103.00065)

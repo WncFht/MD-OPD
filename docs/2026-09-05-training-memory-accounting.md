@@ -649,7 +649,7 @@ weight sync -> vLLM wake -> 下一轮 rollout
 | Actor old-log BF16 logits    | `32768*151936*2/2^30=9.273`             | 未逐阶段打印                 | 理论项                 |
 | Actor student FP32 workspace | `32768*151936*4/2^30=18.547`            | 未逐阶段打印                 | 理论项，直接对应代码   |
 | Actor vocab 相关峰值         | `max(9.273+9.273, 9.273+18.547)=27.820` | high-water `50.242`          | 剩余为模型/workspace   |
-| 旧 Teacher OOM申请           | `57344*151936*4/2^30=32.457`            | 上一份日志 `32.46 GiB`       | 精确对齐               |
+| 旧 Teacher OOM 申请          | `57344*151936*4/2^30=32.457`            | 上一份日志 `32.46 GiB`       | 精确对齐               |
 | 新 Teacher FP32 chunk        | `883*151936*4/2^30≈0.500`               | 新日志无 teacher peak sample | 理论上限，不冒充实测   |
 | Allocator slack              | `reserved-allocated`                    | `0.625 GiB`                  | 正常缓存，不是主要碎片 |
 

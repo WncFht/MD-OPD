@@ -3,6 +3,7 @@ SPDX-FileCopyrightText: 2026 CoreWeave, Inc.
 SPDX-License-Identifier: Apache-2.0
 SPDX-PackageName: skills
 -->
+
 # Run Logs (GraphQL)
 
 Reading W&B run console logs. Two surfaces expose log data, backed by
@@ -46,12 +47,14 @@ logs/output_YYYYMMDD_HHMMSS_NNNNNNNNN.log
 ```
 
 Example from a run with two parts:
+
 ```text
 logs/output_20251219_162652_408917000.log
 logs/output_20251219_162655_920170000.log
 ```
 
 Rollover is controlled by two settings (whichever triggers first):
+
 - `console_chunk_max_bytes` — size-based rollover threshold (bytes)
 - `console_chunk_max_seconds` — time-based rollover threshold (seconds)
 
@@ -66,6 +69,7 @@ To download and stitch them in order:
 
 ```python
 import os, tempfile
+
 with tempfile.TemporaryDirectory() as d:
     for f in sorted(log_files, key=lambda f: f.name):
         f.download(root=d, replace=True)
@@ -109,10 +113,16 @@ query RunLogs($entity: String!, $project: String!, $run: String!,
 after = None
 lines = []
 while True:
-    res = api.client.execute(query, variable_values={
-        "entity": ENTITY, "project": PROJECT, "run": RUN_ID,
-        "first": 5000, "after": after,
-    })
+    res = api.client.execute(
+        query,
+        variable_values={
+            "entity": ENTITY,
+            "project": PROJECT,
+            "run": RUN_ID,
+            "first": 5000,
+            "after": after,
+        },
+    )
     conn = res["project"]["run"]["logLines"]
     lines.extend(edge["node"] for edge in conn["edges"])
     if not conn["pageInfo"]["hasNextPage"]:
@@ -141,28 +151,33 @@ query RunLogTail($entity: String!, $project: String!, $run: String!,
 }
 """)
 
-res = api.client.execute(query, variable_values={
-    "entity": ENTITY, "project": PROJECT, "run": RUN_ID,
-    "last": 100,
-})
+res = api.client.execute(
+    query,
+    variable_values={
+        "entity": ENTITY,
+        "project": PROJECT,
+        "run": RUN_ID,
+        "last": 100,
+    },
+)
 ```
 
 ## LogLine fields
 
-| Field | Description |
-|---|---|
-| `number` | Line number (0-indexed) |
-| `timestamp` | ISO timestamp |
-| `level` | Log level (`info`, `error`, etc.) |
-| `label` | Source label (e.g. `stdout`, `stderr`) |
-| `line` | The log line content |
+| Field       | Description                            |
+| ----------- | -------------------------------------- |
+| `number`    | Line number (0-indexed)                |
+| `timestamp` | ISO timestamp                          |
+| `level`     | Log level (`info`, `error`, etc.)      |
+| `label`     | Source label (e.g. `stdout`, `stderr`) |
+| `line`      | The log line content                   |
 
 ## Useful Run fields
 
-| Field | Description |
-|---|---|
-| `logLineCount` | Total number of log lines available |
-| `logLines(first:, after:, last:, before:)` | Paginated log connection |
+| Field                                      | Description                         |
+| ------------------------------------------ | ----------------------------------- |
+| `logLineCount`                             | Total number of log lines available |
+| `logLines(first:, after:, last:, before:)` | Paginated log connection            |
 
 ## Search and navigation
 

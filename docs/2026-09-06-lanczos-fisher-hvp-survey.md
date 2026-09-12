@@ -95,7 +95,7 @@ $$
 v\mapsto Av,
 $$
 
-即矩阵-向量乘法。若能计算 $Av$，就可以在 $m\ll P$ 次乘法后得到一个 $m\times m$ 的三对角矩阵，其特征值近似 $A$ 的极值和谱密度。
+即矩阵 - 向量乘法。若能计算 $Av$，就可以在 $m\ll P$ 次乘法后得到一个 $m\times m$ 的三对角矩阵，其特征值近似 $A$ 的极值和谱密度。
 
 HVP 的经典自动微分实现来自 Pearlmutter：先算一阶梯度 $g=\nabla L$，再对标量 $g^\top v$ 求一次梯度：
 
@@ -458,7 +458,7 @@ Granziol 的 HessFormer（2025，arXiv:2505.11564）把 Pearlmutter HVP 和 stoc
 2. 不同数据子集会改变谱密度，因而 OPD 的谱测量必须固定状态集、序列长度和 batch 采样口径。
 3. 低迭代数会出现 Ritz 值重合或“ghost”结构；不能把 SLQ 的每个离散峰直接当成 Hessian 的真实重数。
 
-HessFormer测的是经验 Hessian，而不是 OPD 理论中的任务加权谱。它证明了“能测”，但不等于已经证明某个谱能解释吸收率。
+HessFormer 测的是经验 Hessian，而不是 OPD 理论中的任务加权谱。它证明了“能测”，但不等于已经证明某个谱能解释吸收率。
 
 ### 11.2 Foundation-scale Hessian Spectral Analysis：FSDP 下的有限差分 HVP
 
@@ -489,7 +489,7 @@ _The Potential of Second-Order Optimization for LLMs: A Study with Full Gauss--N
 
 对 OPD 来说，layerwise GN 是比 full Fisher 更现实的第一步：它可以检测“中间层 MLP 的高边际收益”究竟是模块驱动力 $b_m$ 大，还是仅仅因为该模块曲率更高。
 
-### 11.4 Why Transformers Need Adam：block heterogeneity
+### 11.4 Why Transformers Need Adam: block heterogeneity
 
 _Why Transformers Need Adam: A Hessian Perspective_（arXiv:2402.16788，NeurIPS 2024）使用 SLQ 比较 Transformer 和 CNN 的 Hessian block 谱[^transformeradam24]。论文的核心概念是 **block heterogeneity**：不同参数块的 Hessian 谱差异很大。单一全局 learning rate 的 GD 在这种情况下受到最坏条件数限制，而 Adam 的坐标/块级尺度调整可以缓解这一问题。
 
@@ -528,7 +528,7 @@ $$
 1. **测谱可行，但测到的谱依赖数据和数值口径。** HessFormer 与 foundation-scale 工作都强调 batch、有限差分步长、精度和重正交化。
 2. **Hessian、GGN、Fisher 不能混称。** full GN 的正定预条件与非凸 Hessian 的负特征值有不同用途。
 3. **块对角近似并非总是可靠。** LLM 的 block heterogeneity 和 foundation-scale 的 block-diagonal 误差结果都支持先测跨块方向对齐，再决定是否采用 layerwise 近似。
-4. **谱密度不等于任务谱。** SLQ 的 trace-weighted density必须与 OPD 教师残差振幅 $b_i$ 或 KL 权重结合，才可用于解释 $v_t$。
+4. **谱密度不等于任务谱。** SLQ 的 trace-weighted density 必须与 OPD 教师残差振幅 $b_i$ 或 KL 权重结合，才可用于解释 $v_t$。
 
 对我们的实验设计，最稳妥的优先级因此是：先在固定状态上用 GGN/Fisher matvec 测 top Ritz 方向和残差投影，再用 SLQ 估计谱密度，最后才讨论用该谱做预条件或 EffOPD 外推。
 

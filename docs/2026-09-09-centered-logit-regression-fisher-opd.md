@@ -510,7 +510,7 @@ $$
 \text{exact output NGD field}.
 $$
 
-需要和 Self-Distilled Policy Gradient（SDPG）[^sdpg26] 等论文中的 “centered log-ratio policy-gradient advantage” 区分：policy-gradient 中常用的是按 student measure 中心化的 baseline $\mathbb E_p[\delta]$；CLR 的 $P\delta$ 是按 vocabulary uniform measure 去除 logit gauge。二者都出现 centered ratio，但不是同一个输出 vector field。
+需要和 Self-Distilled Policy Gradient（SDPG）[^sdpg26] 等论文中的“centered log-ratio policy-gradient advantage”区分：policy-gradient 中常用的是按 student measure 中心化的 baseline $\mathbb E_p[\delta]$；CLR 的 $P\delta$ 是按 vocabulary uniform measure 去除 logit gauge。二者都出现 centered ratio，但不是同一个输出 vector field。
 
 ## 8. Two-token pairwise estimator
 

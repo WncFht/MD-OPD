@@ -5,38 +5,38 @@
 ## 1. palette preset
 
 - `tableau-paper`
-  - 多类别、平衡、适合论文图
+    - 多类别、平衡、适合论文图
 - `tableau-accent`
-  - 一个主系列高亮，其余退成灰或低饱和
+    - 一个主系列高亮，其余退成灰或低饱和
 - `mono-paper`
-  - 灰度为主，只保留一个强调色
+    - 灰度为主，只保留一个强调色
 
 ## 2. marker preset
 
 - `standard`
-  - `o, s, ^, D, P`
+    - `o, s, ^, D, P`
 - `paper-contrast`
-  - `o, ^, D, X, *`
+    - `o, ^, D, X, *`
 
 marker 的目标不是装饰，而是当颜色不够时继续区分类别。
 
 ## 3. line preset
 
 - `solid-primary`
-  - 主系列实线，次系列实线
+    - 主系列实线，次系列实线
 - `with-reference`
-  - 数据线实线，参考线虚线 `--`
+    - 数据线实线，参考线虚线 `--`
 - `with-dotted-grid`
-  - 数据线实线，背景网格点线 `:`
+    - 数据线实线，背景网格点线 `:`
 
 ## 4. frame preset
 
 - `open`
-  - 只保留左/下 spine
+    - 只保留左/下 spine
 - `closed`
-  - 四边框完整
+    - 四边框完整
 - `minimal`
-  - 极弱边框，强调留白
+    - 极弱边框，强调留白
 
 ## 5. grid preset
 
@@ -47,11 +47,11 @@ marker 的目标不是装饰，而是当颜色不够时继续区分类别。
 ## 6. emphasis preset
 
 - `balanced`
-  - 各系列地位平等
+    - 各系列地位平等
 - `accent-first`
-  - 第一个系列是主角
+    - 第一个系列是主角
 - `highlight-best`
-  - 强调最优值或最优系列
+    - 强调最优值或最优系列
 
 ## 7. annotation preset
 
@@ -64,20 +64,20 @@ marker 的目标不是装饰，而是当颜色不够时继续区分类别。
 先不要让 preset 过多。默认只维护三套组合：
 
 - `tableau-paper`
-  - `palette=tableau-paper`
-  - `markers=standard`
-  - `frame=closed`
-  - `grid=y-only`
-  - `emphasis=balanced`
+    - `palette=tableau-paper`
+    - `markers=standard`
+    - `frame=closed`
+    - `grid=y-only`
+    - `emphasis=balanced`
 - `tableau-accent`
-  - `palette=tableau-accent`
-  - `markers=standard`
-  - `frame=closed`
-  - `grid=y-only`
-  - `emphasis=accent-first`
+    - `palette=tableau-accent`
+    - `markers=standard`
+    - `frame=closed`
+    - `grid=y-only`
+    - `emphasis=accent-first`
 - `mono-paper`
-  - `palette=mono-paper`
-  - `markers=paper-contrast`
-  - `frame=open`
-  - `grid=full-dotted`
-  - `emphasis=highlight-best`
+    - `palette=mono-paper`
+    - `markers=paper-contrast`
+    - `frame=open`
+    - `grid=full-dotted`
+    - `emphasis=highlight-best`

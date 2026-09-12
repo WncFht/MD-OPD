@@ -846,11 +846,11 @@ $$
 
 ### 参考文献
 
-[^k11260]: 科学空间. 《重新思考学习率与 Batch Size（一）：现状》. 2025. [原文](https://kexue.fm/archives/11260)
+[^k11260]: 科学空间。《重新思考学习率与 Batch Size（一）：现状》. 2025. [原文](https://kexue.fm/archives/11260)
 
-[^k11280]: 科学空间. 《重新思考学习率与 Batch Size（二）：平均场》. 2025. [原文](https://kexue.fm/archives/11280)
+[^k11280]: 科学空间。《重新思考学习率与 Batch Size（二）：平均场》. 2025. [原文](https://kexue.fm/archives/11280)
 
-[^k11301]: 科学空间. 《重新思考学习率与 Batch Size（四）：EMA》. 2025. [原文](https://kexue.fm/archives/11301)
+[^k11301]: 科学空间。《重新思考学习率与 Batch Size（四）：EMA》. 2025. [原文](https://kexue.fm/archives/11301)
 
 [^cai26]: Y. Cai, D. Cao, L. Lin, et al. _Learning to Foresee: Unveiling the Unlocking Efficiency of On-Policy Distillation_. arXiv 2026. [arXiv:2605.11739](https://arxiv.org/abs/2605.11739)
 

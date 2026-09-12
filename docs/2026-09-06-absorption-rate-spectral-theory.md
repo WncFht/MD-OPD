@@ -160,7 +160,7 @@ $$
 
 ### 2.3 推导三：$\alpha(t)=t\cdot v_t$ 恒等式与尾部形态分类学
 
-定义**局部对数斜率指数**（对数-对数图上 $d$ 曲线的局部斜率）：
+定义**局部对数斜率指数**（对数 - 对数图上 $d$ 曲线的局部斜率）：
 
 $$
 \alpha(t)\;\equiv\;-\frac{d\ln d}{d\ln t}\;=\;-\frac{t\,d'(t)}{d(t)}\;=\;t\cdot v_t^{\mathrm{inst}} ,
@@ -325,7 +325,7 @@ $$
 
 ### 3.1 统计力学学习理论：弛豫、speciation 与风险率
 
-- **Seung, Sompolinsky & Tishby (1992)[^seung92]**：把从样本学习写成 Langevin 动力学。核心结果：学习曲线的形态由学生-教师耦合矩阵（= 误差 Hessian 在解处的谱）决定——耦合满秩时误差**指数**衰减；耦合有零模（对称子空间）时误差呈 **$1/t$** 幂律，由**最小非零特征值**定标；学生比教师"多自由度"时出现 **speciation 相变**——先在对称子空间内弛豫（平台），再分裂成专项解（对数时间的平台-跳变结构）。这正是 §2.2/§2.3 的"前沿 + 阶梯"在师生学习里的原始版本：$v_t$ 的凸起/阶梯若与模式群的 speciation 对应，应表现为 $\kappa_2$ 的非单调。
+- **Seung, Sompolinsky & Tishby (1992)[^seung92]**：把从样本学习写成 Langevin 动力学。核心结果：学习曲线的形态由学生 - 教师耦合矩阵（= 误差 Hessian 在解处的谱）决定——耦合满秩时误差**指数**衰减；耦合有零模（对称子空间）时误差呈 **$1/t$** 幂律，由**最小非零特征值**定标；学生比教师"多自由度"时出现 **speciation 相变**——先在对称子空间内弛豫（平台），再分裂成专项解（对数时间的平台 - 跳变结构）。这正是 §2.2/§2.3 的"前沿 + 阶梯"在师生学习里的原始版本：$v_t$ 的凸起/阶梯若与模式群的 speciation 对应，应表现为 $\kappa_2$ 的非单调。
 - **Saad & Solla (1995)[^saad-solla95]**：online（每样本只用一次）学习 soft committee machine 的精确 ODE 动力学——初期对称相（误差平台，$\kappa_1\approx$ 常数）之后进入专化相，重叠按指数增长、误差呈 $1/t$ 尾巴；中间的 speciation 是相变。给我们最重要的提示：**"平台→跳变→幂律尾"的三段结构在师生学习里是普适的**，论文的 300 步窗口可能只看到了其中一段。
 - **Watkin, Rau & Biehl (1993)[^watkin93]**：上述领域的综述，含学习曲线分类与有限训练集效应。
 - **Proschan (1963)[^proschan63]**：DFR 定理（§2.2 已用）——定性结论"混合指数必有递减风险率"是免参数的；定量读谱才需要假设。
@@ -337,9 +337,9 @@ $$
 - **Kaplan et al. (2020)[^kaplan20]**（精读）：固定模型/数据时 $L(t)\propto t^{-\alpha_S}$，$\alpha_S\approx0.76$（表 3/5；$S_c\approx2.1\times10^3$ 步）；lr 用 warmup+cosine，训练曲线仍可按幂律拟合（初始瞬态之后）。**注意 $\alpha_S\approx0.76$ 与论文 OPD 的 $\alpha\approx0.72$（由 $d_{300}/d_{30}\approx0.19$ 解出）几乎重合**——预训练与 OPD 的"时间幂律指数"惊人同量级，支持"这是优化器×损失几何的性质，不是任务性质"。
 - **Bahri et al. (2021)[^bahri21]**（精读澄清）：四象限 = variance/resolution × 数据/宽度；样本侧 $L(D)-L(\infty)=\mathcal O(D^{-1})$、宽度侧 $\mathcal O(1/w)$；resolution-limited 指数由核谱 $\lambda_i\sim i^{-(1+\alpha_K)}$ 给出 $\alpha_D=\alpha_P=\alpha_K$，且有 $C^t$ 核的 $\alpha\lesssim4/d$ 预言。**没有时间轴**——初版把 "optimization-limited" 归给它是错的。
 - **Maloney, Roberts & Sully (2022)[^mrs22]**（精读澄清）：可解标度模型（潜空间协方差幂律 $\lambda_I=\lambda_+I^{-(1+\alpha)}$，$\alpha=(2-\beta)/(\beta-1)$），解 ridge 回归的 resolvent，$\mathcal L(N,T)=L_0(1/N+1/T)^{\alpha}$——同样**只在资源轴**，无梯度流时间轴。
-- **Bordelon, Canatar & Pehlevan (2020)[^bordelon20]**（时间域的锚）：NTK 域梯度流 $\partial_t u=-K^\ast u$，逐特征方向 $e^{-\lambda_k t}$ 衰减；幂律谱 → 时间幂律学习曲线；样本侧用 replica 方法。**这是"从谱导出 loss-vs-time"最直接的文献依据**，§2 的模型是它在 (学生,教师) KL 几何上的版本。
+- **Bordelon, Canatar & Pehlevan (2020)[^bordelon20]**（时间域的锚）：NTK 域梯度流 $\partial_t u=-K^\ast u$，逐特征方向 $e^{-\lambda_k t}$ 衰减；幂律谱 → 时间幂律学习曲线；样本侧用 replica 方法。**这是"从谱导出 loss-vs-time"最直接的文献依据**，§2 的模型是它在 (学生，教师) KL 几何上的版本。
 - **Canatar, Bordelon & Pehlevan (2021)[^canatar21]**：样本侧的"累积功率 $C(\rho)$"判据（目标在第 $k$ 个核特征方向上的功率累积占比决定该模式的可学习性）——"task-model alignment"。对 OPD 的转译：**教师分布在学生 NTK 特征方向上的累积功率分布**就是初始振幅 $\{a_i\}$，可以在训练前算出来（H5 的前半）。
-- **早停/最优速率经典**：Yao, Rosasco & Caponnetto (2007)[^yao07]（早停=谱正则化，偏差-方差随 $t$ 的交替）、Caponnetto & De Vito (2007)[^caponnetto07]（最优速率 $O(1/\sqrt n)$ 型）、Dieuleveut & Bach (2016)[^dieuleveut16]、Dieuleveut, Flammarion & Bach (2017)[^dieuleveut-17]（常数步长+迭代平均达到统计最优率——P2 的 EMA/权重平均的直接依据，另见 Porian et al. 2024[^porian24] 对 LM step-scaling 偏差的修复）。
+- **早停/最优速率经典**：Yao, Rosasco & Caponnetto (2007)[^yao07]（早停=谱正则化，偏差 - 方差随 $t$ 的交替）、Caponnetto & De Vito (2007)[^caponnetto07]（最优速率 $O(1/\sqrt n)$ 型）、Dieuleveut & Bach (2016)[^dieuleveut16]、Dieuleveut, Flammarion & Bach (2017)[^dieuleveut-17]（常数步长 + 迭代平均达到统计最优率——P2 的 EMA/权重平均的直接依据，另见 Porian et al. 2024[^porian24] 对 LM step-scaling 偏差的修复）。
 
 ### 3.3 频率原理 / 谱偏差：按频率排序的消费顺序
 
@@ -380,7 +380,7 @@ $$
 读法（逐条对应 §2 的判据）：
 
 1. **$\alpha(t)$ 系统性上升**（0.7 → 1.3，两 run 一致）→ 按 §2.3 的分类学是"带边/对数正态型谱"或"优化器效应"的形状；$v_{50}/v_{200}<4$ 由恒等式 $v_{50}/v_{200}=4\,(\alpha_{50}/\alpha_{200})$ 完全解释（用滑窗 $\alpha$ 代入得 2.2–2.4，与 2.5–3.1 的实测在估计器误差内一致）。**纯"幂律谱×幂律振幅"模型在这个窗口被排除**（§2.3 的 boxed 推论）。
-2. **无底**：floor+指数是三种形态里唯一明确被拒的（对数空间 rmse 0.19–0.23 vs 0.07–0.08），$v_{199}$ 仍在降——279 步内前沿尚未触及 $\lambda_{\mathrm{crit}}$ 底。 KL 谱方差读数：$-\dot v/\eta^2$ 给出相对谱宽 $\sqrt{\kappa_2}/\kappa_1\approx0.7\text{–}0.9$——$O(1)$ 宽谱，$v$ 远未走平。 **$v_t$ 凸起**（step ~55→80，1.5%→2.7–3.5%，原始单步 $v$ 里也在）：违反 $\dot\kappa_1\le0$，是谱模型之外机制的现场（§2.7 三选一；最便宜的判别是把论文 §5.3 off-policy run 的 $v_t$ 画出来）。 **损失几何无关**：top16 与 sampled-token 的 $d/d_{30}$、$v_t$ 曲线几乎重合（$d_{end}/d_{30}$ 0.053 vs 0.061）——论文"数据量无关"的推广：**token 子集/损失截断也不改变节奏**，进一步支持"节奏是 OPD×架构 的属性"。 **与论文读数的差异**：$\alpha$（全局）1.31–1.36 vs 论文 $\approx0.72$；$v_{50}/v_{200}$ 方向相反。候选解释按 §2.8：KL vs L1 的速率加倍与 $\lambda$-加权、熵污染（0.81→0.64→0.73）、窗口/估计器差异（median-端点 vs OLS）、吃得更深（94% vs 78–84%）。全部可被 M3 拆开。**事后补记（本轮已量化，M3 动机的核心证据）**：CE $=-\texttt{opd/teacher\_logp\_mean}$（teacher 交叉熵）从 0.896（step 30）降到 0.646（step 199）后**回升**到 0.735（step 279，随学生熵同步回升），两个 run 一致（top16：0.964→0.656→0.748）；而 KL 代理同一区间"干净地"降了 ~15×。也就是说 KL $=$ CE $-\,H$ 的衰减里相当一部分是两个慢变量相减的产物——§4 的 $\alpha$、$v_{50}/v_{200}$ 全部属 KL 口径，M3 的双口径拆解因此从"锦上添花"升级为"必做"。
+2. **无底**：floor+ 指数是三种形态里唯一明确被拒的（对数空间 rmse 0.19–0.23 vs 0.07–0.08），$v_{199}$ 仍在降——279 步内前沿尚未触及 $\lambda_{\mathrm{crit}}$ 底。KL 谱方差读数：$-\dot v/\eta^2$ 给出相对谱宽 $\sqrt{\kappa_2}/\kappa_1\approx0.7\text{–}0.9$——$O(1)$ 宽谱，$v$ 远未走平。 **$v_t$ 凸起**（step ~55→80，1.5%→2.7–3.5%，原始单步 $v$ 里也在）：违反 $\dot\kappa_1\le0$，是谱模型之外机制的现场（§2.7 三选一；最便宜的判别是把论文 §5.3 off-policy run 的 $v_t$ 画出来）。 **损失几何无关**：top16 与 sampled-token 的 $d/d_{30}$、$v_t$ 曲线几乎重合（$d_{end}/d_{30}$ 0.053 vs 0.061）——论文"数据量无关"的推广：**token 子集/损失截断也不改变节奏**，进一步支持"节奏是 OPD×架构 的属性"。 **与论文读数的差异**：$\alpha$（全局）1.31–1.36 vs 论文 $\approx0.72$；$v_{50}/v_{200}$ 方向相反。候选解释按 §2.8：KL vs L1 的速率加倍与 $\lambda$-加权、熵污染（0.81→0.64→0.73）、窗口/估计器差异（median-端点 vs OLS）、吃得更深（94% vs 78–84%）。全部可被 M3 拆开。**事后补记（本轮已量化，M3 动机的核心证据）**：CE $=-\texttt{opd/teacher\_logp\_mean}$（teacher 交叉熵）从 0.896（step 30）降到 0.646（step 199）后**回升**到 0.735（step 279，随学生熵同步回升），两个 run 一致（top16:0.964→0.656→0.748）；而 KL 代理同一区间"干净地"降了 ~15×。也就是说 KL $=$ CE $-\,H$ 的衰减里相当一部分是两个慢变量相减的产物——§4 的 $\alpha$、$v_{50}/v_{200}$ 全部属 KL 口径，M3 的双口径拆解因此从"锦上添花"升级为"必做"。
 
 **M4 多 run 补充（2026-09-07）**：同一相减结构在 baseline、$\beta_2=0.95$、lr=$2\times10^{-6}$、lr=$5\times10^{-7}$ 四臂均复现；末端 KL/CE 约为 0.39%–1.73%。因此 3.2 的口径警告是跨优化器稳健结论。另一方面，M4 当前仍无逐 token 极值/分位数日志；3.3 的重尾结论只能沿用已有基线，不能从 M4 均值曲线外推尾部形状。
 
@@ -401,11 +401,11 @@ $$
 | ours sampled-token（KL） | 0.055          | 0.054           | −0.50（$\gamma\approx0.50$） |
 | paper Full-Data（L1）    | 0.153          | **0.068**       | −1.28                        |
 
-读法：**我们的 KL 曲线需要"幂律+弯曲"的多模式谱才能外推尾部，论文的 L1 曲线用单幂律即可**——与发现 1 的 α(t) 对比完全自洽。这不是谁对谁错：两口径对同一谱的加权不同（§2.8），KL 的 λ-加权放大了高曲率端的弯曲。M3 落地后应在同一 run 内用 L1/KL/CE 三口径各做一次反演（M2 的复跑清单已加）。
+读法：**我们的 KL 曲线需要"幂律 + 弯曲"的多模式谱才能外推尾部，论文的 L1 曲线用单幂律即可**——与发现 1 的 α(t) 对比完全自洽。这不是谁对谁错：两口径对同一谱的加权不同（§2.8），KL 的 λ-加权放大了高曲率端的弯曲。M3 落地后应在同一 run 内用 L1/KL/CE 三口径各做一次反演（M2 的复跑清单已加）。
 
 **图（`plots/figures/paper/`，由 `plots/pipelines/paper/plots.py` / `invert_spectrum.py` 生成）：**
 
-![论文图9四条L1曲线的尾部形态拟合](../plots/figures/paper/tail-distance_vs_step__source-paper__fits.png)
+![论文图 9 四条 L1 曲线的尾部形态拟合](../plots/figures/paper/tail-distance_vs_step__source-paper__fits.png)
 
 _图 M1-a：数字化的论文图 9 距离曲线（L1 口径，log-log）与三种尾部形态拟合。四个 run 全部幂律最优（括号内为对数空间 rmse），floor+exp 被拒——L1 口径下"幂律谱×幂律振幅"仍是可用近似。_
 
@@ -419,7 +419,7 @@ _图 M1-c：左——三个 lr 臂的 v_t（实时轴），凸起位置 {63, 40,
 
 ![top16 run 的 NNLS 谱反演](../plots/figures/paper/spectrum-density_vs_rate__metric-ours_top16_kl.png)
 
-_图 M2-a：top16 run 的谱反演。左：测量 d_t 与 NNLS 重构（竖线右侧为 hold-out 外推区）；右：反演出的谱密度 μ'(ρ)（对数-对数），斜率 ≈ −0.42。sampled-token 与论文 Full-Data 的同款图见 `figures/paper/spectrum-density_vs_rate__metric-ours_sampled_token_kl.png` / `figures/paper/spectrum-density_vs_rate__metric-paper_fulldata_l1.png`。_
+_图 M2-a：top16 run 的谱反演。左：测量 d_t 与 NNLS 重构（竖线右侧为 hold-out 外推区）；右：反演出的谱密度 μ'(ρ)（对数 - 对数），斜率 ≈ −0.42。sampled-token 与论文 Full-Data 的同款图见 `figures/paper/spectrum-density_vs_rate__metric-ours_sampled_token_kl.png` / `figures/paper/spectrum-density_vs_rate__metric-paper_fulldata_l1.png`。_
 
 ---
 
@@ -429,7 +429,7 @@ _图 M2-a：top16 run 的谱反演。左：测量 d_t 与 NNLS 重构（竖线�
 
 **H1（尾部形态 = 谱混合的指纹）。**
 
-- 精确预言：恒等式 $\alpha(t)=t\cdot v_t^{\mathrm{inst}}$（免拟合，直接检验）；$v_{50}/v_{200}=4\,(\alpha_{50}/\alpha_{200})$；三种形态（幂律 / 拉伸指数 / floor+指数）分别对应"幂律谱+振幅衰减 / 宽谱带边（玻璃态）/ 单一主模式+底"（§2.3）。
+- 精确预言：恒等式 $\alpha(t)=t\cdot v_t^{\mathrm{inst}}$（免拟合，直接检验）；$v_{50}/v_{200}=4\,(\alpha_{50}/\alpha_{200})$；三种形态（幂律 / 拉伸指数 / floor+ 指数）分别对应"幂律谱 + 振幅衰减 / 宽谱带边（玻璃态）/ 单一主模式 + 底"（§2.3）。
 - setting：M1（现有日志 + 论文曲线数据），无需新 run。
 - 判据：$t\cdot v_t$ 曲线与滑窗 $\alpha(t)$ 重合（自洽）；floor+exp 的对数空间 rmse 显著最差 → 本窗口无底；$\alpha(t)$ 漂移方向定形态。**状态（M1/M2 后）**：我们的两个 run 拒绝 floor+exp；M1 数字化显示**论文 L1 口径四个 run 全部幂律最优、$\alpha(t)\in0.44\text{–}0.67$ 无系统漂移**——即"$\alpha$ 上升"目前只在我们的 KL 口径出现，两口径是否真方向相反由 M3 裁决。恒等式 $t\cdot v_t$ 与滑窗 $\alpha(t)$ 自检通过。
 
@@ -509,7 +509,7 @@ _图 M2-a：top16 run 的谱反演。左：测量 d_t 与 NNLS 重构（竖线�
 | 硬件/耗时参照  | 8×GPU 单机，实测 $\approx160$ s/step → $\approx13.5$ h/300 步；响应长度均值实测 $\approx5761$ token/序列（→ 每步 $\approx3.7\times10^5$ 响应 token）                                                                           |
 | 度量口径       | $t\ge30$ 起；L1（论文 $d_t$）与 KL（日志代理 $-\texttt{opd/token\_reward\_mean}$）**双口径**；$v_t$ 几何窗口 $[t/1.4,1.4t]$（论文=端点 median，我们的实现=窗口 OLS，两者都报）；归一化 $d/d_{30}$；cumulant/α 读数按 §2.2/§2.3 |
 | seeds          | 结论性数字 ≥3 seeds；探索性 1 seed；**只有同 config 才跨 seed 平均**（top16 与 sampled-token 分开处理）                                                                                                                        |
-| 日志基线       | `plots/pull_wandb_metrics.py` 的 24 键（`DEFAULT_KEYS`），逐 run 存 CSV + 完整 config                                                                                                                                      |
+| 日志基线       | `plots/pull_wandb_metrics.py` 的 24 键（`DEFAULT_KEYS`），逐 run 存 CSV + 完整 config                                                                                                                                          |
 
 ### M1 尾部形态与 $\alpha(t)$ 诊断（零 GPU）——✅ 已完成（2026-09-06，结果见 §4.1）
 
@@ -726,11 +726,7 @@ else:  # 达标 → 缓降，防噪声底抬升过快
 
 [^proschan63]: F. Proschan. Theoretical Explanation of Observed Decreasing Failure Rate. Technometrics 5(3):375–383, 1963.
 
-[^palmer84]: R. G. Palmer, D. Stein, E. Abrahams, P. W. Anderson. Models of Hierarchically Constrained Relaxation for Glassy Relaxation. Phys. Rev. Lett. 53:958–961, 1984.
-
 [^seung92]: H. S. Seung, H. Sompolinsky, N. Tishby. Statistical Mechanics of Learning from Examples. Phys. Rev. A 45:6056–6091, 1992.
-
-[^saad-solla-95]: D. Saad, S. Solla. On-Line Learning in Soft Committee Machines. Phys. Rev. E 52:4225–4243, 1995（快报：PRL 74:4337）.
 
 [^watkin93]: T. Watkin, A. Rau, M. Biehl. The Statistical Mechanics of Learning a Rule. Reviews of Modern Physics 65:499, 1993.
 

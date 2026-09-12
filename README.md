@@ -21,11 +21,11 @@ export CONDA_ENV_BIN=/your/env/bin      # vllm >= 0.18，transformers 5.x
 
 ## 训练
 
-| 脚本 | Reward | Teacher 数量 |
-| --- | --- | --- |
-| `grpo.sh` | 基于规则的 verifier，按每个 prompt 的 `n` 个样本分组 | 无 |
-| `opd.sh` | teacher reverse KL | 1 个 |
-| `mopd.sh` | teacher reverse KL，按每行的 `ability` 列路由 | 多个 |
+| 脚本      | Reward                                               | Teacher 数量 |
+| --------- | ---------------------------------------------------- | ------------ |
+| `grpo.sh` | 基于规则的 verifier，按每个 prompt 的 `n` 个样本分组 | 无           |
+| `opd.sh`  | teacher reverse KL                                   | 1 个         |
+| `mopd.sh` | teacher reverse KL，按每行的 `ability` 列路由        | 多个         |
 
 ```bash
 bash recipe/grpo.sh                 # baseline
@@ -62,40 +62,40 @@ launch "$EXPERIMENT_NAME" \
 
 <summary><b>关键参数</b></summary>
 
-| 参数 | 默认值 | 说明 |
-| --- | --- | --- |
-| `DOMAIN` | `math` | `math` / `code` / `fc` / `if`，选择 teacher 和数据集 |
-| `MODE` | `full` | `full` / `oneshot` / `template`，选择数据变体 |
-| `ACTOR_MODEL_PATH` | 按 `DOMAIN` 决定 | 要训练的 student（policy）模型 |
-| `TEACHER_MODEL_PATH` | 按 `DOMAIN` 决定 | 提供 token-level reward 的冻结 teacher |
-| `MODEL_BASE` | 必填 | 两个模型路径所基于的目录 |
-| `N_RESPONSES` | `1` | 每个 prompt 生成的 rollout 数量 |
-| `LOG_PROB_TOP_K` | `0` | 计算 token reward 时保留的 top-K token；为 `0` 时退回到 sampled-token OPD |
-| `METRIC_TOP_K` | `0` | 同样的计算仅用于**观测**；reward 仍是普通 reverse KL |
-| `TOP_K_STRATEGY` | `only_stu` | 支持集：`only_stu` / `only_tch` / `intersection` / `union` / `union-intersection` |
-| `REWARD_WEIGHT_MODE` | `student_p` | token 加权：`student_p` / `teacher_p` / `none` |
-| `VAL_N` / `VAL_TEMPERATURE` / `VAL_TOP_P` | `16` / `0.7` / `0.9` | 验证采样设置，产生 `avg@16` |
+| 参数                                      | 默认值               | 说明                                                                              |
+| ----------------------------------------- | -------------------- | --------------------------------------------------------------------------------- |
+| `DOMAIN`                                  | `math`               | `math` / `code` / `fc` / `if`，选择 teacher 和数据集                              |
+| `MODE`                                    | `full`               | `full` / `oneshot` / `template`，选择数据变体                                     |
+| `ACTOR_MODEL_PATH`                        | 按 `DOMAIN` 决定     | 要训练的 student（policy）模型                                                    |
+| `TEACHER_MODEL_PATH`                      | 按 `DOMAIN` 决定     | 提供 token-level reward 的冻结 teacher                                            |
+| `MODEL_BASE`                              | 必填                 | 两个模型路径所基于的目录                                                          |
+| `N_RESPONSES`                             | `1`                  | 每个 prompt 生成的 rollout 数量                                                   |
+| `LOG_PROB_TOP_K`                          | `0`                  | 计算 token reward 时保留的 top-K token；为 `0` 时退回到 sampled-token OPD         |
+| `METRIC_TOP_K`                            | `0`                  | 同样的计算仅用于**观测**；reward 仍是普通 reverse KL                              |
+| `TOP_K_STRATEGY`                          | `only_stu`           | 支持集：`only_stu` / `only_tch` / `intersection` / `union` / `union-intersection` |
+| `REWARD_WEIGHT_MODE`                      | `student_p`          | token 加权：`student_p` / `teacher_p` / `none`                                    |
+| `VAL_N` / `VAL_TEMPERATURE` / `VAL_TOP_P` | `16` / `0.7` / `0.9` | 验证采样设置，产生 `avg@16`                                                       |
 
 > 两个 top-K 参数含义不同：`LOG_PROB_TOP_K` 会改变训练 reward；`METRIC_TOP_K` 只用于测量。
 
 <summary><b>论文中 OPD 使用的默认超参数</b></summary>
 
-| 项目 | 值 |
-| --- | --- |
-| Rollout batch size | 64 |
-| Mini batch size | 64 |
-| 每个 prompt 的 response 数 | 1 |
-| KL 系数 | 0.0 |
-| LogProb top-k | 0（默认）/ 16 |
-| Top-k 策略 | student top-k |
-| Loss 聚合 | `token-mean` |
-| Training temperature | 1.0 |
-| Top-p | 1.0 |
-| Optimizer | AdamW（beta1 0.9，beta2 0.999，weight decay 0.01） |
-| Learning rate | 1e-6 |
-| Gradient clip norm | 1.0 |
-| 最大 prompt 长度 | 1024（math）；4096（code、IF、agentic） |
-| 最大 response 长度 | 7680（math、code、IF）；2048（agentic） |
+| 项目                       | 值                                                 |
+| -------------------------- | -------------------------------------------------- |
+| Rollout batch size         | 64                                                 |
+| Mini batch size            | 64                                                 |
+| 每个 prompt 的 response 数 | 1                                                  |
+| KL 系数                    | 0.0                                                |
+| LogProb top-k              | 0（默认）/ 16                                      |
+| Top-k 策略                 | student top-k                                      |
+| Loss 聚合                  | `token-mean`                                       |
+| Training temperature       | 1.0                                                |
+| Top-p                      | 1.0                                                |
+| Optimizer                  | AdamW（beta1 0.9，beta2 0.999，weight decay 0.01） |
+| Learning rate              | 1e-6                                               |
+| Gradient clip norm         | 1.0                                                |
+| 最大 prompt 长度           | 1024（math）；4096（code、IF、agentic）            |
+| 最大 response 长度         | 7680（math、code、IF）；2048（agentic）            |
 
 ## 验证
 
@@ -119,12 +119,12 @@ VAL_ONLY=True bash recipe/opd.sh    # 用当前权重打分，然后退出
 
 论文中的完整评测协议如下；它们不完全等同于训练期间的验证：
 
-| 领域 | Benchmark | 协议 | Response 上限 |
-| --- | --- | --- | --- |
-| 数学 | MATH-500、AMC 2023、AIME 2025 | `avg@16` | 31,744 |
-| 代码 | LiveCodeBench v6 | `avg@3`，官方基于执行的 evaluator | 65,536 |
-| 指令跟随 | Multi-IF | 八种语言的最终轮得分平均 | 每轮 16,384 |
-| Agentic 工具使用 | BFCL v3 | 评测子集上的 `avg@8` | 4,096 |
+| 领域             | Benchmark                     | 协议                              | Response 上限 |
+| ---------------- | ----------------------------- | --------------------------------- | ------------- |
+| 数学             | MATH-500、AMC 2023、AIME 2025 | `avg@16`                          | 31,744        |
+| 代码             | LiveCodeBench v6              | `avg@3`，官方基于执行的 evaluator | 65,536        |
+| 指令跟随         | Multi-IF                      | 八种语言的最终轮得分平均          | 每轮 16,384   |
+| Agentic 工具使用 | BFCL v3                       | 评测子集上的 `avg@8`              | 4,096         |
 
 #### Multi-IF
 

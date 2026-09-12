@@ -55,20 +55,20 @@ plots/
 
 topic 代码只编排 panel；下面这些操作一律用 `core/` 的现成函数，不要自己再写一遍：
 
-| 需求                        | 入口                                                                     |
-| --------------------------- | ------------------------------------------------------------------------ |
-| 加载 + 算指标一次完成       | `load_run_metrics(run_id, runs_dir)` → `(history, metrics)`              |
+| 需求                        | 入口                                                                       |
+| --------------------------- | -------------------------------------------------------------------------- |
+| 加载 + 算指标一次完成       | `load_run_metrics(run_id, runs_dir)` → `(history, metrics)`                |
 | 选 d_t 口径                 | `compute_alignment_metrics(..., column=)` / `distance_proxy(..., column=)` |
-| 取某 step 的值 / 归一化     | `value_at_step` / `normalize_at_step` / `metrics.d_rel`                  |
+| 取某 step 的值 / 归一化     | `value_at_step` / `normalize_at_step` / `metrics.d_rel`                    |
 | fold 时间轴                 | `effective_step(steps, scale)` / `folded_baseline(ax, step, scale, color)` |
-| 画 step 序列（含淡化）      | `plot_series`                                                            |
-| baseline 阴影 + 竖线        | `mark_baseline(ax, step)`                                                |
-| 轴收尾（y 网格/去边框/x=0） | `style_axis`                                                             |
-| validation 均值 / 分任务    | `validation_mean` / `ce_entropy_kl`                                      |
-| accuracy 纵轴 / 参考线      | `accuracy_ylim` / `add_accuracy_baselines`                               |
-| 输出文件名                  | `figure_path`                                                            |
-| 图内 d_t 定义标注           | `distance_definition`                                                    |
-| plot-skill 风格             | `load_plot_style()`                                                      |
+| 画 step 序列（含淡化）      | `plot_series`                                                              |
+| baseline 阴影 + 竖线        | `mark_baseline(ax, step)`                                                  |
+| 轴收尾（y 网格/去边框/x=0） | `style_axis`                                                               |
+| validation 均值 / 分任务    | `validation_mean` / `ce_entropy_kl`                                        |
+| accuracy 纵轴 / 参考线      | `accuracy_ylim` / `add_accuracy_baselines`                                 |
+| 输出文件名                  | `figure_path`                                                              |
+| 图内 d_t 定义标注           | `distance_definition`                                                      |
+| plot-skill 风格             | `load_plot_style()`                                                        |
 
 ## 指标口径
 
@@ -104,14 +104,14 @@ $$
 
 指标层输出表格或 JSON，而不是直接输出图片。标准逐步表（`compute_alignment_metrics`）的列：
 
-| 列            | 含义                                                                |
-| ------------- | ------------------------------------------------------------------- |
-| `step`        | 训练步                                                              |
-| `d_nats`      | 当前口径的 distance，即 `-<column>`                                  |
-| `d_rel`       | 相对于分析 baseline（默认 step 30，插值取）的距离                    |
-| `v_direct`    | $ (d_t-d_{t+1})/d_t $ 的原始单步吸收率                              |
-| `v_geo`       | 在 $[t/1.4,1.4t]$ 上拟合 $\log d_t$ 得到的几何窗口吸收率            |
-| `alpha_local` | $-\mathrm d\log d_t/\mathrm d\log t$ 的局部 log-log 指数            |
+| 列            | 含义                                                     |
+| ------------- | -------------------------------------------------------- |
+| `step`        | 训练步                                                   |
+| `d_nats`      | 当前口径的 distance，即 `-<column>`                      |
+| `d_rel`       | 相对于分析 baseline（默认 step 30，插值取）的距离        |
+| `v_direct`    | $ (d_t-d_{t+1})/d_t $ 的原始单步吸收率                   |
+| `v_geo`       | 在 $[t/1.4,1.4t]$ 上拟合 $\log d_t$ 得到的几何窗口吸收率 |
+| `alpha_local` | $-\mathrm d\log d_t/\mathrm d\log t$ 的局部 log-log 指数 |
 
 `v_geo` 和 `alpha_local` 都继承 `d_nats` 的口径。几何窗口吸收率写成
 
@@ -190,7 +190,7 @@ $$
 .venv/bin/python -m plots.fit_tail --derived-dir plots/derived --plot
 ```
 
-比较幂律、拉伸指数和 floor+指数，写入 `derived/tail_fits.json`，每个 run 一张拟合图到 `figures/tail/`。
+比较幂律、拉伸指数和 floor+ 指数，写入 `derived/tail_fits.json`，每个 run 一张拟合图到 `figures/tail/`。
 
 ### 5. 各 topic
 

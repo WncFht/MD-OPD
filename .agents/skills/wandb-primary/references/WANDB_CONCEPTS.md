@@ -3,6 +3,7 @@ SPDX-FileCopyrightText: 2026 CoreWeave, Inc.
 SPDX-License-Identifier: Apache-2.0
 SPDX-PackageName: skills
 -->
+
 # W&B Concepts & Nomenclature
 
 Reference for understanding W&B's data model, terminology, and common points of confusion. Read this when interpreting user requests or debugging unexpected data locations.
@@ -26,6 +27,7 @@ W&B has five product lines. Understanding which product a user is asking about d
 **What it is:** A toolkit for tracing, evaluating, and improving LLM-powered applications (not training — post-deployment/development observability).
 
 **Core terminology:**
+
 - **Op** (`@weave.op()`): A decorated function that automatically logs all calls. The fundamental unit of instrumentation. Ops are versioned — code changes create new versions automatically.
 - **Call**: A single invocation of an Op. Records inputs, outputs, latency, token usage.
 - **Trace**: The complete execution tree formed when Ops call other Ops. A root Op and all its nested child Ops form one trace. Viewable as a call tree in the UI.
@@ -38,6 +40,7 @@ W&B has five product lines. Understanding which product a user is asking about d
 **Relationship to other products:** Weave is for GenAI/LLM applications. Training is for model training. A trained model (from Training) might be served and then monitored with Weave. Weave uses `weave.init()` (not `wandb.init()`).
 
 **Gotchas:**
+
 - `weave.init("entity/project")` is positional — not `weave.init(project="x")`.
 - Weave autopatches many LLM providers (OpenAI, Anthropic, etc.) — if a user says "I don't see traces," check if their provider is autopatched or if they need manual `@weave.op()`.
 - Weave objects use attribute access (`getattr`), not dict access (`.get()`).
@@ -47,6 +50,7 @@ W&B has five product lines. Understanding which product a user is asking about d
 **What it is:** W&B's hosted API providing access to open-source foundation models through an OpenAI-compatible interface, without self-hosting.
 
 **Core terminology:**
+
 - **OpenAI-compatible API**: Uses the same SDK/format as OpenAI. Switch by changing `base_url` to `https://api.inference.wandb.ai/v1` and using a W&B API key.
 - **Inference credits**: Usage-based billing for API calls.
 - **Team/project attribution**: Optional `extra_headers` to route usage tracking to a specific W&B team and project.
@@ -54,6 +58,7 @@ W&B has five product lines. Understanding which product a user is asking about d
 **Relationship to other products:** Inference provides the LLM. Weave can trace and evaluate calls made through Inference. Training can fine-tune models that Inference then serves.
 
 **Gotchas:**
+
 - Not all open-source models are available — check the model list endpoint.
 - Uses W&B API key for auth, not an OpenAI key.
 - Usage appears in a W&B project (default: "inference") for monitoring.
@@ -63,6 +68,7 @@ W&B has five product lines. Understanding which product a user is asking about d
 **What it is:** The original W&B product for tracking ML training experiments — logging metrics, hyperparameters, and artifacts across runs.
 
 **Core terminology:**
+
 - **Run**: The atomic unit — one execution of training code. Created by `wandb.init()`. Has a unique **run ID** (8-char hash) and a human-readable **run name** (auto-generated words).
 - **Config**: Input hyperparameters set at run start. Does not change during training.
 - **History**: Time-series metrics logged step-by-step during training (`run.log()`).
@@ -77,6 +83,7 @@ W&B has five product lines. Understanding which product a user is asking about d
 **Relationship to other products:** Training produces models/artifacts. Launch executes training jobs on remote compute. Weave monitors the deployed model after training. Inference can serve fine-tuned models.
 
 **Gotchas:**
+
 - `wandb.init()` creates runs (for training scripts). `wandb.Api()` queries existing data (for analysis). Do not confuse them.
 - `run.name` (display name, not unique) vs `run.id` (unique hash) is a constant source of confusion.
 - Config keys with dots cause flattening collisions.
@@ -86,6 +93,7 @@ W&B has five product lines. Understanding which product a user is asking about d
 **What it is:** A system for packaging, queueing, and executing ML workloads on remote compute infrastructure (Kubernetes, SageMaker, Docker).
 
 **Core terminology:**
+
 - **Job**: A blueprint for a task — encapsulates source code, dependencies, and execution parameters. Created from Docker images, git repos, or local code. Stored as a W&B artifact.
 - **Queue**: A FIFO queue targeting a specific compute backend. Jobs are submitted to queues. Each queue has a resource configuration (GPU type, memory, etc.).
 - **Agent**: A polling service that watches a queue, pulls jobs, builds/downloads containers, and executes them on its compute backend.
@@ -98,6 +106,7 @@ W&B has five product lines. Understanding which product a user is asking about d
 **Relationship to other products:** Launch executes Training jobs on remote compute. A trained model can then be served via Inference and monitored via Weave. Launch queues and agents are the bridge between "I want to train" and "this GPU cluster runs it."
 
 **Gotchas:**
+
 - Never fake a launch with `wandb.init()` — use Launch APIs.
 - Config override vs code change: if the user wants to change a hyperparameter, relaunch with config override. If they want to change model architecture, download code, edit, and launch a modified job.
 - `requirements.txt` for launch jobs should only contain deps missing from the base image, not a full `pip freeze`.
@@ -135,8 +144,8 @@ Entity (username or team)
 - **Entity**: A username or team name. The top-level namespace. Everything is scoped under an entity.
 - **Project**: Groups related work. Contains both runs AND Weave objects in the same namespace. If unspecified at `wandb.init()`, defaults to `"uncategorized"` — always specify project. Both `wandb.Api()` and `weave.init()` take the same `"entity/project"` path.
 - **Run**: The atomic unit of training computation. Created by `wandb.init()`. Each has:
-  - A unique **run ID** (8-char hash, e.g. `"abc12def"`) — used for programmatic access, resuming, and API calls
-  - A human-readable **run name** (e.g. `"cosmic-sunset-42"`) — auto-generated if not set, display-only, **not unique**
+    - A unique **run ID** (8-char hash, e.g. `"abc12def"`) — used for programmatic access, resuming, and API calls
+    - A human-readable **run name** (e.g. `"cosmic-sunset-42"`) — auto-generated if not set, display-only, **not unique**
 - **Run path**: `<entity>/<project>/<run_id>` — the canonical way to reference a run in the Public API.
 - **Call**: The atomic unit of Weave tracing. Each has a unique **call ID** (UUID), an **op_name**, and optional **parent_id** (linking it into a trace tree).
 - **Trace**: A tree of calls sharing the same **trace_id**. The root call has no parent. Child calls are nested function invocations within the root.
@@ -144,6 +153,7 @@ Entity (username or team)
 ### name vs id — a common source of confusion
 
 When a user says "find my run called X", determine whether they mean:
+
 - **`run.name`** (display name): Non-unique, human-friendly. Exact: `filters={"display_name": "X"}`. Substring: `filters={"display_name": {"$contains": "X"}}` (indexed, fast). Avoid `{"$regex": ".*X.*"}` for plain substring search — it emits a non-indexable `REGEXP` server-side and scans every run in the project.
 - **`run.id`** (unique ID): The 8-char hash. Access directly with `api.run("entity/project/run_id")`.
 
@@ -155,16 +165,17 @@ If the value looks like a short hash, it's probably an ID. If it's words or a de
 
 Understanding where data lives is critical for answering "where's my metric?":
 
-| What | Set by | When | Access via |
-|------|--------|------|------------|
-| **Config** | `wandb.init(config={...})` or `wandb.config.update()` | Once, at the start | `run.config` (dict) |
-| **History** | `run.log({"loss": 0.5})` | Repeatedly, each training step | `run.history()`, `run.scan_history()` |
-| **Summary** | Auto-set to last logged value, or `run.summary["key"] = val` | End of run (or overwritten) | `run.summary_metrics` (Public API) |
+| What        | Set by                                                       | When                           | Access via                            |
+| ----------- | ------------------------------------------------------------ | ------------------------------ | ------------------------------------- |
+| **Config**  | `wandb.init(config={...})` or `wandb.config.update()`        | Once, at the start             | `run.config` (dict)                   |
+| **History** | `run.log({"loss": 0.5})`                                     | Repeatedly, each training step | `run.history()`, `run.scan_history()` |
+| **Summary** | Auto-set to last logged value, or `run.summary["key"] = val` | End of run (or overwritten)    | `run.summary_metrics` (Public API)    |
 
 **Key rules:**
+
 - **Config** = inputs/hyperparameters. Things that don't change during training. Avoid `.` in config keys — W&B uses dots for nested key flattening (e.g. `{"model.lr": 0.01}` and `{"model": {"lr": 0.01}}` collide).
 - **History** = time-series metrics. Things logged at each step (loss, accuracy, learning rate schedules).
-- **Summary** = final output metrics. By default, the *last* logged value for each key. Users can customize with `run.define_metric("loss", summary="min")` to keep the minimum instead.
+- **Summary** = final output metrics. By default, the _last_ logged value for each key. Users can customize with `run.define_metric("loss", summary="min")` to keep the minimum instead.
 
 **Common mistake**: A user asks "what's the best loss?" — if they used `define_metric(..., summary="min")`, check `summary_metrics`. If not, you need to scan history and compute it yourself.
 
@@ -174,13 +185,13 @@ Understanding where data lives is critical for answering "where's my metric?":
 
 W&B has two Python APIs that serve different purposes. Do NOT confuse them:
 
-| | Python SDK | Public API |
-|---|---|---|
-| **Import** | `import wandb` | `wandb.Api()` |
-| **Purpose** | Real-time logging during training | Post-hoc querying, exporting, updating |
-| **Creates runs?** | Yes (`wandb.init()`) | No (reads existing data) |
-| **Key methods** | `wandb.init()`, `run.log()`, `run.finish()` | `api.run()`, `api.runs()`, `api.artifact()` |
-| **When to use** | Writing training scripts | Analyzing results, building dashboards |
+|                   | Python SDK                                  | Public API                                  |
+| ----------------- | ------------------------------------------- | ------------------------------------------- |
+| **Import**        | `import wandb`                              | `wandb.Api()`                               |
+| **Purpose**       | Real-time logging during training           | Post-hoc querying, exporting, updating      |
+| **Creates runs?** | Yes (`wandb.init()`)                        | No (reads existing data)                    |
+| **Key methods**   | `wandb.init()`, `run.log()`, `run.finish()` | `api.run()`, `api.runs()`, `api.artifact()` |
+| **When to use**   | Writing training scripts                    | Analyzing results, building dashboards      |
 
 **As an agent, you almost always use the Public API** (`wandb.Api()`). You should never call `wandb.init()` to create runs — that's what Launch is for. The only exception is `weave.init()`, which initializes a Weave client for querying traces (different from `wandb.init()`).
 
@@ -207,13 +218,13 @@ artifact = api.artifact("entity/project/my-dataset:latest")
 artifact = api.artifact("entity/project/my-dataset:v3")
 
 # Properties
-artifact.name          # "my-dataset:v3"
-artifact.type          # "dataset"
-artifact.version       # "v3"
-artifact.aliases       # ["latest", "best"]
-artifact.metadata      # dict (user-set metadata)
-artifact.size          # int (bytes)
-artifact.created_at    # str (ISO timestamp)
+artifact.name  # "my-dataset:v3"
+artifact.type  # "dataset"
+artifact.version  # "v3"
+artifact.aliases  # ["latest", "best"]
+artifact.metadata  # dict (user-set metadata)
+artifact.size  # int (bytes)
+artifact.created_at  # str (ISO timestamp)
 
 # Download
 local_path = artifact.download()
@@ -291,18 +302,18 @@ Tables support rich media (images, audio, HTML) in cells and appear as interacti
 
 These hard limits affect code the agent writes. Exceeding them causes errors or silent data loss.
 
-| Resource | Limit |
-|----------|-------|
-| Distinct metrics per project | 10,000 |
-| Single `run.log()` call payload | 25 MB |
-| Config size | 10 MB |
-| Scalar data points per metric | 100,000 |
-| Media data points (images, etc.) | 50,000 |
-| Histogram data points | 10,000 |
-| Runs per project (SaaS) | 100,000 |
-| Table rows per single log call | 10,000 |
-| Config key nesting (dots) | max 3 dots |
-| Summary key nesting (dots) | max 4 dots |
+| Resource                         | Limit      |
+| -------------------------------- | ---------- |
+| Distinct metrics per project     | 10,000     |
+| Single `run.log()` call payload  | 25 MB      |
+| Config size                      | 10 MB      |
+| Scalar data points per metric    | 100,000    |
+| Media data points (images, etc.) | 50,000     |
+| Histogram data points            | 10,000     |
+| Runs per project (SaaS)          | 100,000    |
+| Table rows per single log call   | 10,000     |
+| Config key nesting (dots)        | max 3 dots |
+| Summary key nesting (dots)       | max 4 dots |
 
 **Rate limiting**: Calling `run.log()` more than a few times per second adds training latency. HTTP 429 is returned if rate limits are exceeded.
 
@@ -333,11 +344,11 @@ Without `define_metric`, all metrics use `_step` (global step) as x-axis and `su
 
 Three approaches for multi-GPU/multi-node training:
 
-| Approach | When to use | How |
-|----------|-------------|-----|
-| **Rank-0 only** | Simple, most common | Only call `wandb.init()` on rank 0 |
-| **Process-per-run** | Need per-GPU metrics | Each process calls `wandb.init(group="experiment-1")` |
-| **Shared mode** | Unified view, SDK 0.19.9+ | `wandb.init(mode="shared")` on all processes |
+| Approach            | When to use               | How                                                   |
+| ------------------- | ------------------------- | ----------------------------------------------------- |
+| **Rank-0 only**     | Simple, most common       | Only call `wandb.init()` on rank 0                    |
+| **Process-per-run** | Need per-GPU metrics      | Each process calls `wandb.init(group="experiment-1")` |
+| **Shared mode**     | Unified view, SDK 0.19.9+ | `wandb.init(mode="shared")` on all processes          |
 
 **Gotchas**: Max ~300 concurrent connections tested. Always call `run.finish()` to prevent hanging. Use `wandb.setup()` in main process when spawning subprocesses. Empty connections still push system metrics.
 
@@ -384,17 +395,17 @@ Use `weave[scorers]` when scorer helpers are available in the user's
 environment. Install optional scorer extras only if imports fail and the task
 requires them. LLM-based scorers use litellm under the hood.
 
-| Scorer | What it checks | Type |
-|--------|---------------|------|
-| `HallucinationFreeScorer` | Output grounded in provided context | LLM-as-judge |
-| `SummarizationScorer` | Summary quality vs source | LLM-as-judge |
-| `OpenAIModerationScorer` | Content policy violations | API call |
-| `EmbeddingSimilarityScorer` | Semantic similarity | Embedding |
-| `ValidJSONScorer` | Output is valid JSON | Programmatic |
-| `ValidXMLScorer` | Output is valid XML | Programmatic |
-| `PydanticScorer` | Output matches a Pydantic model | Programmatic |
-| `ContextEntityRecallScorer` | Entity recall from context (RAGAS) | Programmatic |
-| `ContextRelevancyScorer` | Context relevance to query (RAGAS) | LLM-as-judge |
+| Scorer                      | What it checks                      | Type         |
+| --------------------------- | ----------------------------------- | ------------ |
+| `HallucinationFreeScorer`   | Output grounded in provided context | LLM-as-judge |
+| `SummarizationScorer`       | Summary quality vs source           | LLM-as-judge |
+| `OpenAIModerationScorer`    | Content policy violations           | API call     |
+| `EmbeddingSimilarityScorer` | Semantic similarity                 | Embedding    |
+| `ValidJSONScorer`           | Output is valid JSON                | Programmatic |
+| `ValidXMLScorer`            | Output is valid XML                 | Programmatic |
+| `PydanticScorer`            | Output matches a Pydantic model     | Programmatic |
+| `ContextEntityRecallScorer` | Entity recall from context (RAGAS)  | Programmatic |
+| `ContextRelevancyScorer`    | Context relevance to query (RAGAS)  | LLM-as-judge |
 
 Use `column_map` to remap column names if your data doesn't match expected field names.
 
@@ -457,34 +468,34 @@ When a user asks "why don't I see traces?" — check if their framework is in th
 
 ## Key Environment Variables
 
-| Variable | Purpose |
-|----------|---------|
-| `WANDB_API_KEY` | Authentication |
-| `WANDB_ENTITY` | Default entity |
-| `WANDB_PROJECT` | Default project |
-| `WANDB_BASE_URL` | Server URL (for self-hosted) |
-| `WANDB_MODE` | `online`, `offline`, `disabled` |
-| `WANDB_DIR` | Local storage directory |
-| `WANDB_SILENT` / `WANDB_QUIET` | Suppress output |
-| `WANDB_CONFIG_PATHS` | Comma-separated YAMLs loaded into config |
-| `WANDB_IGNORE_GLOBS` | File patterns to exclude from code saving |
-| `WANDB_DISABLE_GIT` | Skip git metadata collection |
-| `WANDB_DISABLE_CODE` | Don't save code |
+| Variable                       | Purpose                                   |
+| ------------------------------ | ----------------------------------------- |
+| `WANDB_API_KEY`                | Authentication                            |
+| `WANDB_ENTITY`                 | Default entity                            |
+| `WANDB_PROJECT`                | Default project                           |
+| `WANDB_BASE_URL`               | Server URL (for self-hosted)              |
+| `WANDB_MODE`                   | `online`, `offline`, `disabled`           |
+| `WANDB_DIR`                    | Local storage directory                   |
+| `WANDB_SILENT` / `WANDB_QUIET` | Suppress output                           |
+| `WANDB_CONFIG_PATHS`           | Comma-separated YAMLs loaded into config  |
+| `WANDB_IGNORE_GLOBS`           | File patterns to exclude from code saving |
+| `WANDB_DISABLE_GIT`            | Skip git metadata collection              |
+| `WANDB_DISABLE_CODE`           | Don't save code                           |
 
 ---
 
 ## Quick Disambiguation
 
-| User says... | They probably mean... | Look here |
-|---|---|---|
-| "my runs" | Training runs in current project | `api.runs(path)` |
-| "my traces" | Weave calls/traces | `client.get_calls()` |
-| "my experiments" | Training runs (synonym for runs) | `api.runs(path)` |
-| "my evals" | Weave Evaluation.evaluate calls | `client.get_calls(filter=CallsFilter(op_names=[...]))` |
-| "my model" | An artifact of type "model" | `api.artifact("entity/project/model-name:latest")` |
-| "my dataset" | An artifact of type "dataset" | `api.artifact("entity/project/dataset-name:latest")` |
-| "this run's config" | Hyperparameters set at init | `run.config` |
-| "this run's metrics" | Time-series logged values | `run.history(keys=[...])` or `run.summary_metrics` |
-| "best loss" | Minimum loss across history (or summary if `define_metric` was used) | Check `summary_metrics` first, fall back to `scan_history` |
-| "run X" (short hash) | Run by ID | `api.run("entity/project/X")` |
-| "run X" (words) | Run by display name | `api.runs(path, filters={"display_name": "X"})` |
+| User says...         | They probably mean...                                                | Look here                                                  |
+| -------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------- |
+| "my runs"            | Training runs in current project                                     | `api.runs(path)`                                           |
+| "my traces"          | Weave calls/traces                                                   | `client.get_calls()`                                       |
+| "my experiments"     | Training runs (synonym for runs)                                     | `api.runs(path)`                                           |
+| "my evals"           | Weave Evaluation.evaluate calls                                      | `client.get_calls(filter=CallsFilter(op_names=[...]))`     |
+| "my model"           | An artifact of type "model"                                          | `api.artifact("entity/project/model-name:latest")`         |
+| "my dataset"         | An artifact of type "dataset"                                        | `api.artifact("entity/project/dataset-name:latest")`       |
+| "this run's config"  | Hyperparameters set at init                                          | `run.config`                                               |
+| "this run's metrics" | Time-series logged values                                            | `run.history(keys=[...])` or `run.summary_metrics`         |
+| "best loss"          | Minimum loss across history (or summary if `define_metric` was used) | Check `summary_metrics` first, fall back to `scan_history` |
+| "run X" (short hash) | Run by ID                                                            | `api.run("entity/project/X")`                              |
+| "run X" (words)      | Run by display name                                                  | `api.runs(path, filters={"display_name": "X"})`            |
