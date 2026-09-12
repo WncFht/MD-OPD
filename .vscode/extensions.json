@@ -1,0 +1,10 @@
+{
+    "recommendations": [
+        "esbenp.prettier-vscode",
+        "davidanson.vscode-markdownlint",
+        "huacnlee.autocorrect",
+        "editorconfig.editorconfig",
+        "charliermarsh.ruff",
+        "ms-python.python"
+    ]
+}

@@ -46,3 +46,5 @@ data/*
 !data/README.md
 
 kexue/
+# node 工具链（md 格式化管线）
+/node_modules/

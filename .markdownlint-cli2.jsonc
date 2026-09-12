@@ -1,0 +1,4 @@
+{
+    // vendored 第三方库与生成物不进 lint 扫描；规则本身在 .markdownlint.jsonc
+    "ignores": ["node_modules/**", ".venv/**", "verl/**", "docs/kexue/articles/**", "data/**", "logs/**", "outputs/**", "results/**", "checkpoints/**", "wandb/**", "swanlab/**"]
+}

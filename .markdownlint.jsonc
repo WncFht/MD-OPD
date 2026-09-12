@@ -1,0 +1,14 @@
+{
+    // 与 VS Code markdownlint 扩展共用同一套规则；放开与 prettier 重叠的规则
+    "MD007": { "indent": 4 },
+    "MD010": false,
+    "MD013": false,
+    "MD024": { "siblings_only": true },
+    "MD025": false,
+    "MD029": false,
+    "MD033": false,
+    "MD034": false,
+    "MD036": false,
+    "MD040": false,
+    "MD045": false
+}

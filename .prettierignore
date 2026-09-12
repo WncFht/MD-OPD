@@ -1,0 +1,11 @@
+.venv/
+node_modules/
+verl/
+docs/kexue/articles/
+data/
+logs/
+outputs/
+results/
+checkpoints/
+wandb/
+swanlab/
