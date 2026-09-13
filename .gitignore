@@ -49,6 +49,7 @@ kexue/
 # node 工具链（md 格式化管线）
 /node_modules/
 
-# paper-search skill：本地运行日志与 OpenReview 缓存（体积大、可再生）
+# paper-search skill：本地运行日志与 OpenReview SQLite 缓存（体积大、可再生；
+# data/ 下的 venues 注册表与 snapshot CSV 仍需入库）
 paper-search-logs/
-/.agents/skills/paper-search/data/
+/.agents/skills/paper-search/data/openreview_cache/
