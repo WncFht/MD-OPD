@@ -53,3 +53,9 @@ kexue/
 # data/ 下的 venues 注册表与 snapshot CSV 仍需入库）
 paper-search-logs/
 /.agents/skills/paper-search/data/openreview_cache/
+
+test.md
+paper-search-reports/
+
+# Claude Code 本地状态：.claude/skills 是指向 .agents/skills 的本机符号链接
+/.claude/
