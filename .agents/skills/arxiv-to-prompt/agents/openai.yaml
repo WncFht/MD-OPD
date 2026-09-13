@@ -1,0 +1,3 @@
+interface:
+  display_name: "arxiv-to-prompt"
+  short_description: "用 uvx 拉取展平后的 arXiv LaTeX"
