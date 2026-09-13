@@ -61,7 +61,7 @@ def main() -> None:
     parser.add_argument(
         "--eval-root",
         type=Path,
-        default=Path("/Users/fanghaotian/Desktop/src/OPD/justrl_eval_outputs"),
+        required=True,
     )
     parser.add_argument(
         "--output",

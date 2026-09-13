@@ -218,7 +218,7 @@ def process_combo(task: tuple) -> list[dict]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--eval-root", type=Path, default=Path("/Users/fanghaotian/Desktop/src/OPD/justrl_eval_outputs")
+        "--eval-root", type=Path, required=True
     )
     parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parent)
     parser.add_argument("--tokenizer", type=str, default=str(DEFAULT_TOKENIZER))

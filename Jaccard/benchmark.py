@@ -52,7 +52,7 @@ def per_1k(seconds: float, tokens: int) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--eval-root", type=Path, default=Path("/Users/fanghaotian/Desktop/src/OPD/justrl_eval_outputs")
+        "--eval-root", type=Path, required=True
     )
     args = parser.parse_args()
 

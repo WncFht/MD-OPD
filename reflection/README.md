@@ -8,7 +8,7 @@ rollout，再对剩下的 rollout 统计每个反思词的出现次数，并给�
 
 ```bash
 python3 reflection/lexical_count.py \
-  --eval-root /Users/fanghaotian/Desktop/src/OPD/justrl_eval_outputs \
+  --eval-root /path/to/justrl_eval_outputs \
   --output-dir reflection/results \
   --top-k 30
 ```

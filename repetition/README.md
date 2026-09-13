@@ -18,7 +18,7 @@ threshold = 10
 
 ```bash
 python repetition/analyze_and_plot.py \
-  --eval-root /Users/fanghaotian/Desktop/src/OPD/justrl_eval_outputs \
+  --eval-root /path/to/justrl_eval_outputs \
   --output-dir repetition \
   --sample-per-model 500
 ```

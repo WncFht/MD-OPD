@@ -395,7 +395,7 @@ def main() -> None:
     parser.add_argument(
         "--eval-root",
         type=Path,
-        default=Path("/Users/fanghaotian/Desktop/src/OPD/justrl_eval_outputs"),
+        required=True,
     )
     parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parent)
     parser.add_argument("--sample-per-model", type=int, default=SAMPLE_PER_MODEL)
