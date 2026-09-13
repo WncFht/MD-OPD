@@ -712,7 +712,7 @@ else:  # 达标 → 缓降，防噪声底抬升过快
 
 [^bernstein18]: J. Bernstein, Y.-X. Wang, K. Azizzadenesheli, A. Anandkumar. signSGD: Compressed Optimisation for Non-Convex Problems. ICML 2018. [arXiv:1802.04434](https://arxiv.org/abs/1802.04434)
 
-[^reddi18]: S. Reddi, S. Kale, S. Kumar. On the Convergence of Adam and Beyond. ICLR 2018. [arXiv:1710.05965](https://arxiv.org/abs/1710.05965)
+[^reddi18]: S. Reddi, S. Kale, S. Kumar. On the Convergence of Adam and Beyond. ICLR 2018. [arXiv:1904.09237](https://arxiv.org/abs/1904.09237)
 
 [^cohen21]: J. Cohen, A. Kaur, Y. Li, J. Z. Kolter, A. Talwalkar. Gradient Descent on Neural Networks Typically Occurs at the Edge of Stability. ICLR 2021. [arXiv:2103.00065](https://arxiv.org/abs/2103.00065)
 

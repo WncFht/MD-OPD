@@ -707,7 +707,7 @@ _理论收益：_
 
 [^bernstein18]: J. Bernstein, Y.-X. Wang, K. Azizzadenesheli, A. Anandkumar. signSGD: Compressed Optimisation for Non-Convex Problems. ICML 2018. [arXiv:1802.04434](https://arxiv.org/abs/1802.04434)
 
-[^reddi18]: S. Reddi, S. Kale, S. Kumar. On the Convergence of Adam and Beyond. ICLR 2018. [arXiv:1710.05965](https://arxiv.org/abs/1710.05965)
+[^reddi18]: S. Reddi, S. Kale, S. Kumar. On the Convergence of Adam and Beyond. ICLR 2018. [arXiv:1904.09237](https://arxiv.org/abs/1904.09237)
 
 [^kosson23]: C. Kosson, et al. Rotational Equilibrium: How Weight Decay Balances Learning Across Neural Networks. NeurIPS 2023. [arXiv:2305.17212](https://arxiv.org/abs/2305.17212)
 
