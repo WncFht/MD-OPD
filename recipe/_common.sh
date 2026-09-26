@@ -305,6 +305,16 @@ MDPO_ARGS="actor_rollout_ref.actor.mdpo_kl_loss=${MDPO_KL} \
     actor_rollout_ref.actor.mdpo_eta_end=${MDPO_ETA_END}"
 export MDPO_ARGS
 
+# VAL_DATA_DIR 为空时不能 emit override——Hydra 不接受 null 字符串。非空时
+# trainer 把每次 val 的逐样本 {input,output,gts,score,...} 写到该目录的
+# <global_step>.jsonl（ray_trainer._dump_generations）。
+if [ -n "${VAL_DATA_DIR:-}" ]; then
+    VAL_DATA_ARGS="trainer.validation_data_dir=${VAL_DATA_DIR}"
+else
+    VAL_DATA_ARGS=""
+fi
+export VAL_DATA_ARGS
+
 # common_args：所有 launcher 共用的 Hydra override。这里故意按空白分词
 # （Hydra 要求每个 override 一个 token），因此路径不能包含空格。
 common_args() {
@@ -367,6 +377,7 @@ common_args() {
         trainer.val_only=${VAL_ONLY} \
         actor_rollout_ref.actor.checkpoint.save_contents="${SAVE_CONTENTS}" \
         actor_rollout_ref.actor.checkpoint.load_contents="${LOAD_CONTENTS}" \
+        ${VAL_DATA_ARGS} \
         trainer.logger=${TRAINER_LOGGER}"
 }
 
