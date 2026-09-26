@@ -399,6 +399,12 @@ class RayPPOTrainer(OPDTrainerMixin):
         self.validate_mdpo_config()
         self.validate_opd_anchor_config()
         self.validate_mopd_loss_config()
+        self.validate_mopd_replay_config()
+        # MOPD M3: cross-window replay buffer + P-C priority sampler; None
+        # unless distillation.mopd_replay.enabled=True, in which case the fit
+        # loop re-draws the actor's update batch from the last `window`
+        # generation fills instead of training strictly on-policy.
+        self.opd_replay = self.init_mopd_replay()
 
         self.use_rm = need_reward_model(self.config)
 
@@ -1602,9 +1608,7 @@ class RayPPOTrainer(OPDTrainerMixin):
             # Same left-shift alignment as log_probs: anchor_eb_logp[t] is the
             # E_b[log pi_theta] of state s_t, taken against the pre-update
             # student (== rollout policy for on-policy steps).
-            result["anchor_eb_logp"] = no_padding_2_padding(
-                tu.get(output, "anchor_eb_logp"), batch_td
-            ).float()
+            result["anchor_eb_logp"] = no_padding_2_padding(tu.get(output, "anchor_eb_logp"), batch_td).float()
         old_log_prob = tu.get_tensordict(result)
         old_log_prob = DataProto.from_tensordict(old_log_prob)
         return old_log_prob, old_log_prob_mfu
@@ -2021,6 +2025,12 @@ class RayPPOTrainer(OPDTrainerMixin):
                             norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
                             config=self.config.algorithm,
                         )
+
+                        # MOPD M3: the fully-scored window joins the cross-window
+                        # buffer. Runs even during critic warmup so the buffer is
+                        # primed when actor updates begin.
+                        if self.opd_replay is not None:
+                            self.opd_replay.append(batch, self.global_steps)
                     # update critic
                     if self.use_critic:
                         with marked_timer("update_critic", timing_raw, color="pink"):
@@ -2035,7 +2045,16 @@ class RayPPOTrainer(OPDTrainerMixin):
                     else:
                         # update actor
                         with marked_timer("update_actor", timing_raw, color="red"):
-                            actor_output = self._update_actor(batch)
+                            # MOPD M3: under replay, the update batch is a
+                            # stratified-quota draw from the cross-window
+                            # buffer, not the fresh on-policy batch.
+                            actor_batch = batch
+                            if self.opd_replay is not None:
+                                actor_batch, replay_metrics = self.opd_replay.draw(
+                                    n_rows=len(batch), current_step=self.global_steps
+                                )
+                                metrics.update(replay_metrics)
+                            actor_output = self._update_actor(actor_batch)
 
                         # Check if the ESI (Elastic Server Instance)/training plan is close to expiration.
                         esi_close_to_expiration = should_save_ckpt_esi(

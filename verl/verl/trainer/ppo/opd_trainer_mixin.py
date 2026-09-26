@@ -45,6 +45,7 @@ import torch
 from verl.protocol import DataProto
 from verl.trainer.ppo.opd_core_algos import MOPD_ANCHOR_EB_LOSSES, MOPD_POLICY_LOSS_FIELDS
 from verl.utils.config import omega_conf_to_dataclass
+from verl.utils.mopd_priority import PRIORITY_MODES
 from verl.workers.config import FsdpTeacherConfig
 
 logger = logging.getLogger(__name__)
@@ -293,6 +294,70 @@ class OPDTrainerMixin:
                 "distillation.fsdp_teacher.log_prob_top_k>0 (top-K reward mode) is incompatible."
             )
 
+    # ------------------------------------------------------------------
+    # MOPD replay (cross-window buffer + P-C priority sampler)
+    # ------------------------------------------------------------------
+    def mopd_replay_enabled(self) -> bool:
+        """Whether the M3 cross-window replay buffer drives the actor update."""
+        if not getattr(self, "use_opd_teacher", False):
+            return False
+        replay = self.config.distillation.get("mopd_replay", None)
+        return bool(replay is not None and replay.get("enabled", False))
+
+    def validate_mopd_replay_config(self) -> None:
+        """Refuse replay setups whose priority inputs would be missing.
+
+        ``marginal_absorption`` reads ``state_mu_eff``/``state_resid_energy``
+        and ``proportional_G_negcontrol`` reads ``state_gap`` — all written by
+        the anchor paired forward, so a non-uniform replay without the anchor
+        would silently sample uniform. ``frozen_rollout`` already replays a
+        single cached window forever; stacking another buffer on top of it is
+        not a meaningful configuration.
+        """
+        if not self.mopd_replay_enabled():
+            return
+        replay = self.config.distillation.mopd_replay
+        mode = replay.get("priority_mode", "marginal_absorption")
+        if mode not in PRIORITY_MODES:
+            raise ValueError(f"distillation.mopd_replay.priority_mode must be one of {PRIORITY_MODES}, got {mode!r}")
+        if int(replay.get("window", 0)) < 1:
+            raise ValueError("distillation.mopd_replay.window must be >= 1")
+        coverage_rarity = float(replay.get("coverage_rarity", 0.0))
+        if not 0.0 <= coverage_rarity <= 1.0:
+            raise ValueError("distillation.mopd_replay.coverage_rarity must be in [0, 1]")
+        if self.frozen_rollout:
+            raise ValueError(
+                "distillation.mopd_replay is incompatible with algorithm.frozen_rollout: "
+                "frozen mode already replays one cached window on every step."
+            )
+        if mode != "uniform" and not self.opd_anchor_enabled():
+            raise ValueError(
+                f"distillation.mopd_replay.priority_mode={mode} requires "
+                "distillation.fsdp_teacher.anchor.enabled=True: the priority fields "
+                "(state_mu_eff, state_resid_energy, state_gap) are written by the "
+                "anchor paired forward."
+            )
+
+    def init_mopd_replay(self):
+        """Build the driver-side replay buffer, or None when disabled."""
+        if not self.mopd_replay_enabled():
+            return None
+        from verl.trainer.ppo.mopd_replay_buffer import MopdReplayBuffer
+
+        replay = self.config.distillation.mopd_replay
+        buffer = MopdReplayBuffer(
+            window=int(replay.get("window", 4)),
+            priority_mode=replay.get("priority_mode", "marginal_absorption"),
+            coverage_rarity=float(replay.get("coverage_rarity", 0.0)),
+        )
+        print(
+            "[mopd-replay] enabled: "
+            f"window={buffer.window}, priority_mode={buffer.priority_mode}, "
+            f"coverage_rarity={buffer.coverage_rarity}",
+            flush=True,
+        )
+        return buffer
+
     def validate_mdpo_config(self) -> None:
         """Reject training modes whose policy anchors differ from MDPO's old policy."""
         actor = self.config.actor_rollout_ref.actor
@@ -341,11 +406,7 @@ class OPDTrainerMixin:
         # sampled from. Step 1 already got its snapshot at init when
         # anchor.from_actor=True.
         refresh_interval = self.opd_anchor_refresh_interval()
-        if (
-            refresh_interval > 0
-            and self.global_steps > 1
-            and (self.global_steps - 1) % refresh_interval == 0
-        ):
+        if refresh_interval > 0 and self.global_steps > 1 and (self.global_steps - 1) % refresh_interval == 0:
             logger.info(
                 "[MOPD] refreshing anchor at global_steps=%d (interval=%d)",
                 self.global_steps,
@@ -441,6 +502,8 @@ class OPDTrainerMixin:
             anchor_fwd = teacher_output.batch["anchor_log_probs_fwd"].to(response_device)
             batch.batch["state_gap"] = teacher_output.batch["state_gap"].to(response_device)
             batch.batch["state_anchor_logb"] = teacher_output.batch["state_anchor_logb"].to(response_device)
+            batch.batch["state_mu_eff"] = teacher_output.batch["state_mu_eff"].to(response_device)
+            batch.batch["state_resid_energy"] = teacher_output.batch["state_resid_energy"].to(response_device)
             batch.batch["anchor_log_probs_fwd"] = anchor_fwd
 
             # anchor_log_probs carries each token's *actual generator* logprob:
@@ -476,6 +539,10 @@ class OPDTrainerMixin:
             logb_mean = _mean_metric(worker_metrics.get("anchor_logb_mean"))
             if logb_mean is not None:
                 metrics["opd/anchor_logb_mean"] = float(logb_mean)
+            for key in ("anchor_mu_eff_mean", "anchor_resid_energy_mean"):
+                value = _mean_metric(worker_metrics.get(key))
+                if value is not None:
+                    metrics[f"opd/{key}"] = float(value)
             # Sanity signal: the anchor's own recomputation of log b(y_t) should
             # sit near zero difference against the recorded generator logprob;
             # a persistent gap means engine-vs-FSDP numerics or a stale anchor.
