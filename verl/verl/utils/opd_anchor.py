@@ -123,6 +123,15 @@ def compute_anchor_state_terms(
     - ``state_anchor_logb``: ``E_b[log b](s_t) = <b, z_b> - lse(z_b) = -H(b|s_t)``,
       the b-only half of ``KL(b || pS)`` at train time.
     - ``state_gap``: ``G(s_t) = KL(b || pT)(s_t) = E_b[log b] - E_b[log pT]``.
+    - ``state_resid_energy``: ``E_b[d^2](s_t) = x^T F_b x`` with ``x = z_b - z_t``
+      and ``d = <b, x> - x`` — the initial residual energy of the P-C substrate
+      (``F_b`` annihilates constants, so raw logits and log-probs give the same
+      ``d``; logsumexp terms never enter).
+    - ``state_mu_eff``: ``mu_eff(s_t) = x^T F_b^2 x / x^T F_b x = E_b[b d^2] / E_b[d^2]``,
+      the marginal absorption rate of the corrected P-C priority measure
+      (paper §4.6: ``eta(s) ~ 1/mu_eff(s)``). ``+inf`` where the residual energy
+      is exactly zero — a converged state has no absorption rate and the
+      downstream demand formula reads ``inf`` as zero demand.
 
     All expectations use the ``<b, z> - lse(z)`` identity under chunking, so no
     full ``(B, T, V)`` float32 tensor ever exists. CPU-testable.
@@ -140,6 +149,8 @@ def compute_anchor_state_terms(
     anchor_log_probs = torch.empty(bsz * seqlen, dtype=torch.float32, device=z_b.device)
     state_anchor_logb = torch.empty(bsz * seqlen, dtype=torch.float32, device=z_b.device)
     state_gap = torch.empty(bsz * seqlen, dtype=torch.float32, device=z_b.device)
+    state_mu_eff = torch.empty(bsz * seqlen, dtype=torch.float32, device=z_b.device)
+    state_resid_energy = torch.empty(bsz * seqlen, dtype=torch.float32, device=z_b.device)
 
     chunk_rows = top_k_logits_chunk_rows(z_b)
     for start in range(0, z_b.shape[0], chunk_rows):
@@ -156,8 +167,28 @@ def compute_anchor_state_terms(
         state_anchor_logb[start:end] = eb_logb
         state_gap[start:end] = eb_logb - eb_logt
 
+        # P-C substrate: d_v = <b, x> - x_v with x = z_b - z_t. The d, d^2,
+        # b*d^2 and b^2*d^2 stages all fold in place onto one buffer so the
+        # chunk peak stays at one extra (rows, V) fp32 temporary.
+        resid = torch.sub(z_b_chunk, z_t_chunk)
+        eb_x = (b_probs * resid).sum(dim=-1, keepdim=True)
+        resid.neg_().add_(eb_x)  # d_v = <b, x> - x_v
+        resid.square_()  # d^2
+        resid.mul_(b_probs)  # b * d^2
+        resid_energy = resid.sum(dim=-1)
+        resid.mul_(b_probs)  # b^2 * d^2
+        mu_num = resid.sum(dim=-1)
+        state_resid_energy[start:end] = resid_energy
+        state_mu_eff[start:end] = torch.where(
+            resid_energy > 0,
+            mu_num / resid_energy.clamp_min(torch.finfo(torch.float32).tiny),
+            torch.inf,
+        )
+
     return {
         "anchor_log_probs_fwd": anchor_log_probs.view(bsz, seqlen),
         "state_anchor_logb": state_anchor_logb.view(bsz, seqlen),
         "state_gap": state_gap.view(bsz, seqlen),
+        "state_mu_eff": state_mu_eff.view(bsz, seqlen),
+        "state_resid_energy": state_resid_energy.view(bsz, seqlen),
     }

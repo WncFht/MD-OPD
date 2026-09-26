@@ -573,6 +573,8 @@ class TeacherWorker(Worker):
                     "anchor_log_probs_fwd",
                     "state_anchor_logb",
                     "state_gap",
+                    "state_mu_eff",
+                    "state_resid_energy",
                     "anchor_top_k_ids",
                     "anchor_top_k_log_probs",
                 ):
@@ -580,9 +582,7 @@ class TeacherWorker(Worker):
                         continue
                     value = out[key]
                     if key not in anchor_parts:
-                        anchor_parts[key] = torch.empty(
-                            (n, *value.shape[1:]), dtype=value.dtype, device=value.device
-                        )
+                        anchor_parts[key] = torch.empty((n, *value.shape[1:]), dtype=value.dtype, device=value.device)
                     anchor_parts[key][chunk] = value
 
         # Reverse KL as a dense per-token reward.
@@ -601,11 +601,23 @@ class TeacherWorker(Worker):
             tensors["anchor_log_probs_fwd"] = anchor_parts["anchor_log_probs_fwd"]
             tensors["state_anchor_logb"] = anchor_parts["state_anchor_logb"]
             tensors["state_gap"] = anchor_parts["state_gap"]
+            tensors["state_mu_eff"] = anchor_parts["state_mu_eff"]
+            tensors["state_resid_energy"] = anchor_parts["state_resid_energy"]
             if "anchor_top_k_ids" in anchor_parts:
                 tensors["anchor_top_k_ids"] = anchor_parts["anchor_top_k_ids"]
                 tensors["anchor_top_k_log_probs"] = anchor_parts["anchor_top_k_log_probs"]
             metrics["anchor_state_gap_mean"] = self.masked_mean(anchor_parts["state_gap"], response_mask)
             metrics["anchor_logb_mean"] = self.masked_mean(anchor_parts["state_anchor_logb"], response_mask)
+            metrics["anchor_resid_energy_mean"] = self.masked_mean(anchor_parts["state_resid_energy"], response_mask)
+            # mu_eff is +inf on positions whose residual energy is exactly
+            # zero; report the mean over the finite ones only.
+            mu_eff = anchor_parts["state_mu_eff"]
+            finite_mask = torch.isfinite(mu_eff).to(mu_eff.dtype)
+            if response_mask is not None:
+                finite_mask = finite_mask * response_mask
+            metrics["anchor_mu_eff_mean"] = self.masked_mean(
+                torch.where(finite_mask.bool(), mu_eff, torch.zeros_like(mu_eff)), finite_mask
+            )
 
         if use_top_k:
             student_in_teacher = top_k_parts["student_in_teacher"]
