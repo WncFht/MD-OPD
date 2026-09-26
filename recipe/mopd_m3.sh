@@ -61,6 +61,7 @@ echo "Actor:        $ACTOR_MODEL_PATH"
 echo "Policy loss:  $POLICY_LOSS_MODE (eta=${MOPD_ETA:-1.0} eps=${MOPD_EPSILON:-0.05} C=${MOPD_CAP:-3.0} lambda=${MOPD_LAMBDA:-0.0})"
 echo "Anchor:       from_actor=${ANCHOR_FROM_ACTOR:-True} refresh_interval=${ANCHOR_REFRESH_INTERVAL:-0} expect_in_train=${ANCHOR_EXPECT_IN_TRAIN:-False}"
 echo "Replay:       enabled=${MOPD_REPLAY_ENABLED:-True} window=${MOPD_REPLAY_WINDOW:-4} priority=${MOPD_PRIORITY_MODE:-marginal_absorption} coverage_rarity=${MOPD_COVERAGE_RARITY:-0.0}"
+echo "EOS patch:    enabled=${MOPD_EOS_PATCH_ENABLED:-True} ids=[${MOPD_EOS_TOKEN_IDS:-151643,151645}]"
 
 launch "$EXPERIMENT_NAME" \
     $(common_args) \
@@ -72,6 +73,7 @@ launch "$EXPERIMENT_NAME" \
     $(anchor_args) \
     $(mopd_loss_args) \
     $(mopd_replay_args) \
+    $(mopd_eos_args) \
     data.train_files="$TRAIN_FILES" \
     data.val_files="$VAL_FILES" \
     "$@"

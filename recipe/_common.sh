@@ -485,6 +485,19 @@ mopd_replay_args() {
         distillation.mopd_replay.coverage_rarity=${MOPD_COVERAGE_RARITY:-0.0}"
 }
 
+# mopd_eos_args：M4 EOS 语义补丁（terminal token 语义类合并，paper 全程开启）。
+#
+# 语义类 E = MOPD_EOS_TOKEN_IDS，首个按惯例写 student 原生 EOS。Qwen 系默认
+# [151643 <|endoftext|>, 151645 <|im_end|>]；换模型族必须覆盖环境变量。
+# rollout.extra_stop_token_ids 同步成同一集合，学生才能真的在类成员上停止。
+# 要求 use_fused_kernels=False、log_prob_top_k=0（trainer 校验器会拦）。
+mopd_eos_args() {
+    echo "\
+        distillation.mopd_eos_patch.enabled=${MOPD_EOS_PATCH_ENABLED:-True} \
+        distillation.mopd_eos_patch.semantic_eos_token_ids=[${MOPD_EOS_TOKEN_IDS:-151643,151645}] \
+        actor_rollout_ref.rollout.extra_stop_token_ids=[${MOPD_EOS_TOKEN_IDS:-151643,151645}]"
+}
+
 # launch <experiment name> <override>...：运行 main_ppo 并将日志 tee 到文件。
 #
 # OPD_DRY_RUN=1 只组合并打印配置，不启动 ray。`--cfg job` 必须放在前面：

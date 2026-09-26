@@ -65,6 +65,7 @@ echo "Actor:        $ACTOR_MODEL_PATH"
 echo "Teacher math: $TEACHER_MATH_PATH"
 echo "Teacher code: $TEACHER_CODE_PATH"
 echo "Teacher if:   $TEACHER_IF_PATH"
+echo "EOS patch:    enabled=${MOPD_EOS_PATCH_ENABLED:-True} ids=[${MOPD_EOS_TOKEN_IDS:-151643,151645}]"
 
 launch "$EXPERIMENT_NAME" \
     $(common_args) \
@@ -73,6 +74,7 @@ launch "$EXPERIMENT_NAME" \
         "math:${TEACHER_MATH_PATH}" \
         "code:${TEACHER_CODE_PATH}" \
         "if:${TEACHER_IF_PATH}") \
+    $(mopd_eos_args) \
     data.train_files="$TRAIN_FILES" \
     data.val_files="$VAL_FILES" \
     "$@"

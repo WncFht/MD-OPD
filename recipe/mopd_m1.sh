@@ -75,6 +75,7 @@ echo "Teacher math: $TEACHER_MATH_PATH"
 echo "Teacher code: $TEACHER_CODE_PATH"
 echo "Teacher if:   $TEACHER_IF_PATH"
 echo "Anchor:       from_actor=${ANCHOR_FROM_ACTOR:-True} refresh_interval=${ANCHOR_REFRESH_INTERVAL:-0} expect_in_train=${ANCHOR_EXPECT_IN_TRAIN:-False}"
+echo "EOS patch:    enabled=${MOPD_EOS_PATCH_ENABLED:-True} ids=[${MOPD_EOS_TOKEN_IDS:-151643,151645}]"
 
 launch "$EXPERIMENT_NAME" \
     $(common_args) \
@@ -84,6 +85,7 @@ launch "$EXPERIMENT_NAME" \
         "code:${TEACHER_CODE_PATH}" \
         "if:${TEACHER_IF_PATH}") \
     $(anchor_args) \
+    $(mopd_eos_args) \
     data.train_files="$TRAIN_FILES" \
     data.val_files="$VAL_FILES" \
     "$@"
