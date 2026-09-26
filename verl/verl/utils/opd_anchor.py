@@ -81,6 +81,59 @@ def get_opd_actor_module() -> torch.nn.Module | None:
     return opd_actor_module
 
 
+class AnchorExpectedLogProbFn(torch.autograd.Function):
+    """``E_b[log pS]`` whose backward recomputes the softmaxes in chunks.
+
+    Letting autograd tape the chunked forward would retain every chunk's fp32
+    ``b_probs``/``z_chunk``/products for backward — roughly 2–3 × (N, V) fp32
+    (~78 GB at 64k×152k rows). This Function instead keeps only the (N,)
+    output and the bf16 input references (``save_for_backward`` also version-
+    checks the caller's logits against in-place mutation) and rebuilds the
+    softmaxes under the same row-chunk bound in ``backward``, so peak fp32
+    stays bounded by chunk size in both directions at the cost of one extra
+    chunked softmax pass.
+    """
+
+    @staticmethod
+    def forward(ctx, anchor_logits, student_logits, anchor_temperature, eos_ids):
+        chunk_rows = top_k_logits_chunk_rows(student_logits)
+        parts = []
+        for start in range(0, student_logits.shape[0], chunk_rows):
+            end = min(start + chunk_rows, student_logits.shape[0])
+            b_probs = torch.softmax(anchor_logits[start:end].float() / anchor_temperature, dim=-1)
+            z_chunk = student_logits[start:end].float()
+            lse_z = torch.logsumexp(z_chunk, dim=-1)
+            if eos_ids is not None:
+                parts.append(merged_expectation(b_probs, z_chunk, lse_z, eos_ids))
+            else:
+                parts.append((b_probs * z_chunk).sum(dim=-1) - lse_z)
+        ctx.save_for_backward(anchor_logits, student_logits)
+        ctx.anchor_temperature = anchor_temperature
+        ctx.eos_ids = eos_ids
+        ctx.chunk_rows = chunk_rows
+        return torch.cat(parts, dim=0)
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        anchor_logits, student_logits = ctx.saved_tensors
+        grad_z = torch.empty_like(student_logits)
+        eos_idx = None
+        if ctx.eos_ids is not None:
+            eos_idx = torch.as_tensor(ctx.eos_ids, device=student_logits.device, dtype=torch.long)
+        for start in range(0, student_logits.shape[0], ctx.chunk_rows):
+            end = min(start + ctx.chunk_rows, student_logits.shape[0])
+            b_probs = torch.softmax(anchor_logits[start:end].float() / ctx.anchor_temperature, dim=-1)
+            p = torch.softmax(student_logits[start:end].float(), dim=-1)
+            b_eff = b_probs
+            if eos_idx is not None:
+                # merged-space pullback: class members carry b_E * p_v / p_E
+                b_e = b_probs.index_select(-1, eos_idx).sum(-1, keepdim=True)
+                p_e = p.index_select(-1, eos_idx).sum(-1, keepdim=True)
+                b_eff = b_probs.index_copy(-1, eos_idx, b_e / p_e * p.index_select(-1, eos_idx))
+            grad_z[start:end] = (b_eff - p).mul_(grad_out[start:end].unsqueeze(-1))
+        return None, grad_z, None, None
+
+
 def anchor_expected_log_prob(
     anchor_logits: torch.Tensor,
     student_logits: torch.Tensor,
@@ -95,10 +148,10 @@ def anchor_expected_log_prob(
         E_b[log pS] = <b, z> - logsumexp(z)
 
     which keeps grad flowing through ``z`` (the backward is ``b - pS``) while
-    the anchor side stays detached. Rows are processed in chunks so the FP32
-    temporaries stay bounded independent of ``N``; the chunked results are
-    concatenated, which preserves autograd. Shapes: ``(N, V)`` -> ``(N,)``,
-    float32. CPU-testable.
+    the anchor side stays detached. Shapes: ``(N, V)`` -> ``(N,)``, float32.
+    The computation is wrapped in :class:`AnchorExpectedLogProbFn` so the
+    retained autograd graph holds only input references — FP32 temporaries
+    stay bounded by the row chunk in both directions. CPU-testable.
 
     When ``eos_token_ids`` names the merged terminal class ``E`` (M4), the
     expectation runs on the merged action space instead:
@@ -115,18 +168,7 @@ def anchor_expected_log_prob(
             f"and {tuple(student_logits.shape)}"
         )
     eos_ids = validate_eos_class_ids(eos_token_ids) if eos_token_ids else None
-    parts = []
-    for start in range(0, anchor_logits.shape[0], top_k_logits_chunk_rows(anchor_logits)):
-        end = min(start + top_k_logits_chunk_rows(anchor_logits), anchor_logits.shape[0])
-        b_logits = anchor_logits[start:end].float() / anchor_temperature
-        b_probs = torch.softmax(b_logits, dim=-1)
-        z_chunk = student_logits[start:end].float()
-        lse_z = torch.logsumexp(z_chunk, dim=-1)
-        if eos_ids is not None:
-            parts.append(merged_expectation(b_probs, z_chunk, lse_z, eos_ids))
-        else:
-            parts.append((b_probs * z_chunk).sum(dim=-1) - lse_z)
-    return torch.cat(parts, dim=0)
+    return AnchorExpectedLogProbFn.apply(anchor_logits, student_logits, anchor_temperature, eos_ids)
 
 
 def compute_anchor_state_terms(
