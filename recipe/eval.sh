@@ -12,8 +12,10 @@
 #     EVAL_BENCH=math bash recipe/eval.sh
 #     EVAL_BENCH=math ... OPD_DRY_RUN=1 bash recipe/eval.sh   # 只打配置
 #
-# EVAL_BENCH ∈ math | code | bfcl。Multi-IF 三轮不在此处——训练内 val 结构性
-# 做不了多轮，走 eval/run_if_eval.py 离线通道。
+# EVAL_BENCH ∈ math | math32 | code | bfcl。math32 = math 同表 n=32 档，供
+# 协议 pass@k 的 k=32 读数（math 预设 n=16 只够到 pass@16）；写独立 bench
+# 目录，不会覆盖 math 的 n=16 dump。Multi-IF 三轮不在此处——训练内 val
+# 结构性做不了多轮，走 eval/run_if_eval.py 离线通道。
 #
 # 产物：
 #     $EVAL_OUT/$EVAL_BENCH/dump/<step>.jsonl   逐样本（input/output/gts/
@@ -55,8 +57,13 @@ case "$EVAL_BENCH" in
         export MAX_VAL_RESP_LENGTH=${MAX_VAL_RESP_LENGTH:-16384}
         export VAL_N=${VAL_N:-8}
         ;;
+    math32)
+        export MAX_PROMPT_LENGTH=${MAX_PROMPT_LENGTH:-2048}
+        export MAX_VAL_RESP_LENGTH=${MAX_VAL_RESP_LENGTH:-31744}
+        export VAL_N=${VAL_N:-32}
+        ;;
     *)
-        echo "EVAL_BENCH=$EVAL_BENCH is not one of: math, code, bfcl" >&2
+        echo "EVAL_BENCH=$EVAL_BENCH is not one of: math, math32, code, bfcl" >&2
         exit 2
         ;;
 esac
@@ -92,7 +99,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 export TRAIN_FILES=${TRAIN_FILES:-["${DATA_BASE}/smoke/mixed_3domain_192.parquet"]}
 
 case "$EVAL_BENCH" in
-    math)
+    math|math32)
         export VAL_FILES=${VAL_FILES:-["${DATA_BASE}/math/MATH-500/test.parquet","${DATA_BASE}/math/AMC23/test.parquet","${DATA_BASE}/math/AIME25/test.parquet"]}
         ;;
     code)
