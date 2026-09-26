@@ -20,7 +20,7 @@ from typing import Optional
 from verl.base_config import BaseConfig
 from verl.utils.config import omega_conf_to_dataclass
 
-from .fsdp_teacher import FsdpTeacherConfig
+from .fsdp_teacher import FsdpTeacherConfig, MopdReplayConfig
 from .rollout import RolloutConfig
 
 __all__ = ["DistillationLossConfig", "DistillationTeacherModelConfig", "DistillationConfig"]
@@ -269,6 +269,8 @@ class DistillationConfig(BaseConfig):
     # OPD on-policy distillation teacher (FSDP forward-based). Independent of
     # `teacher_models` above, which serves teachers as inference replicas.
     fsdp_teacher: FsdpTeacherConfig = field(default_factory=FsdpTeacherConfig)
+    # MOPD cross-window replay buffer + P-C priority sampler (trainer-side).
+    mopd_replay: MopdReplayConfig = field(default_factory=MopdReplayConfig)
 
     def __post_init__(self):
         if not self.enabled:

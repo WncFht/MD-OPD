@@ -225,3 +225,29 @@ fsdp_teacher:
     # E_b[log pi_theta] alternative. Ablation-only: the missing tail mass biases
     # the residual's per-state constant.
     top_k: 0
+
+# MOPD cross-window replay buffer + P-C priority sampler (paper §4.4 M3).
+# Trainer-side only: each fully-scored generation batch joins a buffer holding
+# the last `window` fills, and the actor's update batch is re-drawn from it by
+# deterministic stratified quota under the P-C priority measure. OFF by
+# default — disabled behavior is identical to today.
+mopd_replay:
+
+  # Required when using verl.utils.omega_conf_to_dataclass to instantiate dataclass configs
+  _target_: verl.workers.config.MopdReplayConfig
+
+  # Master switch for the replay buffer + priority sampler.
+  enabled: false
+
+  # Number of most-recent generation batches retained (the "last L windows";
+  # v0 generates every step, so one window = one step's scored fill).
+  window: 4
+
+  # Priority measure: marginal_absorption (P-C corrected form, demand
+  # ~ 1/mu_eff(s) = c0/2H·eta(s) shape) | proportional_G_negcontrol (falsified
+  # E19/E20 baseline, demand ~ G(s)) | uniform.
+  priority_mode: marginal_absorption
+
+  # Mixture weight on coverage rarity r = 1/(1+n_sampled) vs the priority
+  # measure (both normalized to mean 1 over the live buffer); 0 = pure priority.
+  coverage_rarity: 0.0

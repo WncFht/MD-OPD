@@ -28,7 +28,7 @@ from typing import Any, Optional
 
 from verl.base_config import BaseConfig
 
-__all__ = ["AnchorConfig", "FsdpTeacherConfig", "route_by_ability"]
+__all__ = ["AnchorConfig", "FsdpTeacherConfig", "MopdReplayConfig", "route_by_ability"]
 
 logger = logging.getLogger(__name__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
@@ -152,6 +152,32 @@ class AnchorConfig(BaseConfig):
 
 
 @dataclass
+class MopdReplayConfig(BaseConfig):
+    """MOPD cross-window replay buffer + P-C priority sampler (paper §4.4 M3).
+
+    Consumed entirely on the trainer driver (``RayPPOTrainer``); declared under
+    ``distillation`` because it is an OPD-family feature whose inputs are the
+    M1 anchor batch fields.
+
+    Args:
+        enabled: master switch. When False the trainer updates strictly on the
+            fresh batch, byte-identical to upstream.
+        window: number of most-recent generation batches retained in the
+            buffer (the paper's "last L windows"; one fill happens per step).
+        priority_mode: ``marginal_absorption`` (P-C corrected form, demand
+            ``~ 1/mu_eff(s)``), ``proportional_G_negcontrol`` (falsified E19/E20
+            baseline, demand ``~ G(s)``), or ``uniform``.
+        coverage_rarity: mixture weight on the rarity score ``1/(1+n_sampled)``
+            vs the priority measure; 0 = pure priority.
+    """
+
+    enabled: bool = False
+    window: int = 4
+    priority_mode: str = "marginal_absorption"
+    coverage_rarity: float = 0.0
+
+
+@dataclass
 class FsdpTeacherConfig(BaseConfig):
     """OPD teacher configuration.
 
@@ -229,8 +255,7 @@ class FsdpTeacherConfig(BaseConfig):
                 raise ValueError(f"[OPD] anchor.top_k must be >= 0, got {self.anchor.top_k}")
             if self.anchor.micro_batch_size_per_gpu < 0:
                 raise ValueError(
-                    "[OPD] anchor.micro_batch_size_per_gpu must be >= 0, "
-                    f"got {self.anchor.micro_batch_size_per_gpu}"
+                    f"[OPD] anchor.micro_batch_size_per_gpu must be >= 0, got {self.anchor.micro_batch_size_per_gpu}"
                 )
             if "anchor" in self.teacher_names():
                 raise ValueError(

@@ -472,6 +472,19 @@ mopd_loss_args() {
     echo "$args"
 }
 
+# mopd_replay_args：M3 跨窗口 replay buffer + P-C 优先级 sampler（paper §4.4/§4.6）。
+#
+# mopd_replay.* 已在 distillation.yaml 结构化声明，直接 . 覆盖。
+# MOPD_PRIORITY_MODE=marginal_absorption 需 anchor.enabled（state_mu_eff/
+# state_resid_energy/state_gap 都来自 anchor 配对前向）；uniform 可裸跑。
+mopd_replay_args() {
+    echo "\
+        distillation.mopd_replay.enabled=${MOPD_REPLAY_ENABLED:-True} \
+        distillation.mopd_replay.window=${MOPD_REPLAY_WINDOW:-4} \
+        distillation.mopd_replay.priority_mode=${MOPD_PRIORITY_MODE:-marginal_absorption} \
+        distillation.mopd_replay.coverage_rarity=${MOPD_COVERAGE_RARITY:-0.0}"
+}
+
 # launch <experiment name> <override>...：运行 main_ppo 并将日志 tee 到文件。
 #
 # OPD_DRY_RUN=1 只组合并打印配置，不启动 ray。`--cfg job` 必须放在前面：
