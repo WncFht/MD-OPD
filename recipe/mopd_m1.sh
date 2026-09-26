@@ -65,7 +65,7 @@ IF_TRAIN=${IF_TRAIN:-${DATA_BASE}/if/MultiIF/train.parquet}
 export TRAIN_FILES=${TRAIN_FILES:-["$MATH_TRAIN","$CODE_TRAIN","$IF_TRAIN"]}
 
 
-export VAL_FILES=${VAL_FILES:-["${DATA_BASE}/math/MATH-500/test.parquet","${DATA_BASE}/code/LCBv6/test.parquet"]}
+export VAL_FILES=${VAL_FILES:-["${DATA_BASE}/math/MATH-500/test.parquet","${DATA_BASE}/math/AMC23/test.parquet","${DATA_BASE}/math/AIME25/test.parquet","${DATA_BASE}/code/LCBv6/test.parquet"]}
 
 export EXPERIMENT_NAME=${EXPERIMENT_NAME:-${DATE}-mopd_m1_${MODE}_${ACTOR_MODEL_NAME}-${OPD_SIGNAL_TAG}_adv_${OPD_ADV_TAG}-T_${TEMPERATURE}-anchorL${ANCHOR_REFRESH_INTERVAL:-0}-${TIME_TAG}}
 

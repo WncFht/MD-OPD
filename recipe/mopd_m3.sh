@@ -52,7 +52,7 @@ CODE_TRAIN=${CODE_TRAIN:-${DATA_BASE}/code/TACO/train.parquet}
 IF_TRAIN=${IF_TRAIN:-${DATA_BASE}/if/MultiIF/train.parquet}
 export TRAIN_FILES=${TRAIN_FILES:-["$MATH_TRAIN","$CODE_TRAIN","$IF_TRAIN"]}
 
-export VAL_FILES=${VAL_FILES:-["${DATA_BASE}/math/MATH-500/test.parquet","${DATA_BASE}/code/LCBv6/test.parquet"]}
+export VAL_FILES=${VAL_FILES:-["${DATA_BASE}/math/MATH-500/test.parquet","${DATA_BASE}/math/AMC23/test.parquet","${DATA_BASE}/math/AIME25/test.parquet","${DATA_BASE}/code/LCBv6/test.parquet"]}
 
 export EXPERIMENT_NAME=${EXPERIMENT_NAME:-${DATE}-mopd_m3_${MODE}_${ACTOR_MODEL_NAME}-${POLICY_LOSS_MODE}_${MOPD_PRIORITY_MODE:-marginal_absorption}-win${MOPD_REPLAY_WINDOW:-4}-${TIME_TAG}}
 
