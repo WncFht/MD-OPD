@@ -338,6 +338,15 @@ class OPDTrainerMixin:
                 "(state_mu_eff, state_resid_energy, state_gap) are written by the "
                 "anchor paired forward."
             )
+        loss_mode = self.config.actor_rollout_ref.actor.policy_loss.get("loss_mode", "vanilla")
+        if loss_mode in MOPD_ANCHOR_EB_LOSSES and self.opd_anchor_refresh_interval() > 0:
+            raise ValueError(
+                f"distillation.mopd_replay + actor.policy_loss.loss_mode={loss_mode} requires "
+                "distillation.fsdp_teacher.anchor.refresh_interval=0: replayed rows store state "
+                "constants (state_gap, state_anchor_logb, anchor_log_probs) under the append-time "
+                "anchor, while mopd_resid recomputes anchor_eb_logp under the refreshed anchor — "
+                "a refresh would silently mix two behavior policies into one residual."
+            )
 
     # ------------------------------------------------------------------
     # MOPD EOS semantic patch (merged terminal class, paper M4)

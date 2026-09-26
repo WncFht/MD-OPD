@@ -205,11 +205,11 @@ def aggregate_bench(bench_dir: Path, data_root: Path, rescore: bool) -> dict:
             )
             want = expected.get(source)
             entry["coverage"] = entry["n_prompts"] / want if want else None
-            if entry["coverage"] is not None and entry["coverage"] < 1.0:
+            if entry["coverage"] is not None and entry["coverage"] != 1.0:
                 print(
                     f"[warn] {source}: coverage={entry['coverage']:.3f} "
-                    f"({entry['n_prompts']}/{want} prompts) -- filter_overlong_prompts "
-                    "dropped eval rows; raise MAX_PROMPT_LENGTH for this bench",
+                    f"({entry['n_prompts']}/{want} prompts) -- <1.0 means filter_overlong_prompts "
+                    "dropped eval rows (raise MAX_PROMPT_LENGTH); >1.0 means duplicate dump rows",
                     file=sys.stderr,
                 )
             if rescore:
@@ -289,6 +289,12 @@ def summary_row(run: dict) -> dict[str, str]:
             mean_key = f"mean@{e['n_per_prompt']}"
             if col in row:
                 row[col] = f"{e['metrics'][var][mean_key]:.6f}"
+            else:
+                print(
+                    f"[warn] data_source {e['data_source']!r} has no summary column -- "
+                    "dropped from summary.csv (report.json keeps it)",
+                    file=sys.stderr,
+                )
         if bench["macro_mean"] is not None:
             if name == "math":
                 row["math_macro"] = f"{bench['macro_mean']:.6f}"

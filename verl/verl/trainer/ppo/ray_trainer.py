@@ -967,9 +967,9 @@ class RayPPOTrainer(OPDTrainerMixin):
                 gts=sample_gts,
                 scores=sample_scores,
                 reward_extra_infos_dict={
+                    **reward_extra_infos_dict,
                     "data_source": [src for sources in data_source_lst for src in sources],
                     "uid": list(sample_uids),
-                    **reward_extra_infos_dict,
                 },
                 dump_path=val_data_dir,
             )
