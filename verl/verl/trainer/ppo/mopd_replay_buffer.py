@@ -67,6 +67,12 @@ class MopdReplayBuffer:
         buffer ages. The proto is deep-copied because the live batch object
         keeps flowing through the rest of the step.
         """
+        cuda_fields = [k for k, v in batch.batch.items() if v.is_cuda]
+        if cuda_fields:
+            raise ValueError(
+                f"mopd replay expects CPU-resident batches on the driver, got CUDA tensors "
+                f"in {cuda_fields}; every retained window would pin a full GPU copy"
+            )
         fields = {"response_mask": batch.batch["response_mask"].detach().cpu().numpy()}
         for key in MODE_FIELDS[self.priority_mode]:
             fields[key] = batch.batch[key].detach().cpu().numpy()

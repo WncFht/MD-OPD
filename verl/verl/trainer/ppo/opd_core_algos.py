@@ -449,8 +449,16 @@ def compute_policy_loss_mopd_grpo(
     cap = float(config.policy_loss.get("mopd_cap", 3.0))
     clip_low = config.policy_loss.get("mopd_clip_low")
     clip_high = config.policy_loss.get("mopd_clip_high")
-    clip_low = float(clip_low) if clip_low is not None else float(config.clip_ratio_low or config.clip_ratio)
-    clip_high = float(clip_high) if clip_high is not None else float(config.clip_ratio_high or config.clip_ratio)
+    if clip_low is None:
+        clip_low = config.clip_ratio_low if config.clip_ratio_low is not None else config.clip_ratio
+    if clip_high is None:
+        clip_high = config.clip_ratio_high if config.clip_ratio_high is not None else config.clip_ratio
+    if clip_low is None or clip_high is None:
+        raise ValueError(
+            "mopd_grpo clip bounds unset: configure policy_loss mopd_clip_low/mopd_clip_high "
+            "or actor clip_ratio(_low/_high)"
+        )
+    clip_low, clip_high = float(clip_low), float(clip_high)
 
     log_prob = log_prob.float()
     teacher_lp = teacher_log_probs.float().detach()
