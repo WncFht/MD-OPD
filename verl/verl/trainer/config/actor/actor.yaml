@@ -79,6 +79,31 @@ policy_loss:
   # Must be set to a positive value when policy_loss.loss_mode is "dro".
   dro_beta: null
 
+  # --- MOPD per-state losses (mopd_resid / mopd_grpo) -------------------------
+  # Both require distillation.fsdp_teacher.anchor.enabled=True; mopd_resid also
+  # needs anchor.expect_in_train=True. See verl/trainer/ppo/opd_core_algos.py.
+
+  # Mirror step size eta. eta=1 is the paper's main form.
+  mopd_eta: 1.0
+
+  # Complement-ratio smoothing epsilon for mopd_grpo's omega = (1+eps-b)/(1+eps-pi).
+  mopd_epsilon: 0.05
+
+  # Cap C on the omega weight for mopd_grpo.
+  mopd_cap: 3.0
+
+  # Bounds of the BPO clip-rule mask M on omega. null = reuse clip_ratio_low/high.
+  mopd_clip_low: null
+  mopd_clip_high: null
+
+  # Coefficient of the KL(pi_T || pi_theta) support floor, approximated by
+  # b-importance-sampled -E_{pi_T}[log pi_theta] on sampled tokens (covers only
+  # b's support). 0 disables.
+  mopd_lambda: 0.0
+
+  # Cap on the pi_T/b importance weight of the floor estimate.
+  mopd_is_cap: 20.0
+
 # Constant C in Dual-clip PPO; clips when advantage < 0 and ratio > C
 clip_ratio_c: 3.0
 

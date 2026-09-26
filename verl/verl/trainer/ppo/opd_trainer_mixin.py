@@ -43,6 +43,7 @@ import numpy as np
 import torch
 
 from verl.protocol import DataProto
+from verl.trainer.ppo.opd_core_algos import MOPD_ANCHOR_EB_LOSSES, MOPD_POLICY_LOSS_FIELDS
 from verl.utils.config import omega_conf_to_dataclass
 from verl.workers.config import FsdpTeacherConfig
 
@@ -258,6 +259,38 @@ class OPDTrainerMixin:
                 "anchor.expect_in_train requires matching ulysses_sequence_parallel_size on "
                 f"actor ({actor_sp}) and fsdp_teacher ({teacher_sp}): the anchor forward "
                 "consumes the SP-sliced packed inputs the actor engine builds."
+            )
+
+    def validate_mopd_loss_config(self) -> None:
+        """Refuse mopd_* policy losses whose anchor inputs would be missing.
+
+        The per-state residual losses read the M1 anchor batch fields
+        (``teacher_log_probs``, ``anchor_log_probs``, ``state_gap``,
+        ``state_anchor_logb``), so they are only defined when the anchor module
+        is on; ``mopd_resid`` additionally needs ``anchor_eb_logp`` emitted by
+        the actor's own train forward (``anchor.expect_in_train``). They are
+        sampled-token losses: top-K reward mode's (B, T, K) plumbing does not
+        apply to them.
+        """
+        loss_mode = self.config.actor_rollout_ref.actor.policy_loss.get("loss_mode", "vanilla")
+        if loss_mode not in MOPD_POLICY_LOSS_FIELDS:
+            return
+        if not self.opd_anchor_enabled():
+            raise ValueError(
+                f"actor.policy_loss.loss_mode={loss_mode} requires "
+                "distillation.fsdp_teacher.anchor.enabled=True: the M1 anchor pipeline writes "
+                "the b-side fields (anchor_log_probs, state_gap, state_anchor_logb) it consumes."
+            )
+        if loss_mode in MOPD_ANCHOR_EB_LOSSES and not self.opd_anchor_expect_in_train():
+            raise ValueError(
+                f"actor.policy_loss.loss_mode={loss_mode} requires "
+                "distillation.fsdp_teacher.anchor.expect_in_train=True: the residual needs "
+                "anchor_eb_logp = E_b[log pi_theta] from the actor's train forward."
+            )
+        if self.opd_top_k_is_reward():
+            raise ValueError(
+                f"actor.policy_loss.loss_mode={loss_mode} is a sampled-token MOPD loss; "
+                "distillation.fsdp_teacher.log_prob_top_k>0 (top-K reward mode) is incompatible."
             )
 
     def validate_mdpo_config(self) -> None:

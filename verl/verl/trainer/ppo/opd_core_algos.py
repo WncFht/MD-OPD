@@ -41,6 +41,7 @@ from verl.trainer.ppo.core_algos import (
     register_adv_est,
     register_policy_loss,
 )
+from verl.utils.torch_functional import masked_mean
 from verl.workers.config import ActorConfig
 
 __all__ = [
@@ -49,7 +50,26 @@ __all__ = [
     "compute_discounted_token_reward_advantage",
     "compute_policy_loss_vanilla_topk",
     "compute_policy_loss_opd_noratio",
+    "compute_policy_loss_mopd_resid",
+    "compute_policy_loss_mopd_grpo",
+    "MOPD_POLICY_LOSS_FIELDS",
+    "MOPD_ANCHOR_EB_LOSSES",
 ]
+
+#: Batch fields (written by the M1 anchor pipeline in
+#: ``OPDTrainerMixin.compute_opd_token_reward``) that each MOPD per-state loss
+#: consumes beyond the shared policy-loss interface. ``ppo_loss`` validates and
+#: selects them by loss mode. ``anchor_eb_logp`` is deliberately absent here: it
+#: must arrive via ``model_output`` because only the in-forward value carries
+#: grad against the *current* student.
+MOPD_POLICY_LOSS_FIELDS: dict[str, tuple[str, ...]] = {
+    "mopd_resid": ("teacher_log_probs", "anchor_log_probs", "state_gap", "state_anchor_logb"),
+    "mopd_grpo": ("teacher_log_probs", "anchor_log_probs", "state_gap"),
+}
+
+#: MOPD losses that additionally require ``anchor_eb_logp`` = E_b[log pi_theta]
+#: from the actor's own train forward (``anchor.expect_in_train=True``).
+MOPD_ANCHOR_EB_LOSSES: frozenset = frozenset({"mopd_resid"})
 
 
 @register_adv_est("token_reward_direct")
@@ -272,3 +292,201 @@ def compute_policy_loss_opd_noratio(
         "actor/ppo_kl": 0.0,
         "actor/pg_clipfrac_lower": 0.0,
     }
+
+
+def _mopd_is_floor(
+    log_prob: torch.Tensor,
+    teacher_log_probs: torch.Tensor,
+    anchor_log_probs: torch.Tensor,
+    is_cap: float,
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+    """IS-under-b estimate of ``-E_{pi_T}[log pi_theta]`` — the theta-dependent
+    half of the ``lam * KL(pi_T || pi_theta)`` support floor.
+
+    The exact floor needs ``E_{pi_T}[log pi_theta]`` over the full vocabulary;
+    M1 stores only sampled-token teacher log-probs, so each sampled token is
+    weighted by ``w = pi_T(y)/b(y)`` capped at ``is_cap``. The estimate is
+    unbiased over b's support but cannot deliver mass to b-dead tokens — the
+    dead-support recovery the floor exists for still needs the deferred
+    gather-at-teacher-ids engine path.
+    """
+    is_w = (teacher_log_probs - anchor_log_probs).exp().clamp_max(is_cap)
+    return -is_w * log_prob, {
+        "mopd/floor_is_w_mean": is_w,
+        "mopd/floor_is_cap_frac": (is_w >= is_cap).to(is_w.dtype),
+    }
+
+
+def _mopd_floor_term(
+    config: ActorConfig,
+    log_prob: torch.Tensor,
+    teacher_log_probs: torch.Tensor,
+    anchor_log_probs: torch.Tensor,
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+    """Per-token floor contribution ``-lam * w * log pi_theta``, or zero."""
+    lam = float(config.policy_loss.get("mopd_lambda", 0.0))
+    if lam <= 0.0:
+        return torch.zeros((), dtype=log_prob.dtype, device=log_prob.device), {}
+    floor_mat, floor_metrics = _mopd_is_floor(
+        log_prob, teacher_log_probs, anchor_log_probs, float(config.policy_loss.get("mopd_is_cap", 20.0))
+    )
+    return lam * floor_mat, floor_metrics
+
+
+@register_policy_loss("mopd_resid")
+def compute_policy_loss_mopd_resid(
+    old_log_prob: torch.Tensor,
+    log_prob: torch.Tensor,
+    advantages: torch.Tensor,
+    response_mask: torch.Tensor,
+    loss_agg_mode: str = "token-mean",
+    config: Optional[ActorConfig] = None,
+    rollout_is_weights: torch.Tensor | None = None,
+    *,
+    teacher_log_probs: torch.Tensor,
+    anchor_log_probs: torch.Tensor,
+    state_gap: torch.Tensor,
+    state_anchor_logb: torch.Tensor,
+    anchor_eb_logp: torch.Tensor,
+) -> tuple[torch.Tensor, dict[str, Any]]:
+    """MOPD per-state residual loss ``E_b[d^2]`` (paper form 2; eta=1 main form).
+
+    Fused residual ``d_v = <b, x> - x_v + (eta-1) A`` with
+    ``x = log pi_theta - log pi_T``: the ``E_b[log b]`` halves of the two
+    centering KLs cancel analytically inside ``<b, x>``, so the loss never
+    subtracts the two large per-state constants (the fp16-fragile pattern E25
+    measured). ``<b, x> = anchor_eb_logp + state_gap - state_anchor_logb``
+    carries grad only through ``anchor_eb_logp`` (backward ``b - pi_theta``)
+    and ``x_v`` only through ``log_prob`` (backward ``pi_theta - e_y``), so
+    ``nabla_z d = b - e_y`` and autodiff of ``d^2`` gives the unbiased
+    single-sample update ``2 d (b - e_y)`` — no manual stop-gradient. Every
+    other field is a detached constant and all logprob-derived quantities are
+    fp32 per the E25 precision contract.
+
+    ``old_log_prob``/``advantages`` are accepted for the shared policy-loss
+    interface and unused: the M1 anchor fields carry the whole signal.
+    """
+    if rollout_is_weights is not None:
+        raise ValueError("mopd_resid does not support rollout importance-sampling weights")
+    if config is None:
+        raise ValueError("mopd_resid requires ActorConfig")
+
+    eta = float(config.policy_loss.get("mopd_eta", 1.0))
+
+    log_prob = log_prob.float()
+    anchor_eb_logp = anchor_eb_logp.float()
+    teacher_lp = teacher_log_probs.float().detach()
+    anchor_lp = anchor_log_probs.float().detach()
+    gap = state_gap.float().detach()
+    eblogb = state_anchor_logb.float().detach()
+
+    # <b, x> = E_b[log pi_theta] - E_b[log pi_T]:
+    # anchor_eb_logp is E_b[log pi_theta]; state_gap - state_anchor_logb = -E_b[log pi_T].
+    resid = anchor_eb_logp + (gap - eblogb) - (log_prob - teacher_lp)
+    if eta != 1.0:
+        # d^eta = d^1 + (eta - 1) * A, with A = log pi_T - log b + KL(b || pi_T).
+        resid = resid + (eta - 1.0) * (teacher_lp - anchor_lp + gap)
+
+    floor_mat, floor_metrics = _mopd_floor_term(config, log_prob, teacher_lp, anchor_lp)
+    loss_mat = resid.square() + floor_mat
+    pg_loss = agg_loss(
+        loss_mat=loss_mat,
+        loss_mask=response_mask,
+        loss_agg_mode=loss_agg_mode,
+        **config.global_batch_info,
+    )
+
+    resid = resid.detach()
+    metrics = {
+        "actor/pg_clipfrac": 0.0,
+        "actor/pg_clipfrac_lower": 0.0,
+        "actor/ppo_kl": masked_mean(old_log_prob.float() - log_prob.detach(), response_mask).detach().item(),
+        # E_b[d] = 0 per state, so a nonzero masked mean flags plumbing or
+        # dtype drift; resid_rms is the LS objective's own scale.
+        "mopd/resid_mean": masked_mean(resid, response_mask).item(),
+        "mopd/resid_rms": masked_mean(resid.square(), response_mask).sqrt().item(),
+    }
+    for key, val in floor_metrics.items():
+        metrics[key] = masked_mean(val, response_mask).item()
+    return pg_loss, metrics
+
+
+@register_policy_loss("mopd_grpo")
+def compute_policy_loss_mopd_grpo(
+    old_log_prob: torch.Tensor,
+    log_prob: torch.Tensor,
+    advantages: torch.Tensor,
+    response_mask: torch.Tensor,
+    loss_agg_mode: str = "token-mean",
+    config: Optional[ActorConfig] = None,
+    rollout_is_weights: torch.Tensor | None = None,
+    *,
+    teacher_log_probs: torch.Tensor,
+    anchor_log_probs: torch.Tensor,
+    state_gap: torch.Tensor,
+) -> tuple[torch.Tensor, dict[str, Any]]:
+    """Practical MOPD loss (paper form 3): the BPO-shaped weighted SFT form.
+
+    ``L = -2 eta sg[A] M min{sg[omega], C} log pi_theta(y|s)`` with
+    ``A = log pi_T - log b + KL(b || pi_T)`` — exactly centered per state, so
+    no group normalization — and ``omega = (1 + eps - b) / (1 + eps - pi)``
+    the binary-KL complement ratio. ``M`` is the BPO clip-rule mask applied to
+    ``omega``: off when ``A > 0`` and ``omega > 1 + clip_high`` (positive
+    signal, token already saturated) or ``A < 0`` and ``omega < 1 - clip_low``
+    (negative signal, already pushed below b); the clip bounds default to the
+    actor's ``clip_ratio_low``/``clip_ratio_high``.
+
+    Only ``log_prob`` carries grad: ``A``, ``omega`` and ``M`` are all
+    stop-gradiented, so the gradient is the intended weighted-SFT direction.
+    """
+    if rollout_is_weights is not None:
+        raise ValueError("mopd_grpo does not support rollout importance-sampling weights")
+    if config is None:
+        raise ValueError("mopd_grpo requires ActorConfig")
+
+    eta = float(config.policy_loss.get("mopd_eta", 1.0))
+    eps = float(config.policy_loss.get("mopd_epsilon", 0.05))
+    cap = float(config.policy_loss.get("mopd_cap", 3.0))
+    clip_low = config.policy_loss.get("mopd_clip_low")
+    clip_high = config.policy_loss.get("mopd_clip_high")
+    clip_low = float(clip_low) if clip_low is not None else float(config.clip_ratio_low or config.clip_ratio)
+    clip_high = float(clip_high) if clip_high is not None else float(config.clip_ratio_high or config.clip_ratio)
+
+    log_prob = log_prob.float()
+    teacher_lp = teacher_log_probs.float().detach()
+    anchor_lp = anchor_log_probs.float().detach()
+    gap = state_gap.float().detach()
+
+    adv = teacher_lp - anchor_lp + gap
+    pi_prob = log_prob.detach().exp()
+    b_prob = anchor_lp.exp()
+    # Both numerator and denominator stay in [eps, 1+eps], so omega > 0 and the
+    # clamp only guards the saturated tail pi -> 1 (omega ~ (1+eps-b)/eps).
+    omega = ((1.0 + eps - b_prob) / (1.0 + eps - pi_prob).clamp_min(1e-8)).detach()
+    weight = omega.clamp_max(cap)
+    keep = ~(((adv > 0) & (omega > 1.0 + clip_high)) | ((adv < 0) & (omega < 1.0 - clip_low)))
+
+    floor_mat, floor_metrics = _mopd_floor_term(config, log_prob, teacher_lp, anchor_lp)
+    loss_mat = -2.0 * eta * adv * keep.to(log_prob.dtype) * weight * log_prob + floor_mat
+    pg_loss = agg_loss(
+        loss_mat=loss_mat,
+        loss_mask=response_mask,
+        loss_agg_mode=loss_agg_mode,
+        **config.global_batch_info,
+    )
+
+    clip_frac_high = masked_mean(((adv > 0) & (omega > 1.0 + clip_high)).to(log_prob.dtype), response_mask)
+    clip_frac_low = masked_mean(((adv < 0) & (omega < 1.0 - clip_low)).to(log_prob.dtype), response_mask)
+    metrics = {
+        "actor/pg_clipfrac": (clip_frac_high + clip_frac_low).detach().item(),
+        "actor/pg_clipfrac_lower": clip_frac_low.detach().item(),
+        "actor/ppo_kl": masked_mean(old_log_prob.float() - log_prob.detach(), response_mask).detach().item(),
+        "mopd/adv_mean": masked_mean(adv, response_mask).item(),
+        "mopd/adv_abs_mean": masked_mean(adv.abs(), response_mask).item(),
+        "mopd/omega_mean": masked_mean(omega, response_mask).item(),
+        "mopd/omega_cap_frac": masked_mean((omega > cap).to(log_prob.dtype), response_mask).item(),
+    }
+    for key, val in floor_metrics.items():
+        metrics[key] = masked_mean(val, response_mask).item()
+    return pg_loss, metrics
+

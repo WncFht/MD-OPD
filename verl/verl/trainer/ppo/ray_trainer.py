@@ -398,6 +398,7 @@ class RayPPOTrainer(OPDTrainerMixin):
         self.validate_opd_top_k_config()
         self.validate_mdpo_config()
         self.validate_opd_anchor_config()
+        self.validate_mopd_loss_config()
 
         self.use_rm = need_reward_model(self.config)
 

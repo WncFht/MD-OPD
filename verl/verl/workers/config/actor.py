@@ -83,8 +83,9 @@ class PolicyLossConfig(BaseConfig):
 
     Args:
         loss_mode (str): Registered policy loss name. Options: 'vanilla', 'dppo_tv', 'dppo_kl', 'gspo', 'sapo',
-            'gpg', 'clip_cov', 'kl_cov', 'geo_mean', 'dro', 'cispo', 'bypass_mode', and 'vanilla_topk'
-            (OPD top-K reward mode; see verl/trainer/ppo/opd_core_algos.py).
+            'gpg', 'clip_cov', 'kl_cov', 'geo_mean', 'dro', 'cispo', 'bypass_mode', 'vanilla_topk',
+            'opd_noratio' (OPD losses; see verl/trainer/ppo/opd_core_algos.py), and the MOPD
+            per-state losses 'mopd_resid' / 'mopd_grpo' (require distillation.fsdp_teacher.anchor).
         clip_cov_ratio (float): Ratio of tokens to be clipped for clip-cov loss.
         clip_cov_lb (float): Lower bound for clip-cov loss.
         clip_cov_ub (float): Upper bound for clip-cov loss.
@@ -92,6 +93,17 @@ class PolicyLossConfig(BaseConfig):
         ppo_kl_coef (float): KL divergence penalty coefficient.
         dro_beta (Optional[float]): Quadratic log-ratio penalty for DRO. Required when loss_mode is 'dro'.
         rollout_correction (RolloutCorrectionConfig): Configuration for rollout correction.
+        mopd_eta (float): MOPD mirror step size. eta=1 is the paper's main form; the residual
+            generalizes as d^eta = d^1 + (eta-1) * A. Applies to 'mopd_resid' and 'mopd_grpo'.
+        mopd_epsilon (float): Complement-ratio smoothing epsilon for 'mopd_grpo'
+            (omega = (1+eps-b)/(1+eps-pi_theta)). Paper range ~0.05-0.1.
+        mopd_cap (float): Cap C on the omega weight for 'mopd_grpo'. Paper default ~3.
+        mopd_clip_low / mopd_clip_high (Optional[float]): Bounds of the BPO clip-rule mask M on
+            omega for 'mopd_grpo'. None = reuse the actor's clip_ratio_low / clip_ratio_high.
+        mopd_lambda (float): Coefficient of the KL(pi_T || pi_theta) support floor, estimated by
+            b-importance-sampling -E_{pi_T}[log pi_theta] on sampled tokens. Covers only b's
+            support (no dead-token delivery); 0 disables. Applies to both MOPD losses.
+        mopd_is_cap (float): Cap on the pi_T/b importance weight of the floor estimate.
     """
 
     loss_mode: str = "vanilla"
@@ -101,6 +113,13 @@ class PolicyLossConfig(BaseConfig):
     kl_cov_ratio: float = 0.0002
     ppo_kl_coef: float = 0.1
     dro_beta: Optional[float] = None
+    mopd_eta: float = 1.0
+    mopd_epsilon: float = 0.05
+    mopd_cap: float = 3.0
+    mopd_clip_low: Optional[float] = None
+    mopd_clip_high: Optional[float] = None
+    mopd_lambda: float = 0.0
+    mopd_is_cap: float = 20.0
     rollout_correction: RolloutCorrectionConfig = field(default_factory=RolloutCorrectionConfig)
 
 

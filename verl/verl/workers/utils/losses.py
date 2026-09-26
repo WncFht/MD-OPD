@@ -17,6 +17,7 @@ import torch
 from tensordict import TensorDict
 
 from verl.trainer.ppo.core_algos import agg_loss, compute_value_loss, get_policy_loss_fn, kl_penalty
+from verl.trainer.ppo.opd_core_algos import MOPD_ANCHOR_EB_LOSSES, MOPD_POLICY_LOSS_FIELDS
 from verl.utils import tensordict_utils as tu
 from verl.utils.dataset.dataset_utils import DatasetPadMode
 from verl.utils.metric import AggregationType, Metric
@@ -71,6 +72,21 @@ def ppo_loss(config: ActorConfig, model_output, data: TensorDict, dp_group=None)
     if top_k_log_probs is not None:
         log_prob = no_padding_2_padding(top_k_log_probs, data)
 
+    loss_mode = config.policy_loss.get("loss_mode", "vanilla")
+
+    # MOPD per-state losses consume the M1 anchor batch fields, and mopd_resid
+    # additionally needs anchor_eb_logp = E_b[log pi_theta] from this very
+    # forward (the only term carrying grad against the current student).
+    anchor_eb_logp = None
+    if loss_mode in MOPD_ANCHOR_EB_LOSSES:
+        anchor_eb_rmpad = model_output.get("anchor_eb_logp", None)
+        if anchor_eb_rmpad is None:
+            raise ValueError(
+                f"policy_loss.loss_mode={loss_mode} requires model_output['anchor_eb_logp']; enable "
+                "distillation.fsdp_teacher.anchor.expect_in_train=True so the actor train forward emits it."
+            )
+        anchor_eb_logp = no_padding_2_padding(anchor_eb_rmpad, data).float()
+
     # global batch info for loss aggregation
     config.global_batch_info["dp_size"] = data["dp_size"]
     config.global_batch_info["batch_num_tokens"] = data["batch_num_tokens"]
@@ -101,6 +117,15 @@ def ppo_loss(config: ActorConfig, model_output, data: TensorDict, dp_group=None)
         fields.append("rollout_is_weights")
     if "ref_log_prob" in data:
         fields.append("ref_log_prob")
+    mopd_fields = MOPD_POLICY_LOSS_FIELDS.get(loss_mode, ())
+    if mopd_fields:
+        missing = [key for key in mopd_fields if key not in data.keys()]
+        if missing:
+            raise ValueError(
+                f"policy_loss.loss_mode={loss_mode} requires MOPD anchor batch fields {missing}; "
+                "enable distillation.fsdp_teacher.anchor.enabled=True so M1's anchor pipeline writes them."
+            )
+        fields.extend(mopd_fields)
     data = data.select(*fields).to_padded_tensor()
 
     response_mask = data["response_mask"].to(bool)
@@ -111,9 +136,12 @@ def ppo_loss(config: ActorConfig, model_output, data: TensorDict, dp_group=None)
 
     loss_agg_mode = config.loss_agg_mode
 
-    loss_mode = config.policy_loss.get("loss_mode", "vanilla")
-
     policy_loss_fn = get_policy_loss_fn(loss_mode)
+    policy_kwargs = {}
+    if mopd_fields:
+        policy_kwargs = {key: data[key].float() for key in mopd_fields}
+        if anchor_eb_logp is not None:
+            policy_kwargs["anchor_eb_logp"] = anchor_eb_logp
     pg_loss, pg_metrics = policy_loss_fn(
         old_log_prob=old_log_prob,
         log_prob=log_prob,
@@ -122,6 +150,7 @@ def ppo_loss(config: ActorConfig, model_output, data: TensorDict, dp_group=None)
         loss_agg_mode=loss_agg_mode,
         config=config,
         rollout_is_weights=rollout_is_weights,
+        **policy_kwargs,
     )
 
     # AggregationType.MEAN for pg metrics: assumes policy_loss_fn normalizes by local_bsz/local_tokens

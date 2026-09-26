@@ -451,6 +451,27 @@ anchor_args() {
     echo "$args"
 }
 
+# mopd_loss_args：MOPD 逐状态残差 loss（paper §4.3 形式二/三）的超参块。
+#
+# POLICY_LOSS_MODE=mopd_resid 用精确 E_b[d^2]（需 anchor.expect_in_train=True），
+# mopd_grpo 用 BPO 同形的 -2 eta sg[A] M min{sg[omega],C} log pi_theta
+# （只需 anchor.enabled=True）。mopd_* 已在 actor.yaml 结构化声明，直接 . 覆盖。
+mopd_loss_args() {
+    local args="\
+        actor_rollout_ref.actor.policy_loss.mopd_eta=${MOPD_ETA:-1.0} \
+        actor_rollout_ref.actor.policy_loss.mopd_epsilon=${MOPD_EPSILON:-0.05} \
+        actor_rollout_ref.actor.policy_loss.mopd_cap=${MOPD_CAP:-3.0} \
+        actor_rollout_ref.actor.policy_loss.mopd_lambda=${MOPD_LAMBDA:-0.0} \
+        actor_rollout_ref.actor.policy_loss.mopd_is_cap=${MOPD_IS_CAP:-20.0}"
+    if [ -n "${MOPD_CLIP_LOW:-}" ]; then
+        args="${args} actor_rollout_ref.actor.policy_loss.mopd_clip_low=${MOPD_CLIP_LOW}"
+    fi
+    if [ -n "${MOPD_CLIP_HIGH:-}" ]; then
+        args="${args} actor_rollout_ref.actor.policy_loss.mopd_clip_high=${MOPD_CLIP_HIGH}"
+    fi
+    echo "$args"
+}
+
 # launch <experiment name> <override>...：运行 main_ppo 并将日志 tee 到文件。
 #
 # OPD_DRY_RUN=1 只组合并打印配置，不启动 ray。`--cfg job` 必须放在前面：
