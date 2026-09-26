@@ -259,6 +259,7 @@ def _generate_here(records: list[dict], args) -> None:
         top_p=args.top_p,
         max_tokens=args.max_out_len,
         seed=args.seed,
+        stop_token_ids=args.stop_token_ids,
     )
 
     # One conversation per record, extended in place. All records advance
@@ -457,6 +458,15 @@ def parse_args(argv=None):
     p.add_argument("--temperature", type=float, default=0.6)
     p.add_argument("--top-p", type=float, default=0.95)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument(
+        "--stop-token-ids",
+        type=lambda s: [int(x) for x in s.split(",") if x.strip()],
+        default=None,
+        metavar="ID[,ID...]",
+        help="stop_token_ids passed to SamplingParams; M4-trained checkpoints whose "
+        "generation_config eos only names <|endoftext|> need 151643,151645 so "
+        "<|im_end|> terminates generation",
+    )
     p.add_argument(
         "--history-keeps-reasoning",
         action="store_true",
