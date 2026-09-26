@@ -15,15 +15,15 @@ _图 0：左，三个速率模态 $c_ke^{-\rho_k(t-T_0)}$ 相加得到观测曲�
 
 地球物理那章与本项目的对象对照：
 
-| 地球物理（谱方法第 0 章） | MD-OPD |
-|---|---|
-| 自伴算子 $-\nabla^2$，特征函数 $e^{ik\cdot r}$ / $Y_{lm}$ | 对称半正定 Hessian/Fisher $H$，特征方向 $q_i$ |
-| 谱变量：波数 $k$、阶数 $l$ | 谱变量：衰减率 $\rho_i=2\alpha\tilde\lambda_i$ |
-| 重力场向上延拓核 $e^{-kz}$ | 时间观测核 $e^{-\rho t}$，$t$ 相当于"延拓高度" |
-| 病态反演 $d=Gm$ | $d(t)=\int e^{-\rho t}\mu(d\rho)$ 的逆拉普拉斯 |
-| 分辨率矩阵 $R_m=V_pV_p^\top$、averaging kernel | 同物：每个估计 bin 是真谱的带符号平均 |
-| Tikhonov 参数 $\lambda^2$、Morozov 偏差原理 | MDPO 近端权重 $1/\eta$、内层步数 $m$ |
-| EOF（数据学的谱）vs 球谐（几何定的谱） | 曲线反演谱 vs Lanczos 实测 Hessian 谱 |
+| 地球物理（谱方法第 0 章）                                 | MD-OPD                                         |
+| --------------------------------------------------------- | ---------------------------------------------- |
+| 自伴算子 $-\nabla^2$，特征函数 $e^{ik\cdot r}$ / $Y_{lm}$ | 对称半正定 Hessian/Fisher $H$，特征方向 $q_i$  |
+| 谱变量：波数 $k$、阶数 $l$                                | 谱变量：衰减率 $\rho_i=2\alpha\tilde\lambda_i$ |
+| 重力场向上延拓核 $e^{-kz}$                                | 时间观测核 $e^{-\rho t}$，$t$ 相当于"延拓高度" |
+| 病态反演 $d=Gm$                                           | $d(t)=\int e^{-\rho t}\mu(d\rho)$ 的逆拉普拉斯 |
+| 分辨率矩阵 $R_m=V_pV_p^\top$、averaging kernel            | 同物：每个估计 bin 是真谱的带符号平均          |
+| Tikhonov 参数 $\lambda^2$、Morozov 偏差原理               | MDPO 近端权重 $1/\eta$、内层步数 $m$           |
+| EOF（数据学的谱）vs 球谐（几何定的谱）                    | 曲线反演谱 vs Lanczos 实测 Hessian 谱          |
 
 ## 1. 正演：$d(t)$ 为什么是指数模态之和
 
@@ -111,12 +111,12 @@ _图 3：$R_m$（$p=8$ 截断）。(a) 热图：只有快端保留对角脊；(b
 
 构造已知谱（两个对数正态峰 + 网格外的直流地板模态），正演加 5% 相对噪声，反演比较：
 
-| 方法 | 相对 $\ell_2$ 误差 | 行为 |
-|---|---|---|
-| 裸伪逆 $V\Sigma^{-1}U^\top$ | $\Vert c\Vert\sim5\times10^{12}$ | 完全爆炸（$\kappa$ 机器极限） |
-| TSVD $p=8$ | 27 | 不爆但**符号震荡**，密度无意义 |
-| Tikhonov（Morozov $\lambda$） | 0.62 | 保守光滑，拿对总质量、丢结构 |
-| NNLS（项目现用） | 0.92 | 稳定、峰位大致正确，慢端质量堆到 $\rho_{\min}$ |
+| 方法                          | 相对 $\ell_2$ 误差               | 行为                                           |
+| ----------------------------- | -------------------------------- | ---------------------------------------------- |
+| 裸伪逆 $V\Sigma^{-1}U^\top$   | $\Vert c\Vert\sim5\times10^{12}$ | 完全爆炸（$\kappa$ 机器极限）                  |
+| TSVD $p=8$                    | 27                               | 不爆但**符号震荡**，密度无意义                 |
+| Tikhonov（Morozov $\lambda$） | 0.62                             | 保守光滑，拿对总质量、丢结构                   |
+| NNLS（项目现用）              | 0.92                             | 稳定、峰位大致正确，慢端质量堆到 $\rho_{\min}$ |
 
 ![合成反演](figures/2026-09-13-opd-spectral-inverse-primer/fig4_synthetic_inversion.png)
 
@@ -135,13 +135,13 @@ _图 4：(a) 正演 + 5% 噪声与 NNLS 拟合；(b) 反演对比（线性轴画
 
 在 $B$（或 $X^\top X$）的特征基下，各种"正则化/迭代"都是对谱系数的逐模态标量乘子 $f_i$：
 
-| 方法 | 滤波因子 $f_i$ | 正则参数 | 所在问题 |
-|---|---|---|---|
-| TSVD | $\mathbf 1[i\le p]$ | 截断阶 $p$ | 反演 |
-| Tikhonov | $\sigma_i^2/(\sigma_i^2+\lambda^2)$ | $\lambda$ | 反演 |
-| Landweber/Richardson $m$ 步 | $1-(1-\alpha\sigma_i^2)^m$ | 迭代次数 $m$ | 反演[^landweber51] |
-| MDPO 内层 $\delta_m=-[I-(I-\alpha B)^m]B^{-1}g$ | $1-(1-\alpha\tilde\lambda_i)^m$ | 内层步数 $m$ | 动力学[^dyn] |
-| Muon（msign） | $\sigma_i\to1$ 全拍平 | — | 优化器几何[^jordan24] |
+| 方法                                            | 滤波因子 $f_i$                      | 正则参数     | 所在问题              |
+| ----------------------------------------------- | ----------------------------------- | ------------ | --------------------- |
+| TSVD                                            | $\mathbf 1[i\le p]$                 | 截断阶 $p$   | 反演                  |
+| Tikhonov                                        | $\sigma_i^2/(\sigma_i^2+\lambda^2)$ | $\lambda$    | 反演                  |
+| Landweber/Richardson $m$ 步                     | $1-(1-\alpha\sigma_i^2)^m$          | 迭代次数 $m$ | 反演[^landweber51]    |
+| MDPO 内层 $\delta_m=-[I-(I-\alpha B)^m]B^{-1}g$ | $1-(1-\alpha\tilde\lambda_i)^m$     | 内层步数 $m$ | 动力学[^dyn]          |
+| Muon（msign）                                   | $\sigma_i\to1$ 全拍平               | —            | 优化器几何[^jordan24] |
 
 第三行与第四行是**同一个对象**：Richardson 迭代 $x_{k+1}=x_k+\alpha(b-Bx_k)$ 的截断 Neumann 级数 $\alpha\sum_{j<m}(I-\alpha B)^j$[^saad03]——MDPO 内层就是作用在近端子问题上的 Landweber 迭代，反演理论里"早停即正则化"的全部结果（收敛需 $\alpha\lambda_{\max}<2$、迭代数当正则参数、先快后慢的模态交付序）直接搬运。
 
@@ -221,7 +221,7 @@ MDPO 每个外层步最小化 $\{\text{对教师拟合}+(1/\eta)\,\mathrm{KL}(p\
 3. **分辨率矩阵/averaging kernel 随谱一起报**：$R_m=V_{p^*}V_{p^*}^\top$ 的行（或至少对角元与等效宽度）是"这个 bin 实际测了什么"的标准答案。
 4. **Morozov 作为 L-curve 的交叉验证**：噪声水平 $\epsilon\approx6\%$ 已知，$\Vert Xc_\lambda-b\Vert^2=n\epsilon^2$ 单参数解，比"残差涨 10% 取最小"的手动规则有原则。
 5. **报告谱时用带平均替代逐点密度**：$\ln\rho$ 上 ~1 nat 宽的 4–8 个带质量 + averaging kernel，替代 64 点密度图与 log-log 斜率。
-6. **内层步数 $m$ 当正则参数调**：Landweber 视角下 $m$ 与 $\eta$ 分工明确（$m$ 定滤波形状、$\eta$ 定目标）， rebound 预测可用 $\alpha\tilde\lambda$ 的分布直接算。
+6. **内层步数 $m$ 当正则参数调**：Landweber 视角下 $m$ 与 $\eta$ 分工明确（$m$ 定滤波形状、$\eta$ 定目标），rebound 预测可用 $\alpha\tilde\lambda$ 的分布直接算。
 
 ## 8. 与其他文档的接口
 
@@ -289,7 +289,7 @@ MDPO 每个外层步最小化 $\{\text{对教师拟合}+(1/\eta)\,\mathrm{KL}(p\
 
 [^bahri24]: Y. Bahri, E. Dyer, J. Kaplan, J. Lee, U. Sharma. Explaining Neural Scaling Laws. PNAS 121(27), 2024. [arXiv:2102.06701](https://arxiv.org/abs/2102.06701)
 
-[^provencher82]: S. W. Provencher. CONTIN: A general purpose constrained regularization program for inverting noisy linear algebraic and integral equations. Comput. Phys. Commun. 27(3), 1982. [DOI:10.1016/0010-4655(82)90174-6](https://doi.org/10.1016/0010-4655(82)90174-6)
+[^provencher82]: S. W. Provencher. CONTIN: A general purpose constrained regularization program for inverting noisy linear algebraic and integral equations. Comput. Phys. Commun. 27(3), 1982. [DOI:10.1016/0010-4655(82)90174-6](<https://doi.org/10.1016/0010-4655(82)90174-6>)
 
 [^harutyunyan23]: H. Harutyunyan, A. S. Rawat, A. K. Menon, S. Kim, S. Kumar. Supervision Complexity and its Role in Knowledge Distillation. ICLR 2023. [arXiv:2301.12245](https://arxiv.org/abs/2301.12245)
 

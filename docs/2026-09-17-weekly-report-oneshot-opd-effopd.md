@@ -97,7 +97,7 @@ $b$ 为什么天然低秩：教师相对学生只在少数功能性 token（推�
 
 ### 3.1 Baseline 复现
 
-`mdxt04lm`（[wandb](https://wandb.ai/wncfht/One-Shot-OPD/runs/mdxt04lm)）：DeepSeek-R1-Distill-Qwen-1.5B 学生、JustRL-DeepSeek-1.5B 教师、DAPO-Math-17k 全量、vanilla ratio、lr 1e-6，即论文配方。sampled-token 距离 $d$ 从 ~0.10/token 降到 ~0.004（$d_{279}/d_{30}=0.064$），validation best 69.55%（AIME25/AMC23/MATH-500 均值 @16），与论文全量档位读数同量级，复现成立。tail 拟合：power-law $\alpha\approx1.31$，floor_exp 给出 $d_\infty\approx0.001$。
+`mdxt04lm`（[wandb](https://wandb.ai/wncfht/One-Shot-OPD/runs/mdxt04lm)）：DeepSeek-R1-Distill-Qwen-1.5B 学生、JustRL-DeepSeek-1.5B 教师、DAPO-Math-17k 全量、vanilla ratio、lr 1e-6，即论文配方。sampled-token 距离 $d$ 从 ~0.10/token 降到 ~0.004（$d_{279}/d_{30}=0.064$），validation best 69.55%（AIME25/AMC23/MATH-500 均值 @16），与论文全量档位读数同量级，复现成立。tail 拟合：power-law $\alpha\approx1.31$，floor*exp 给出 $d*\infty\approx0.001$。
 
 ### 3.2 lr 扫描（M4）：越大越快，太快则炸
 
@@ -167,15 +167,6 @@ one-shot t22 上另一组干预——同一批 rollout 上跑 $m$ 个 inner epoc
 ### 3.6 序列级 KL：方差过大，效果不好
 
 尝试把逐 token 的 KL 信号聚合成序列级（seq 级 KL 估计，对应 verl 里 seq_sum/seq_mean 一族口径）：序列 log-ratio 是数千个相关 token 项的和，单条轨迹的估计方差远大于逐 token 形式，训练信号噪声主导，效果不好。与论文脚注的口径观察一致——sampled-token 与 top-k 截断形式就是拿尾部精度换方差，序列级聚合把这个权衡推到了不可用的极端。该方向不再继续。
-
-## 4. 讨论与下周计划
-
-把两篇论文与本周数据放在一起，图景是自洽的：OPD 的吸收过程由谱决定——数据只扩展覆盖的状态集合（1 条就够 71.5%），lr 只做时间轴缩放（4 倍内折叠），吸收速率衰减来自快慢 mode 的先后耗尽，floor 由噪声和不可对齐分量构成。加速的正交杠杆因此清晰：速率均衡（预条件/NGD，上限 ~2–3×；MD-OPD 系列已实测出边际增益形态）、方向外推（EffOPD 型，~3×）、方差工程（压噪声 floor）、换师生对（碰 $d_{gap}$）。下周按优先级：
-
-1. **EffOPD 式外推在我们配方上的复现**：`plots/spectral_effopd.py` 已有 trainer-agnostic 原型，先在 frozen-rollout 配方（便宜、状态固定）上验证位移外推是否拿到同量级加速；
-2. **E1 floor 成因分辨**：frozen 平台后 lr 退火，floor 降→噪声主导（方差工程有用），不降→gap 主导（预条件无用）；
-3. **E2 残余分解**：逐 token 频率十分位分解剩余 $d$，量出 NGD 可服务的市场占比；
-4. **E3 单步 CLR 手术探针**：frozen checkpoint 上 head+OTHER CLR loss 走一步 SGD/Adam，测"自然化方向"每步多吸收多少，决定整个 NGD 方向的 go/no-go。
 
 ### 参考文献
 
