@@ -32,8 +32,16 @@ Nothing here imports verl workers or engines, so this module stays a leaf that
 both sides can import without cycles.
 """
 
+from collections.abc import Sequence
+
 import torch
 
+from verl.utils.mopd_eos import (
+    merged_class_dot,
+    merged_expectation,
+    semantic_eos_mask,
+    validate_eos_class_ids,
+)
 from verl.utils.topk_logits import top_k_logits_chunk_rows
 
 __all__ = [
@@ -77,6 +85,7 @@ def anchor_expected_log_prob(
     anchor_logits: torch.Tensor,
     student_logits: torch.Tensor,
     anchor_temperature: float = 1.0,
+    eos_token_ids: Sequence[int] | None = None,
 ) -> torch.Tensor:
     """Per-position ``E_b[log pS]`` from paired full-vocab logits.
 
@@ -90,19 +99,33 @@ def anchor_expected_log_prob(
     temporaries stay bounded independent of ``N``; the chunked results are
     concatenated, which preserves autograd. Shapes: ``(N, V)`` -> ``(N,)``,
     float32. CPU-testable.
+
+    When ``eos_token_ids`` names the merged terminal class ``E`` (M4), the
+    expectation runs on the merged action space instead:
+
+        E_b[log pS]_merged = sum_{v not in E} b_v z_v + b_E * lse(z_E) - lse(z)
+
+    and the backward spreads the class coordinate's gradient over the member
+    logits, ``b_E * pi_v / pi_E`` — exactly what the merged-space residual
+    requires of ``anchor_eb_logp``.
     """
     if anchor_logits.shape != student_logits.shape:
         raise ValueError(
             f"anchor and student logits must have identical shape, got {tuple(anchor_logits.shape)} "
             f"and {tuple(student_logits.shape)}"
         )
+    eos_ids = validate_eos_class_ids(eos_token_ids) if eos_token_ids else None
     parts = []
     for start in range(0, anchor_logits.shape[0], top_k_logits_chunk_rows(anchor_logits)):
         end = min(start + top_k_logits_chunk_rows(anchor_logits), anchor_logits.shape[0])
         b_logits = anchor_logits[start:end].float() / anchor_temperature
         b_probs = torch.softmax(b_logits, dim=-1)
         z_chunk = student_logits[start:end].float()
-        parts.append((b_probs * z_chunk).sum(dim=-1) - torch.logsumexp(z_chunk, dim=-1))
+        lse_z = torch.logsumexp(z_chunk, dim=-1)
+        if eos_ids is not None:
+            parts.append(merged_expectation(b_probs, z_chunk, lse_z, eos_ids))
+        else:
+            parts.append((b_probs * z_chunk).sum(dim=-1) - lse_z)
     return torch.cat(parts, dim=0)
 
 
@@ -110,6 +133,7 @@ def compute_anchor_state_terms(
     anchor_logits: torch.Tensor,
     teacher_logits: torch.Tensor,
     responses: torch.Tensor,
+    eos_token_ids: Sequence[int] | None = None,
 ) -> dict[str, torch.Tensor]:
     """Per-state MOPD anchor terms from paired full-vocab response logits.
 
@@ -133,6 +157,15 @@ def compute_anchor_state_terms(
       is exactly zero — a converged state has no absorption rate and the
       downstream demand formula reads ``inf`` as zero demand.
 
+    When ``eos_token_ids`` names the merged terminal class ``E`` (M4), every
+    term is evaluated on the merged action space: ``anchor_log_probs_fwd``
+    carries ``log b_E`` at positions where ``y_t in E``; the two log-moments
+    become ``sum_{v not in E} b_v z_v + b_E * lse(z_E) - lse(z)``; and the
+    residual uses the merged center ``<b,x>_m`` with the single class
+    coordinate ``d_E = <b,x>_m - x_E`` where ``x_E = lse(z_b_E) - lse(z_t_E)``
+    (raw-lse convention — ``F_b`` annihilates the shared normalization shift
+    exactly as it does for the member coordinates).
+
     All expectations use the ``<b, z> - lse(z)`` identity under chunking, so no
     full ``(B, T, V)`` float32 tensor ever exists. CPU-testable.
     """
@@ -141,6 +174,10 @@ def compute_anchor_state_terms(
             f"anchor and teacher logits must have identical shape, got {tuple(anchor_logits.shape)} "
             f"and {tuple(teacher_logits.shape)}"
         )
+    eos_ids = validate_eos_class_ids(eos_token_ids) if eos_token_ids else None
+    eos_idx = None
+    if eos_ids is not None:
+        eos_idx = torch.as_tensor(eos_ids, dtype=torch.long, device=anchor_logits.device)
     bsz, seqlen = anchor_logits.shape[:2]
     z_b = anchor_logits.reshape(bsz * seqlen, -1)
     z_t = teacher_logits.reshape(bsz * seqlen, -1)
@@ -151,6 +188,11 @@ def compute_anchor_state_terms(
     state_gap = torch.empty(bsz * seqlen, dtype=torch.float32, device=z_b.device)
     state_mu_eff = torch.empty(bsz * seqlen, dtype=torch.float32, device=z_b.device)
     state_resid_energy = torch.empty(bsz * seqlen, dtype=torch.float32, device=z_b.device)
+    anchor_eos_log_probs = None
+    if eos_idx is not None:
+        # Per-member log b(v) for v in E — the class-mass split is the direct
+        # diagnostic of the EOS-inflation pathology M4 fixes.
+        anchor_eos_log_probs = torch.empty(bsz * seqlen, len(eos_ids), dtype=torch.float32, device=z_b.device)
 
     chunk_rows = top_k_logits_chunk_rows(z_b)
     for start in range(0, z_b.shape[0], chunk_rows):
@@ -161,9 +203,29 @@ def compute_anchor_state_terms(
         lse_b = torch.logsumexp(z_b_chunk, dim=-1)
         lse_t = torch.logsumexp(z_t_chunk, dim=-1)
 
-        eb_logb = (b_probs * z_b_chunk).sum(dim=-1) - lse_b
-        eb_logt = (b_probs * z_t_chunk).sum(dim=-1) - lse_t
-        anchor_log_probs[start:end] = z_b_chunk.gather(-1, y[start:end].unsqueeze(-1)).squeeze(-1) - lse_b
+        if eos_idx is not None:
+            # Merged terminal class: per-member lse over E gives the class
+            # coordinate's merged value; b_E is the class mass.
+            lse_b_E = z_b_chunk.index_select(-1, eos_idx).logsumexp(-1)
+            lse_t_E = z_t_chunk.index_select(-1, eos_idx).logsumexp(-1)
+            log_b_E = lse_b_E - lse_b
+            x_E = lse_b_E - lse_t_E
+            b_e_vec = b_probs.index_select(-1, eos_idx)
+            b_E = b_e_vec.sum(-1)
+            anchor_eos_log_probs[start:end] = z_b_chunk.index_select(-1, eos_idx) - lse_b.unsqueeze(-1)
+            eb_logb = merged_expectation(b_probs, z_b_chunk, lse_b, eos_ids)
+            eb_logt = merged_expectation(b_probs, z_t_chunk, lse_t, eos_ids)
+        else:
+            eb_logb = (b_probs * z_b_chunk).sum(dim=-1) - lse_b
+            eb_logt = (b_probs * z_t_chunk).sum(dim=-1) - lse_t
+
+        sampled_lp = z_b_chunk.gather(-1, y[start:end].unsqueeze(-1)).squeeze(-1) - lse_b
+        if eos_idx is not None:
+            anchor_log_probs[start:end] = torch.where(
+                semantic_eos_mask(y[start:end], eos_ids), log_b_E, sampled_lp
+            )
+        else:
+            anchor_log_probs[start:end] = sampled_lp
         state_anchor_logb[start:end] = eb_logb
         state_gap[start:end] = eb_logb - eb_logt
 
@@ -171,13 +233,27 @@ def compute_anchor_state_terms(
         # b*d^2 and b^2*d^2 stages all fold in place onto one buffer so the
         # chunk peak stays at one extra (rows, V) fp32 temporary.
         resid = torch.sub(z_b_chunk, z_t_chunk)
-        eb_x = (b_probs * resid).sum(dim=-1, keepdim=True)
-        resid.neg_().add_(eb_x)  # d_v = <b, x> - x_v
+        if eos_idx is not None:
+            # Merged space: the center is <b,x>_m = sum_{v not in E} b_v x_v +
+            # b_E x_E. Member coordinates inside E keep their (meaningless)
+            # member-level d_v in the buffer; each energy stage then subtracts
+            # its member contribution and adds the single class term.
+            eb_x = merged_class_dot(b_probs, resid, eos_ids, x_E).unsqueeze(-1)
+        else:
+            eb_x = (b_probs * resid).sum(dim=-1, keepdim=True)
+        resid.neg_().add_(eb_x)  # d_v = <b, x>_m - x_v
         resid.square_()  # d^2
+        if eos_idx is not None:
+            d2_e = resid.index_select(-1, eos_idx)  # member-level d_v^2 (to drop)
+            d_E = eb_x.squeeze(-1) - x_E  # class residual
         resid.mul_(b_probs)  # b * d^2
         resid_energy = resid.sum(dim=-1)
+        if eos_idx is not None:
+            resid_energy = resid_energy - (b_e_vec * d2_e).sum(-1) + b_E * d_E.square()
         resid.mul_(b_probs)  # b^2 * d^2
         mu_num = resid.sum(dim=-1)
+        if eos_idx is not None:
+            mu_num = mu_num - (b_e_vec.square() * d2_e).sum(-1) + b_E.square() * d_E.square()
         state_resid_energy[start:end] = resid_energy
         state_mu_eff[start:end] = torch.where(
             resid_energy > 0,
@@ -185,10 +261,13 @@ def compute_anchor_state_terms(
             torch.inf,
         )
 
-    return {
+    result = {
         "anchor_log_probs_fwd": anchor_log_probs.view(bsz, seqlen),
         "state_anchor_logb": state_anchor_logb.view(bsz, seqlen),
         "state_gap": state_gap.view(bsz, seqlen),
         "state_mu_eff": state_mu_eff.view(bsz, seqlen),
         "state_resid_energy": state_resid_energy.view(bsz, seqlen),
     }
+    if anchor_eos_log_probs is not None:
+        result["anchor_eos_log_probs"] = anchor_eos_log_probs.view(bsz, seqlen, -1)
+    return result

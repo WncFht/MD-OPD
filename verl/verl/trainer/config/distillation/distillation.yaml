@@ -251,3 +251,27 @@ mopd_replay:
   # Mixture weight on coverage rarity r = 1/(1+n_sampled) vs the priority
   # measure (both normalized to mean 1 over the live buffer); 0 = pure priority.
   coverage_rarity: 0.0
+
+# M4 EOS semantic patch (merged terminal-token class). A base student that
+# terminates on <|endoftext|> cannot learn termination from a teacher whose
+# terminal mass sits on <|im_end|>: the teacher's eos is never sampled, so the
+# sampled-token reward never sees it. The patch declares both ids one semantic
+# class E: the rollout stops on any member (pair with
+# actor_rollout_ref.rollout.extra_stop_token_ids), and teacher / student /
+# anchor log-prob terms are all evaluated under the merged mass
+# log p(E) = lse(z_E) - lse(z). OFF by default; requires fsdp_teacher.enabled,
+# use_fused_kernels=False, log_prob_top_k=0.
+mopd_eos_patch:
+
+  # Required when using verl.utils.omega_conf_to_dataclass to instantiate dataclass configs
+  _target_: verl.workers.config.MopdEosPatchConfig
+
+  # Master switch for the merged-class patch.
+  enabled: false
+
+  # The merged terminal class E. Ordered, student-native EOS first by
+  # convention. For the Qwen pair: [151643 (<|endoftext|>), 151645 (<|im_end|>)].
+  # Every member that is not the tokenizer's eos must also appear in
+  # actor_rollout_ref.rollout.extra_stop_token_ids or generation can never
+  # terminate on it (the trainer validator rejects the gap).
+  semantic_eos_token_ids: []

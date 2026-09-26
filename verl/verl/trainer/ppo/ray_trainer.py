@@ -400,6 +400,7 @@ class RayPPOTrainer(OPDTrainerMixin):
         self.validate_opd_anchor_config()
         self.validate_mopd_loss_config()
         self.validate_mopd_replay_config()
+        self.validate_mopd_eos_config()
         # MOPD M3: cross-window replay buffer + P-C priority sampler; None
         # unless distillation.mopd_replay.enabled=True, in which case the fit
         # loop re-draws the actor's update batch from the last `window`
@@ -1577,6 +1578,8 @@ class RayPPOTrainer(OPDTrainerMixin):
         # MOPD: the same pass also emits E_b[log pi_theta] against the frozen
         # anchor when anchor.expect_in_train is on (see assign_anchor_expectation_flag).
         self.assign_anchor_expectation_flag(batch_td)
+        # MOPD M4: merge sampled-token log-probs onto the EOS semantic class.
+        self.assign_eos_patch_flag(batch_td)
         output = self.actor_rollout_wg.compute_log_prob(batch_td)
         # gather output
         entropy = tu.get(output, "entropy")
@@ -1609,6 +1612,10 @@ class RayPPOTrainer(OPDTrainerMixin):
             # E_b[log pi_theta] of state s_t, taken against the pre-update
             # student (== rollout policy for on-policy steps).
             result["anchor_eb_logp"] = no_padding_2_padding(tu.get(output, "anchor_eb_logp"), batch_td).float()
+        eos_class_lp = tu.get(output, "eos_class_log_probs")
+        if eos_class_lp is not None:
+            # M4 diagnostic: log pi_theta(E|s_t) — the student's merged-class mass.
+            result["student_eos_class_log_probs"] = no_padding_2_padding(eos_class_lp, batch_td).float()
         old_log_prob = tu.get_tensordict(result)
         old_log_prob = DataProto.from_tensordict(old_log_prob)
         return old_log_prob, old_log_prob_mfu
@@ -1674,6 +1681,9 @@ class RayPPOTrainer(OPDTrainerMixin):
         # residual term that depends on the *current* student, and the gradient
         # through it (b - pi_theta) is what the M2 loss consumes.
         self.assign_anchor_expectation_flag(batch_td)
+        # MOPD M4: the update forward's log_prob must live on the same merged
+        # action space as old_log_probs or the policy ratio is ill-defined.
+        self.assign_eos_patch_flag(batch_td)
         actor_output = self.actor_rollout_wg.update_actor(batch_td)
         actor_output = tu.get(actor_output, "metrics")
         actor_output = rename_dict(actor_output, "actor/")

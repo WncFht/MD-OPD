@@ -20,7 +20,7 @@ from typing import Optional
 from verl.base_config import BaseConfig
 from verl.utils.config import omega_conf_to_dataclass
 
-from .fsdp_teacher import FsdpTeacherConfig, MopdReplayConfig
+from .fsdp_teacher import FsdpTeacherConfig, MopdEosPatchConfig, MopdReplayConfig
 from .rollout import RolloutConfig
 
 __all__ = ["DistillationLossConfig", "DistillationTeacherModelConfig", "DistillationConfig"]
@@ -271,6 +271,9 @@ class DistillationConfig(BaseConfig):
     fsdp_teacher: FsdpTeacherConfig = field(default_factory=FsdpTeacherConfig)
     # MOPD cross-window replay buffer + P-C priority sampler (trainer-side).
     mopd_replay: MopdReplayConfig = field(default_factory=MopdReplayConfig)
+    # M4 EOS semantic patch: merged terminal-token class across teacher,
+    # student and anchor distributions (see verl/utils/mopd_eos.py).
+    mopd_eos_patch: MopdEosPatchConfig = field(default_factory=MopdEosPatchConfig)
 
     def __post_init__(self):
         if not self.enabled:

@@ -51,6 +51,12 @@ from verl.utils.fsdp_utils import (
     get_init_weight_context_manager,
     init_fn,
 )
+from verl.utils.mopd_eos import (
+    eos_member_log_probs,
+    merge_sampled_log_probs,
+    semantic_eos_mask,
+    validate_eos_class_ids,
+)
 from verl.utils.opd_anchor import (
     compute_anchor_state_terms,
     get_opd_actor_module,
@@ -279,6 +285,14 @@ class TeacherWorker(Worker):
         self.teacher_modules: dict[str, torch.nn.Module] = {}
         self.anchor_module: Optional[torch.nn.Module] = None
         self.tokenizer = None
+        # M4 EOS semantic patch (distillation.mopd_eos_patch): merged terminal
+        # class ids, or None when the patch is off. The trainer-side validator
+        # has already cross-checked ids against rollout.extra_stop_token_ids.
+        patch = config.distillation.get("mopd_eos_patch", None)
+        self.eos_patch_ids: Optional[list[int]] = None
+        if patch is not None and patch.get("enabled", False):
+            self.eos_patch_ids = validate_eos_class_ids(patch.get("semantic_eos_token_ids", []))
+            logger.info("[MOPD-EOS] semantic terminal class active: %s", self.eos_patch_ids)
 
     def _build_model(self, model_path: str):
         """Load one frozen teacher and wrap it in FSDP."""
@@ -394,6 +408,7 @@ class TeacherWorker(Worker):
         student_top_k_ids: Optional[torch.Tensor] = None,
         top_k: int = 0,
         anchor_module=None,
+        eos_ids: Optional[list[int]] = None,
     ):
         """Teacher forward over one micro-batch; returns per-token teacher log-probs."""
         from verl.utils.torch_functional import logprobs_from_logits
@@ -434,6 +449,11 @@ class TeacherWorker(Worker):
             )
 
             result = {"teacher_log_probs": log_probs}
+            if eos_ids is not None:
+                # M4: sampled positions carrying a class member score the
+                # merged terminal mass log p(E) instead of log p(y_t).
+                result["teacher_log_probs"] = merge_sampled_log_probs(logits, responses, log_probs, eos_ids)
+                result["teacher_eos_log_probs"] = eos_member_log_probs(logits, eos_ids)
             if top_k > 0 and student_top_k_ids is not None:
                 flat = compute_top_k_teacher_log_probs(
                     logits,
@@ -459,7 +479,9 @@ class TeacherWorker(Worker):
                 anchor_output = anchor_module(**anchor_kwargs)
                 anchor_logits = anchor_output.logits[:, -response_length - 1 : -1, :]
                 anchor_logits.div_(self.teacher_config.anchor.temperature)
-                result.update(compute_anchor_state_terms(anchor_logits, logits, responses))
+                result.update(
+                    compute_anchor_state_terms(anchor_logits, logits, responses, eos_token_ids=eos_ids)
+                )
                 anchor_top_k = self.teacher_config.anchor.top_k
                 if anchor_top_k > 0:
                     ids, lps = chunked_top_k_log_probs(
@@ -519,6 +541,9 @@ class TeacherWorker(Worker):
         if anchor_module is not None:
             forward_bs = anchor_cfg.micro_batch_size_per_gpu or micro_bs
 
+        eos_ids = self.eos_patch_ids
+        teacher_eos_parts: dict[str, torch.Tensor] = {}
+
         # Every rank has to issue the *same sequence* of teacher forwards. The
         # teachers are FSDP-sharded, so each forward is a collective: a rank whose
         # shard happens to hold no `coding` rows would skip the code teacher and
@@ -552,10 +577,18 @@ class TeacherWorker(Worker):
                     student_top_k_ids=student_top_k_ids[rows] if use_top_k else None,
                     top_k=top_k if use_top_k else 0,
                     anchor_module=anchor_module,
+                    eos_ids=eos_ids,
                 )
                 if not chunk:
                     continue
                 teacher_log_probs[chunk] = out["teacher_log_probs"].to(teacher_log_probs.dtype)
+                if "teacher_eos_log_probs" in out:
+                    value = out["teacher_eos_log_probs"]
+                    if "teacher_eos_log_probs" not in teacher_eos_parts:
+                        teacher_eos_parts["teacher_eos_log_probs"] = torch.empty(
+                            (n, *value.shape[1:]), dtype=value.dtype, device=value.device
+                        )
+                    teacher_eos_parts["teacher_eos_log_probs"][chunk] = value
                 for key in (
                     "teacher_top_k_log_probs",
                     "student_in_teacher",
@@ -577,6 +610,7 @@ class TeacherWorker(Worker):
                     "state_resid_energy",
                     "anchor_top_k_ids",
                     "anchor_top_k_log_probs",
+                    "anchor_eos_log_probs",
                 ):
                     if key not in out:
                         continue
@@ -597,6 +631,14 @@ class TeacherWorker(Worker):
         non_tensors = {"mopd_teacher": np.array(routes, dtype=object)}
         metrics: dict = {"mopd_teacher_counts": {k: len(v) for k, v in sorted(order.items())}}
 
+        if eos_ids is not None:
+            tensors["teacher_eos_log_probs"] = teacher_eos_parts["teacher_eos_log_probs"]
+            responses = data.batch["responses"]
+            sampled_eos = semantic_eos_mask(responses, eos_ids).to(torch.float32)
+            metrics["mopd_eos_class_sample_frac"] = self.masked_mean(sampled_eos, response_mask)
+            teacher_class_mass = teacher_eos_parts["teacher_eos_log_probs"].logsumexp(-1).exp()
+            metrics["mopd_eos_teacher_class_mass"] = self.masked_mean(teacher_class_mass, response_mask)
+
         if anchor_cfg.enabled:
             tensors["anchor_log_probs_fwd"] = anchor_parts["anchor_log_probs_fwd"]
             tensors["state_anchor_logb"] = anchor_parts["state_anchor_logb"]
@@ -606,6 +648,10 @@ class TeacherWorker(Worker):
             if "anchor_top_k_ids" in anchor_parts:
                 tensors["anchor_top_k_ids"] = anchor_parts["anchor_top_k_ids"]
                 tensors["anchor_top_k_log_probs"] = anchor_parts["anchor_top_k_log_probs"]
+            if "anchor_eos_log_probs" in anchor_parts:
+                tensors["anchor_eos_log_probs"] = anchor_parts["anchor_eos_log_probs"]
+                anchor_class_mass = anchor_parts["anchor_eos_log_probs"].logsumexp(-1).exp()
+                metrics["mopd_eos_anchor_class_mass"] = self.masked_mean(anchor_class_mass, response_mask)
             metrics["anchor_state_gap_mean"] = self.masked_mean(anchor_parts["state_gap"], response_mask)
             metrics["anchor_logb_mean"] = self.masked_mean(anchor_parts["state_anchor_logb"], response_mask)
             metrics["anchor_resid_energy_mean"] = self.masked_mean(anchor_parts["state_resid_energy"], response_mask)

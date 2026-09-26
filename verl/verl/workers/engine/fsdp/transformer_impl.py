@@ -1339,6 +1339,11 @@ class FSDPEngineWithLMHead(FSDPEngine):
         opd_anchor_expectation = tu.get_non_tensor_data(
             data=micro_batch, key="opd_anchor_expectation", default=False
         )
+        # M4 EOS semantic patch: merged terminal-class ids (tuple assigned via
+        # tu.assign_non_tensor), empty when the patch is off.
+        opd_eos_ids = tuple(
+            tu.get_non_tensor_data(data=micro_batch, key="mopd_eos_token_ids", default=()) or ()
+        )
 
         if calculate_sum_pi_squared and use_fused_kernels:
             raise NotImplementedError(
@@ -1366,6 +1371,14 @@ class FSDPEngineWithLMHead(FSDPEngine):
             raise NotImplementedError(
                 "MOPD anchor expectation requires actor_rollout_ref.model.use_remove_padding=True: "
                 "the paired anchor forward reuses the packed-input pipeline."
+            )
+
+        if opd_eos_ids and use_fused_kernels:
+            raise NotImplementedError(
+                "MOPD EOS semantic patch requires actor_rollout_ref.model.use_fused_kernels=False: "
+                "fused kernels never materialize the full logits tensor the merged-class "
+                "log-prob needs. Set distillation.mopd_eos_patch.enabled=False, or disable "
+                "fused kernels."
             )
 
         model_output = {}
@@ -1440,6 +1453,8 @@ class FSDPEngineWithLMHead(FSDPEngine):
                     # E_b[log pi_theta] = <b, z> - lse(z) per packed position.
                     # The anchor half is detached (frozen snapshot); grad flows
                     # only through the student logits, where backward gives b-pi.
+                    # Under the EOS patch the expectation runs on the merged
+                    # action space (b_E * lse(z_E) at the class coordinate).
                     from verl.utils.opd_anchor import anchor_expected_log_prob
 
                     anchor_logits_rmpad = output_args["anchor_logits"].squeeze(0)
@@ -1451,7 +1466,15 @@ class FSDPEngineWithLMHead(FSDPEngine):
                         anchor_temperature=tu.get_non_tensor_data(
                             data=micro_batch, key="opd_anchor_temperature", default=1.0
                         ),
+                        eos_token_ids=opd_eos_ids or None,
                     )
+
+                if opd_eos_ids:
+                    # M4 diagnostics: the student's own class mass log pi_theta(E)
+                    # per packed position — the quantity the patch teaches to grow.
+                    from verl.utils.mopd_eos import eos_class_log_probs
+
+                    opd_eos_class_lp_rmpad = eos_class_log_probs(logits_rmpad, opd_eos_ids)
 
                 if not distillation_only:
                     # if use_sp: ((total_nnz / sp) + pad) ; if not use_sp: (batch, seqlen)
@@ -1463,6 +1486,15 @@ class FSDPEngineWithLMHead(FSDPEngine):
                         labels=input_ids_rmpad_rolled,
                         inplace_backward=inplace_backward,
                     )
+                    if opd_eos_ids:
+                        # M4: positions that sampled a class member score the
+                        # merged mass log pi_theta(E) — in both the old_log_probs
+                        # recompute and the update forward (same call site).
+                        from verl.utils.mopd_eos import merge_sampled_log_probs
+
+                        log_probs = merge_sampled_log_probs(
+                            logits_rmpad, input_ids_rmpad_rolled, log_probs, opd_eos_ids
+                        )
 
             # gather across the ulysses sp group and drop the packed-sequence padding
             pad_size = output_args["pad_size"]
@@ -1478,6 +1510,8 @@ class FSDPEngineWithLMHead(FSDPEngine):
                 opd_top_k_rmpad = {k: self._gather_and_unpad_packed(v, pad_size) for k, v in opd_top_k_rmpad.items()}
             if opd_anchor_expectation:
                 anchor_eb_rmpad = self._gather_and_unpad_packed(anchor_eb_rmpad, pad_size)
+            if opd_eos_ids:
+                opd_eos_class_lp_rmpad = self._gather_and_unpad_packed(opd_eos_class_lp_rmpad, pad_size)
 
             if pad_mode == DatasetPadMode.NO_PADDING:
                 cu_seqlens = input_ids.offsets()
@@ -1494,6 +1528,10 @@ class FSDPEngineWithLMHead(FSDPEngine):
                 if opd_anchor_expectation:
                     model_output["anchor_eb_logp"] = torch.nested.nested_tensor_from_jagged(
                         anchor_eb_rmpad, cu_seqlens
+                    )
+                if opd_eos_ids and not distillation_only:
+                    model_output["eos_class_log_probs"] = torch.nested.nested_tensor_from_jagged(
+                        opd_eos_class_lp_rmpad, cu_seqlens
                     )
             else:
                 raise NotImplementedError(f"pad_mode {pad_mode} not implemented")
@@ -1566,6 +1604,20 @@ class FSDPEngineWithLMHead(FSDPEngine):
                     log_probs = None
                     if not distillation_only:
                         log_probs = logprobs_from_logits(logits=logits_rmpad, labels=input_ids_rmpad_rolled)
+                        if opd_eos_ids:
+                            from verl.utils.mopd_eos import (
+                                eos_class_log_probs,
+                                merge_sampled_log_probs,
+                            )
+
+                            model_output["eos_class_log_probs"] = (
+                                torch.nested.nested_tensor_from_jagged(
+                                    eos_class_log_probs(logits_rmpad, opd_eos_ids), cu_seqlens
+                                )
+                            )
+                            log_probs = merge_sampled_log_probs(
+                                logits_rmpad, input_ids_rmpad_rolled, log_probs, opd_eos_ids
+                            )
 
                     # (bsz, j1), for each sample, length of each sample: [real_prompt_length + real_response_length]
                     if not distillation_only:

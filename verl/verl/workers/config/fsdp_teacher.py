@@ -28,7 +28,7 @@ from typing import Any, Optional
 
 from verl.base_config import BaseConfig
 
-__all__ = ["AnchorConfig", "FsdpTeacherConfig", "MopdReplayConfig", "route_by_ability"]
+__all__ = ["AnchorConfig", "FsdpTeacherConfig", "MopdEosPatchConfig", "MopdReplayConfig", "route_by_ability"]
 
 logger = logging.getLogger(__name__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
@@ -175,6 +175,46 @@ class MopdReplayConfig(BaseConfig):
     window: int = 4
     priority_mode: str = "marginal_absorption"
     coverage_rarity: float = 0.0
+
+
+@dataclass
+class MopdEosPatchConfig(BaseConfig):
+    """M4 EOS semantic patch: merged terminal-token class (paper §M4).
+
+    A base student terminates on ``e1`` while a post-trained teacher
+    terminates on ``e2``; the teacher's terminal mass then lands on a token
+    the student never samples, so the sampled-token reward can never teach
+    termination (EOS length inflation). The patch collapses the ids into one
+    semantic class ``E``: the rollout stops on any member, and every
+    sampled-token and per-state log-prob term is evaluated under the merged
+    class mass ``log p(E) = lse(z_E) - lse(z)`` (see
+    ``verl/utils/mopd_eos.py``).
+
+    Args:
+        enabled: master switch. Requires ``fsdp_teacher.enabled`` and
+            ``rollout.extra_stop_token_ids`` covering every class member that
+            is not the tokenizer's native EOS; the trainer-side validator
+            enforces both plus fused-kernels-off and no top-K reward mode.
+        semantic_eos_token_ids: the merged class ``E``, ordered with the
+            student-native EOS first by convention (the reference manifest's
+            ordering). For the Qwen pair: ``[151643]`` ``<|endoftext|>`` +
+            ``[151645]`` ``<|im_end|>``.
+    """
+
+    enabled: bool = False
+    semantic_eos_token_ids: list[int] = field(default_factory=list)
+
+    def __post_init__(self):
+        object.__setattr__(
+            self, "semantic_eos_token_ids", [int(i) for i in (self.semantic_eos_token_ids or [])]
+        )
+        if self.enabled:
+            ids = self.semantic_eos_token_ids
+            if not ids or len(set(ids)) != len(ids):
+                raise ValueError(
+                    "[MOPD-EOS] distillation.mopd_eos_patch.semantic_eos_token_ids must be a "
+                    f"non-empty list of distinct token ids when enabled, got {ids}"
+                )
 
 
 @dataclass

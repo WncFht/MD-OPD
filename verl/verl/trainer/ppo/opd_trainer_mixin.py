@@ -45,6 +45,7 @@ import torch
 from verl.protocol import DataProto
 from verl.trainer.ppo.opd_core_algos import MOPD_ANCHOR_EB_LOSSES, MOPD_POLICY_LOSS_FIELDS
 from verl.utils.config import omega_conf_to_dataclass
+from verl.utils.mopd_eos import semantic_eos_mask, validate_eos_class_ids
 from verl.utils.mopd_priority import PRIORITY_MODES
 from verl.workers.config import FsdpTeacherConfig
 
@@ -338,6 +339,96 @@ class OPDTrainerMixin:
                 "anchor paired forward."
             )
 
+    # ------------------------------------------------------------------
+    # MOPD EOS semantic patch (merged terminal class, paper M4)
+    # ------------------------------------------------------------------
+    def mopd_eos_patch_enabled(self) -> bool:
+        """Whether the M4 merged-terminal-class patch is active for this run."""
+        if not getattr(self, "use_opd_teacher", False):
+            return False
+        patch = self.config.distillation.get("mopd_eos_patch", None)
+        return bool(patch is not None and patch.get("enabled", False))
+
+    def mopd_eos_class_ids(self) -> list[int]:
+        """The merged terminal class ids, or [] when the patch is off."""
+        if not self.mopd_eos_patch_enabled():
+            return []
+        return validate_eos_class_ids(self.config.distillation.mopd_eos_patch.get("semantic_eos_token_ids", []))
+
+    def assign_eos_patch_flag(self, batch_td) -> None:
+        """Tell the engine to merge sampled-token log-probs on the class.
+
+        One non-tensor flag covers both the ``compute_log_prob`` and
+        ``update_actor`` forwards — the merge must apply identically to
+        old_log_probs and to the policy-gradient log_prob or the ratio compares
+        two different action spaces.
+        """
+        from verl.utils import tensordict_utils as tu
+
+        ids = self.mopd_eos_class_ids()
+        if ids:
+            tu.assign_non_tensor(batch_td, mopd_eos_token_ids=tuple(ids))
+
+    def validate_mopd_eos_config(self) -> None:
+        """Reject EOS-patch setups the merged semantics cannot honour.
+
+        The patch scores every sampled class member under the merged mass
+        ``log p(E)`` on teacher, student and anchor distributions alike. That
+        needs: the OPD teacher present (there is nothing else to merge
+        against), full student logits (no fused kernels), the rollout stop set
+        covering every class member, no top-K reward mode (candidate-level
+        class merging is not defined), and no rollout-correction bypass
+        (unmerged ``rollout_log_probs`` as old_log_probs would put the ratio
+        on two different action spaces).
+        """
+        patch = self.config.distillation.get("mopd_eos_patch", None)
+        if patch is None or not patch.get("enabled", False):
+            return
+        if not self.use_opd_teacher:
+            raise ValueError(
+                "distillation.mopd_eos_patch.enabled=True requires the OPD FSDP teacher "
+                "(distillation.fsdp_teacher.enabled=True): the patch merges teacher scoring "
+                "onto the shared terminal class."
+            )
+        ids = self.mopd_eos_class_ids()
+        model_cfg = self.config.actor_rollout_ref.model
+        if model_cfg.get("use_fused_kernels", False):
+            raise ValueError(
+                "distillation.mopd_eos_patch requires actor_rollout_ref.model.use_fused_kernels=False: "
+                "the merged class log-prob needs the full student logits."
+            )
+        rollout_cfg = self.config.actor_rollout_ref.rollout
+        if rollout_cfg.get("ignore_eos", False):
+            raise ValueError(
+                "distillation.mopd_eos_patch is contradictory with rollout.ignore_eos=True: "
+                "the patch exists to teach termination on the merged class."
+            )
+        stop_ids = {int(i) for i in (rollout_cfg.get("extra_stop_token_ids") or [])}
+        student_eos = getattr(self.tokenizer, "eos_token_id", None)
+        if student_eos is not None:
+            stop_ids.add(int(student_eos))
+        missing = [i for i in ids if i not in stop_ids]
+        if missing:
+            raise ValueError(
+                f"distillation.mopd_eos_patch.semantic_eos_token_ids={ids} is not covered by the "
+                f"rollout stop set (extra_stop_token_ids + tokenizer eos): members {missing} would "
+                "never terminate generation. Add them to actor_rollout_ref.rollout.extra_stop_token_ids."
+            )
+        if self.opd_top_k_is_reward():
+            raise ValueError(
+                "distillation.mopd_eos_patch is incompatible with log_prob_top_k>0: the top-K "
+                "reward works on per-candidate log-probs and merged-class scoring has no "
+                "candidate-level analogue. metric_top_k stays available (it reports raw "
+                "per-member statistics only)."
+            )
+        rollout_corr = self.config.algorithm.get("rollout_correction", {}) or {}
+        if rollout_corr.get("bypass_mode", False):
+            raise ValueError(
+                "distillation.mopd_eos_patch is incompatible with rollout_correction.bypass_mode: "
+                "bypass reuses unmerged rollout_log_probs as old_log_probs, so the policy ratio "
+                "would compare merged and unmerged action spaces."
+            )
+
     def init_mopd_replay(self):
         """Build the driver-side replay buffer, or None when disabled."""
         if not self.mopd_replay_enabled():
@@ -427,6 +518,11 @@ class OPDTrainerMixin:
         rm_scores = teacher_output.batch["rm_scores"].to(response_mask.device)
         batch.batch["token_level_scores"] = rm_scores
         batch.batch["teacher_log_probs"] = teacher_output.batch["teacher_log_probs"].to(response_mask.device)
+
+        if self.mopd_eos_patch_enabled() and "teacher_eos_log_probs" in teacher_output.batch.keys():
+            batch.batch["teacher_eos_log_probs"] = teacher_output.batch["teacher_eos_log_probs"].to(
+                response_mask.device
+            )
 
         n_tokens = max(int(response_mask.sum().item()), 1)
         # Keep the diagnostic statistics on the plain sampled-token advantage,
@@ -527,6 +623,19 @@ class OPDTrainerMixin:
             batch.batch["anchor_log_probs"] = anchor_log_probs
             batch.non_tensor_batch["anchor_source"] = anchor_source
 
+            if self.mopd_eos_patch_enabled():
+                # M4: at sampled class positions on student rows the rollout's
+                # recorded logprob cannot express merged mass (vLLM only ever
+                # returns per-token log p(y_t)). The anchor IS the formal b, so
+                # substitute its merged log b_E from anchor_log_probs_fwd.
+                ids = self.mopd_eos_class_ids()
+                eos_pos = semantic_eos_mask(batch.batch["responses"], ids).to(response_device)
+                student_rows = torch.ones(len(batch), dtype=torch.bool, device=response_device)
+                if generators is not None:
+                    student_rows = ~torch.as_tensor(teacher_rows, device=response_device)
+                fix = eos_pos & student_rows.unsqueeze(-1)
+                anchor_log_probs[fix] = anchor_fwd[fix]
+
             if "anchor_top_k_ids" in teacher_output.batch.keys():
                 batch.batch["anchor_top_k_ids"] = teacher_output.batch["anchor_top_k_ids"].to(response_device)
                 batch.batch["anchor_top_k_log_probs"] = teacher_output.batch["anchor_top_k_log_probs"].to(
@@ -543,12 +652,31 @@ class OPDTrainerMixin:
                 value = _mean_metric(worker_metrics.get(key))
                 if value is not None:
                     metrics[f"opd/{key}"] = float(value)
+            if "anchor_eos_log_probs" in teacher_output.batch.keys():
+                batch.batch["anchor_eos_log_probs"] = teacher_output.batch["anchor_eos_log_probs"].to(
+                    response_device
+                )
             # Sanity signal: the anchor's own recomputation of log b(y_t) should
             # sit near zero difference against the recorded generator logprob;
             # a persistent gap means engine-vs-FSDP numerics or a stale anchor.
             metrics["opd/anchor_vs_rollout_mean"] = float(
                 ((anchor_fwd - generator_lp) * token_mask).sum().item() / denom.item()
             )
+
+        if self.mopd_eos_patch_enabled():
+            # M4 diagnostics: how much mass each distribution puts on the
+            # merged terminal class, and how often sampled tokens hit it. The
+            # student value is the headline — the patch exists to grow it.
+            for key in ("mopd_eos_class_sample_frac", "mopd_eos_teacher_class_mass", "mopd_eos_anchor_class_mass"):
+                value = _mean_metric(worker_metrics.get(key))
+                if value is not None:
+                    metrics[f"mopd_eos/{key.removeprefix('mopd_eos_')}"] = float(value)
+            student_eos_lp = batch.batch.get("student_eos_class_log_probs")
+            if student_eos_lp is not None:
+                metrics["mopd_eos/student_class_mass"] = float(
+                    (student_eos_lp.to(teacher_log_probs.device).float().exp() * token_mask).sum().item()
+                    / denom.item()
+                )
 
         return batch
 
