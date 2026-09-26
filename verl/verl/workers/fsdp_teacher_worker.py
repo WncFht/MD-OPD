@@ -46,10 +46,13 @@ from verl.single_controller.base.decorator import Dispatch, register
 from verl.utils.device import get_device_id, get_device_name
 from verl.utils.distributed import initialize_global_process_group_ray
 from verl.utils.fsdp_utils import (
+    fsdp_version,
     get_fsdp_full_state_dict,
     get_fsdp_wrap_policy,
     get_init_weight_context_manager,
     init_fn,
+    load_fsdp_model_to_gpu,
+    offload_fsdp_model_to_cpu,
 )
 from verl.utils.mopd_eos import (
     eos_member_log_probs,
@@ -393,7 +396,18 @@ class TeacherWorker(Worker):
             )
 
         # get_fsdp_full_state_dict covers both FSDP1 and FSDP2 actor engines.
-        actor_state = get_fsdp_full_state_dict(actor_module, offload_to_cpu=True, rank0_only=False)
+        # FSDP1 FULL_STATE_DICT unshard asserts flat params on the compute
+        # device (pre_unshard -> _check_on_compute_device); under
+        # actor.fsdp_config.param_offload they are CPU-resident between
+        # engine contexts, so stage them like FSDPEngine.save_checkpoint does.
+        stage_actor = fsdp_version(actor_module) == 1 and next(actor_module.parameters()).device.type == "cpu"
+        if stage_actor:
+            load_fsdp_model_to_gpu(actor_module)
+        try:
+            actor_state = get_fsdp_full_state_dict(actor_module, offload_to_cpu=True, rank0_only=False)
+        finally:
+            if stage_actor:
+                offload_fsdp_model_to_cpu(actor_module)
         full_cfg = FullStateDictConfig(offload_to_cpu=True, rank0_only=False)
         with FSDP.state_dict_type(self.anchor_module, StateDictType.FULL_STATE_DICT, full_cfg):
             self.anchor_module.load_state_dict(actor_state)
