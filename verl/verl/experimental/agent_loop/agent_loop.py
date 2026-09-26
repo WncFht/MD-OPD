@@ -625,6 +625,11 @@ class AgentLoopWorker:
             repetition_penalty=1.0,
             logprobs=config.calculate_log_probs,
         )
+        # Additional stop ids (e.g. the M4 merged terminal class) apply to both
+        # train and validation rollouts: the generation-side stop semantics are
+        # the same in both, matching the reference implementation's behaviour.
+        if config.extra_stop_token_ids:
+            sampling_params["stop_token_ids"] = list(config.extra_stop_token_ids)
 
         def apply_greedy_sampling_params(params: dict[str, Any]) -> None:
             params["top_p"] = 1.0

@@ -48,6 +48,13 @@ gpu_memory_utilization: 0.5
 # Whether to ignore EOS and continue generating after EOS is hit.
 ignore_eos: False
 
+# Additional token ids that terminate generation, on top of the model's own
+# eos. Passed verbatim to SamplingParams.stop_token_ids for both train and
+# validation rollouts. The M4 EOS patch (distillation.mopd_eos_patch) uses this
+# so the student can stop on the teacher's terminal token id; usable alone for
+# plain multi-stop generation.
+extra_stop_token_ids: []
+
 # Whether to disable CUDA graph. Default False to best performance.
 enforce_eager: False
 
