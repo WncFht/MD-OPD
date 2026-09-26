@@ -637,6 +637,15 @@ class ActorRolloutRefWorker(Worker, DistProfilerExtension):
                 self.loss_fn = partial(ppo_loss, config=actor_config)
             self.actor = self.actor_worker_cls(config=actor_training_config)
             self.actor.reset()
+            # MOPD: expose the live actor module to the colocated teacher worker
+            # so refresh_anchor() can snapshot b <- pi_theta without RPC.
+            if (
+                self.distillation_config is not None
+                and self.distillation_config.get("fsdp_teacher", {}).get("anchor", {}).get("enabled", False)
+            ):
+                from verl.utils.opd_anchor import set_opd_actor_module
+
+                set_opd_actor_module(self.actor.engine.module)
             self.actor.set_loss_fn(self.loss_fn)
             self.set_dispatch_collect(mesh_name="actor", **self.actor.get_dispatch_collect())
 

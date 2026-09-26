@@ -187,3 +187,41 @@ fsdp_teacher:
   # HuggingFace attention backend. flash_attention_2 needs a matching
   # flash-attn wheel; sdpa is the fallback when that wheel cannot be built.
   attn_implementation: flash_attention_2
+
+  # MOPD anchor: a frozen generator snapshot (b) loaded as a dedicated module
+  # on the teacher worker, outside the routed `teachers` list. It produces the
+  # per-state terms of the MOPD residual: log b(y_t), G(s)=KL(b||pi_T)(s) and
+  # E_b[log b](s); see verl/utils/opd_anchor.py and verl/workers/fsdp_teacher_worker.py.
+  anchor:
+    _target_: verl.workers.config.AnchorConfig
+
+    # Master switch for the anchor module and its batch fields.
+    enabled: false
+
+    # HF path for the anchor's initial weights. null = actor_rollout_ref.model.path
+    # (the window-0 snapshot b <- pi_theta0).
+    path: null
+
+    # Pull the actor's live weights into the anchor at init and on refresh.
+    from_actor: true
+
+    # Global steps between b <- pi_theta re-snapshots; 0 disables refresh.
+    refresh_interval: 0
+
+    # Temperature applied to anchor logits; should match the rollout temperature.
+    temperature: 1.0
+
+    # Paired teacher+anchor forward granularity; 0 = same as micro_batch_size_per_gpu.
+    # The pair transiently holds two (rows, T, V) logits — halve this if memory is tight.
+    micro_batch_size_per_gpu: 0
+
+    # Emit anchor_eb_logp = E_b[log pi_theta] inside the actor's forward pass
+    # (+1 anchor-class forward per actor micro-batch). Requires
+    # use_remove_padding=True, use_fused_kernels=False, and the same
+    # ulysses_sequence_parallel_size as the actor.
+    expect_in_train: false
+
+    # >0 stores the anchor's top-K ids+log-probs (B,T,K) for the truncated
+    # E_b[log pi_theta] alternative. Ablation-only: the missing tail mass biases
+    # the residual's per-state constant.
+    top_k: 0

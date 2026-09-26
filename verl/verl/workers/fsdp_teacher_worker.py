@@ -46,12 +46,18 @@ from verl.single_controller.base.decorator import Dispatch, register
 from verl.utils.device import get_device_id, get_device_name
 from verl.utils.distributed import initialize_global_process_group_ray
 from verl.utils.fsdp_utils import (
+    get_fsdp_full_state_dict,
     get_fsdp_wrap_policy,
     get_init_weight_context_manager,
     init_fn,
 )
+from verl.utils.opd_anchor import (
+    compute_anchor_state_terms,
+    get_opd_actor_module,
+    set_opd_anchor_module,
+)
 from verl.utils.py_functional import convert_to_regular_types
-from verl.utils.topk_logits import top_k_logits_chunk_rows
+from verl.utils.topk_logits import chunked_top_k_log_probs, top_k_logits_chunk_rows
 from verl.utils.torch_dtypes import PrecisionType
 from verl.workers.config import FsdpTeacherConfig
 
@@ -271,6 +277,7 @@ class TeacherWorker(Worker):
             teacher_cfg = FsdpTeacherConfig(**convert_to_regular_types(OmegaConf.to_container(teacher_cfg)))
         self.teacher_config: FsdpTeacherConfig = teacher_cfg
         self.teacher_modules: dict[str, torch.nn.Module] = {}
+        self.anchor_module: Optional[torch.nn.Module] = None
         self.tokenizer = None
 
     def _build_model(self, model_path: str):
@@ -340,6 +347,45 @@ class TeacherWorker(Worker):
                 self.teacher_config.strict_routing,
             )
 
+        anchor_cfg = self.teacher_config.anchor
+        if anchor_cfg.enabled:
+            anchor_path = anchor_cfg.path or self.config.actor_rollout_ref.model.path
+            logger.info("[MOPD] Loading anchor snapshot from %s", anchor_path)
+            self.anchor_module = self._build_model(anchor_path)
+            set_opd_anchor_module(self.anchor_module)
+            if anchor_cfg.from_actor:
+                # Window-0 semantics: b <- pi_theta at init. The actor publishes
+                # its module handle inside this same WorkerDict process.
+                self.refresh_anchor()
+
+    @register(dispatch_mode=Dispatch.ONE_TO_ALL)
+    def refresh_anchor(self):
+        """Re-snapshot the actor's live weights into the anchor (b <- pi_theta).
+
+        Called by the trainer mixin at window boundaries. Relies on the actor
+        engine and this worker sharing one colocated WorkerDict process: the
+        actor side publishes its module via ``set_opd_actor_module``.
+        """
+        from torch.distributed.fsdp import FullStateDictConfig, StateDictType
+        from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+
+        if self.anchor_module is None:
+            raise ValueError("[MOPD] refresh_anchor called while fsdp_teacher.anchor.enabled=False")
+        actor_module = get_opd_actor_module()
+        if actor_module is None:
+            raise ValueError(
+                "[MOPD] refresh_anchor found no actor module in this process; "
+                "ActorRolloutRefWorker publishes it when fsdp_teacher.anchor.enabled=True"
+            )
+
+        # get_fsdp_full_state_dict covers both FSDP1 and FSDP2 actor engines.
+        actor_state = get_fsdp_full_state_dict(actor_module, offload_to_cpu=True, rank0_only=False)
+        full_cfg = FullStateDictConfig(offload_to_cpu=True, rank0_only=False)
+        with FSDP.state_dict_type(self.anchor_module, StateDictType.FULL_STATE_DICT, full_cfg):
+            self.anchor_module.load_state_dict(actor_state)
+        del actor_state
+        logger.info("[MOPD] Anchor re-snapshotted from actor weights")
+
     @torch.no_grad()
     def _forward_micro_batch(
         self,
@@ -347,6 +393,7 @@ class TeacherWorker(Worker):
         micro_batch: dict,
         student_top_k_ids: Optional[torch.Tensor] = None,
         top_k: int = 0,
+        anchor_module=None,
     ):
         """Teacher forward over one micro-batch; returns per-token teacher log-probs."""
         from verl.utils.torch_functional import logprobs_from_logits
@@ -400,6 +447,27 @@ class TeacherWorker(Worker):
                 result["student_in_teacher"] = flat["student_in_teacher"].view(bsz, seqlen, -1)
                 result["teacher_in_student"] = flat["teacher_in_student"].view(bsz, seqlen, -1)
                 result["teacher_own_top_k_log_probs"] = flat["teacher_log_probs"].view(bsz, seqlen, -1)
+
+            if anchor_module is not None:
+                # Both full-vocab logits must coexist: the per-state terms need
+                # b = softmax(anchor_logits) and the tempered teacher logits at
+                # the same positions, and shipping (B, T, V) across workers is
+                # off the table.
+                anchor_kwargs = dict(forward_kwargs)
+                if not _supports_logits_to_keep(anchor_module):
+                    anchor_kwargs.pop("logits_to_keep", None)
+                anchor_output = anchor_module(**anchor_kwargs)
+                anchor_logits = anchor_output.logits[:, -response_length - 1 : -1, :]
+                anchor_logits.div_(self.teacher_config.anchor.temperature)
+                result.update(compute_anchor_state_terms(anchor_logits, logits, responses))
+                anchor_top_k = self.teacher_config.anchor.top_k
+                if anchor_top_k > 0:
+                    ids, lps = chunked_top_k_log_probs(
+                        anchor_logits.reshape(-1, anchor_logits.size(-1)), top_k=anchor_top_k
+                    )
+                    result["anchor_top_k_ids"] = ids.view(responses.shape[0], responses.shape[1], -1)
+                    result["anchor_top_k_log_probs"] = lps.view(responses.shape[0], responses.shape[1], -1)
+                del anchor_output, anchor_logits
         return result
 
     @register(dispatch_mode=Dispatch.DP_COMPUTE_PROTO)
@@ -438,6 +506,19 @@ class TeacherWorker(Worker):
         top_k_parts: dict[str, torch.Tensor] = {}
         micro_bs = self.teacher_config.micro_batch_size_per_gpu
 
+        anchor_cfg = self.teacher_config.anchor
+        anchor_module = self.anchor_module if anchor_cfg.enabled else None
+        anchor_parts: dict[str, torch.Tensor] = {}
+        # The anchor rides each teacher micro-batch: every row is routed to
+        # exactly one teacher chunk, so pairing the forwards covers the batch
+        # once, keeps the per-state KL inputs (b and pi_T logits) together, and
+        # preserves the collective call sequence. anchor.micro_batch_size_per_gpu
+        # lets the pair run at a finer granularity when two (rows, T, V) logits
+        # do not fit at the teacher's micro-batch size.
+        forward_bs = micro_bs
+        if anchor_module is not None:
+            forward_bs = anchor_cfg.micro_batch_size_per_gpu or micro_bs
+
         # Every rank has to issue the *same sequence* of teacher forwards. The
         # teachers are FSDP-sharded, so each forward is a collective: a rank whose
         # shard happens to hold no `coding` rows would skip the code teacher and
@@ -449,7 +530,7 @@ class TeacherWorker(Worker):
         # global maximum with a throwaway forward.
         teacher_names = sorted(self.teacher_modules)
         n_micro = torch.tensor(
-            local_micro_batch_counts(order, teacher_names, micro_bs),
+            local_micro_batch_counts(order, teacher_names, forward_bs),
             device=teacher_log_probs.device,
             dtype=torch.long,
         )
@@ -460,7 +541,7 @@ class TeacherWorker(Worker):
             module = self.teacher_modules[name]
             idxs = order.get(name, [])
             for step in range(int(n_micro[t].item())):
-                chunk = idxs[step * micro_bs : (step + 1) * micro_bs]
+                chunk = idxs[step * forward_bs : (step + 1) * forward_bs]
                 # This rank is out of rows for this teacher but the collective still
                 # has to happen: score row 0 and drop the result.
                 rows = chunk or [0]
@@ -470,6 +551,7 @@ class TeacherWorker(Worker):
                     micro,
                     student_top_k_ids=student_top_k_ids[rows] if use_top_k else None,
                     top_k=top_k if use_top_k else 0,
+                    anchor_module=anchor_module,
                 )
                 if not chunk:
                     continue
@@ -487,6 +569,21 @@ class TeacherWorker(Worker):
                     # Scatter back by original row index: `order` groups rows out
                     # of batch order, so a plain concat would misalign them.
                     top_k_parts[key][chunk] = value
+                for key in (
+                    "anchor_log_probs_fwd",
+                    "state_anchor_logb",
+                    "state_gap",
+                    "anchor_top_k_ids",
+                    "anchor_top_k_log_probs",
+                ):
+                    if key not in out:
+                        continue
+                    value = out[key]
+                    if key not in anchor_parts:
+                        anchor_parts[key] = torch.empty(
+                            (n, *value.shape[1:]), dtype=value.dtype, device=value.device
+                        )
+                    anchor_parts[key][chunk] = value
 
         # Reverse KL as a dense per-token reward.
         rm_scores = -(student_log_probs - teacher_log_probs)
@@ -499,6 +596,16 @@ class TeacherWorker(Worker):
         # identical across ranks, and each rank saw a different shard.
         non_tensors = {"mopd_teacher": np.array(routes, dtype=object)}
         metrics: dict = {"mopd_teacher_counts": {k: len(v) for k, v in sorted(order.items())}}
+
+        if anchor_cfg.enabled:
+            tensors["anchor_log_probs_fwd"] = anchor_parts["anchor_log_probs_fwd"]
+            tensors["state_anchor_logb"] = anchor_parts["state_anchor_logb"]
+            tensors["state_gap"] = anchor_parts["state_gap"]
+            if "anchor_top_k_ids" in anchor_parts:
+                tensors["anchor_top_k_ids"] = anchor_parts["anchor_top_k_ids"]
+                tensors["anchor_top_k_log_probs"] = anchor_parts["anchor_top_k_log_probs"]
+            metrics["anchor_state_gap_mean"] = self.masked_mean(anchor_parts["state_gap"], response_mask)
+            metrics["anchor_logb_mean"] = self.masked_mean(anchor_parts["state_anchor_logb"], response_mask)
 
         if use_top_k:
             student_in_teacher = top_k_parts["student_in_teacher"]
@@ -551,3 +658,11 @@ class TeacherWorker(Worker):
             return float(mass.mean().item())
         total = float(response_mask.sum().item())
         return float((mass * response_mask).sum().item()) / max(total, 1.0)
+
+    @staticmethod
+    def masked_mean(values: torch.Tensor, response_mask: Optional[torch.Tensor]) -> float:
+        """Mean of a per-token field over real response tokens."""
+        if response_mask is None:
+            return float(values.mean().item())
+        total = float(response_mask.sum().item())
+        return float((values * response_mask).sum().item()) / max(total, 1.0)

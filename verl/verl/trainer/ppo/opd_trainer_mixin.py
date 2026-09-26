@@ -39,6 +39,7 @@ import os
 from collections import Counter
 from typing import Any
 
+import numpy as np
 import torch
 
 from verl.protocol import DataProto
@@ -189,6 +190,76 @@ class OPDTrainerMixin:
                 "only want the agreement statistics."
             )
 
+    # ------------------------------------------------------------------
+    # MOPD anchor (frozen generator snapshot b)
+    # ------------------------------------------------------------------
+    def opd_anchor_enabled(self) -> bool:
+        """Whether the anchor snapshot module is active for this run."""
+        if not getattr(self, "use_opd_teacher", False):
+            return False
+        anchor = self.config.distillation.fsdp_teacher.get("anchor", None)
+        return bool(anchor is not None and anchor.get("enabled", False))
+
+    def opd_anchor_expect_in_train(self) -> bool:
+        """Whether the actor forward must also emit ``anchor_eb_logp`` = E_b[log pi_theta].
+
+        That expectation is the only term of the MOPD residual that depends on
+        the *current* student, so it has to be computed where full-vocab student
+        logits exist — inside the actor's train forward, dotted against the
+        colocated frozen anchor.
+        """
+        if not self.opd_anchor_enabled():
+            return False
+        return bool(self.config.distillation.fsdp_teacher.anchor.get("expect_in_train", False))
+
+    def opd_anchor_refresh_interval(self) -> int:
+        """Window length in global steps between b <- pi_theta re-snapshots; 0 disables."""
+        if not self.opd_anchor_enabled():
+            return 0
+        return int(self.config.distillation.fsdp_teacher.anchor.get("refresh_interval", 0) or 0)
+
+    def assign_anchor_expectation_flag(self, batch_td) -> None:
+        """Mark the actor forward to emit ``anchor_eb_logp`` for this batch."""
+        from verl.utils import tensordict_utils as tu
+
+        if not self.opd_anchor_expect_in_train():
+            return
+        anchor = self.config.distillation.fsdp_teacher.anchor
+        tu.assign_non_tensor(
+            batch_td,
+            opd_anchor_expectation=True,
+            opd_anchor_temperature=float(anchor.get("temperature", 1.0)),
+        )
+
+    def validate_opd_anchor_config(self) -> None:
+        """Reject anchor setups the colocated in-engine forward cannot honour.
+
+        ``expect_in_train`` runs the anchor inside the actor's forward on the
+        exact same packed inputs, so the two modules must share that input
+        layout: remove-padding on, fused kernels off (full logits must
+        materialize for the ``<b, z>`` dot), and identical ulysses
+        sequence-parallel sizes so the SP-sliced inputs are valid for both.
+        """
+        if not self.opd_anchor_expect_in_train():
+            return
+        model_cfg = self.config.actor_rollout_ref.model
+        if not model_cfg.get("use_remove_padding", False):
+            raise ValueError("anchor.expect_in_train requires actor_rollout_ref.model.use_remove_padding=True")
+        if model_cfg.get("use_fused_kernels", False):
+            raise ValueError("anchor.expect_in_train requires actor_rollout_ref.model.use_fused_kernels=False")
+        # The anchor was patched with the teacher's settings; it must accept the
+        # same packed inputs the actor engine builds.
+        if not self.config.distillation.fsdp_teacher.get("use_remove_padding", True):
+            raise ValueError("anchor.expect_in_train requires distillation.fsdp_teacher.use_remove_padding=True")
+        teacher_sp = int(self.config.distillation.fsdp_teacher.get("ulysses_sequence_parallel_size", 1) or 1)
+        actor_sp = int(self.config.actor_rollout_ref.actor.get("ulysses_sequence_parallel_size", 1) or 1)
+        if teacher_sp != actor_sp:
+            raise ValueError(
+                "anchor.expect_in_train requires matching ulysses_sequence_parallel_size on "
+                f"actor ({actor_sp}) and fsdp_teacher ({teacher_sp}): the anchor forward "
+                "consumes the SP-sliced packed inputs the actor engine builds."
+            )
+
     def validate_mdpo_config(self) -> None:
         """Reject training modes whose policy anchors differ from MDPO's old policy."""
         actor = self.config.actor_rollout_ref.actor
@@ -229,6 +300,26 @@ class OPDTrainerMixin:
         overlap statistics, but ``rm_scores`` stays the plain (B, T) reverse KL.
         """
         batch.meta_info["opd_top_k_is_reward"] = self.opd_top_k_is_reward()
+
+        # MOPD anchor window lifecycle: re-snapshot b <- pi_theta at window
+        # starts. Steps are 1-indexed and scoring precedes the actor update, so
+        # window starts are global_steps in {L+1, 2L+1, ...} — at that point the
+        # actor holds exactly the weights the window's first trajectory was
+        # sampled from. Step 1 already got its snapshot at init when
+        # anchor.from_actor=True.
+        refresh_interval = self.opd_anchor_refresh_interval()
+        if (
+            refresh_interval > 0
+            and self.global_steps > 1
+            and (self.global_steps - 1) % refresh_interval == 0
+        ):
+            logger.info(
+                "[MOPD] refreshing anchor at global_steps=%d (interval=%d)",
+                self.global_steps,
+                refresh_interval,
+            )
+            self.opd_teacher_wg.refresh_anchor()
+
         # Frozen-state mode caches only the rollout tokens/states.  The teacher
         # remains frozen, but we intentionally run one teacher forward per
         # optimizer step so metric-only top-K uses the *current* student's
@@ -311,6 +402,53 @@ class OPDTrainerMixin:
             value = _mean_metric(worker_metrics.get(key))
             if value is not None:
                 metrics[f"opd/{key}"] = float(value)
+
+        if self.opd_anchor_enabled():
+            response_device = response_mask.device
+            anchor_fwd = teacher_output.batch["anchor_log_probs_fwd"].to(response_device)
+            batch.batch["state_gap"] = teacher_output.batch["state_gap"].to(response_device)
+            batch.batch["state_anchor_logb"] = teacher_output.batch["state_anchor_logb"].to(response_device)
+            batch.batch["anchor_log_probs_fwd"] = anchor_fwd
+
+            # anchor_log_probs carries each token's *actual generator* logprob:
+            # student-generated rows take the rollout's own recorded logprob
+            # (the true b), teacher-generated rows take the routed teacher's
+            # logprob. The pure anchor-forward value stays under
+            # anchor_log_probs_fwd so the two can be compared.
+            generator_lp = batch.batch.get("rollout_log_probs")
+            if generator_lp is None:
+                generator_lp = batch.batch["old_log_probs"]
+            generator_lp = generator_lp.to(response_device).float()
+            anchor_log_probs = generator_lp.clone()
+            anchor_source = np.full(len(batch), "rollout", dtype=object)
+            generators = batch.non_tensor_batch.get("generator")
+            if generators is not None:
+                teacher_rows = np.asarray([str(g) == "teacher" for g in generators])
+                if teacher_rows.any():
+                    teacher_idx = torch.as_tensor(teacher_rows, device=response_device)
+                    anchor_log_probs[teacher_idx] = batch.batch["teacher_log_probs"][teacher_idx]
+                    anchor_source[teacher_rows] = "teacher"
+            batch.batch["anchor_log_probs"] = anchor_log_probs
+            batch.non_tensor_batch["anchor_source"] = anchor_source
+
+            if "anchor_top_k_ids" in teacher_output.batch.keys():
+                batch.batch["anchor_top_k_ids"] = teacher_output.batch["anchor_top_k_ids"].to(response_device)
+                batch.batch["anchor_top_k_log_probs"] = teacher_output.batch["anchor_top_k_log_probs"].to(
+                    response_device
+                )
+
+            gap_mean = _mean_metric(worker_metrics.get("anchor_state_gap_mean"))
+            if gap_mean is not None:
+                metrics["opd/anchor_state_gap_mean"] = float(gap_mean)
+            logb_mean = _mean_metric(worker_metrics.get("anchor_logb_mean"))
+            if logb_mean is not None:
+                metrics["opd/anchor_logb_mean"] = float(logb_mean)
+            # Sanity signal: the anchor's own recomputation of log b(y_t) should
+            # sit near zero difference against the recorded generator logprob;
+            # a persistent gap means engine-vs-FSDP numerics or a stale anchor.
+            metrics["opd/anchor_vs_rollout_mean"] = float(
+                ((anchor_fwd - generator_lp) * token_mask).sum().item() / denom.item()
+            )
 
         return batch
 

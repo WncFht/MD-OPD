@@ -431,6 +431,26 @@ _teacher_common_args() {
         distillation.fsdp_teacher.fsdp_config.param_offload=True"
 }
 
+# anchor_args：MOPD anchor（冻结生成器快照 b）配置块。
+#
+# anchor.* 已在 distillation.yaml 结构化声明，直接 . 覆盖，不走 ++。
+# ANCHOR_PATH 为空时默认 actor_rollout_ref.model.path（窗口 0 快照）；
+# ANCHOR_TEMPERATURE 应与 rollout 采样温度一致（b 就是该分布）。
+anchor_args() {
+    local args="\
+        distillation.fsdp_teacher.anchor.enabled=True \
+        distillation.fsdp_teacher.anchor.from_actor=${ANCHOR_FROM_ACTOR:-True} \
+        distillation.fsdp_teacher.anchor.refresh_interval=${ANCHOR_REFRESH_INTERVAL:-0} \
+        distillation.fsdp_teacher.anchor.temperature=${ANCHOR_TEMPERATURE:-${TEMPERATURE}} \
+        distillation.fsdp_teacher.anchor.micro_batch_size_per_gpu=${ANCHOR_MICRO_BSZ:-0} \
+        distillation.fsdp_teacher.anchor.expect_in_train=${ANCHOR_EXPECT_IN_TRAIN:-False} \
+        distillation.fsdp_teacher.anchor.top_k=${ANCHOR_TOP_K:-0}"
+    if [ -n "${ANCHOR_PATH:-}" ]; then
+        args="${args} distillation.fsdp_teacher.anchor.path=${ANCHOR_PATH}"
+    fi
+    echo "$args"
+}
+
 # launch <experiment name> <override>...：运行 main_ppo 并将日志 tee 到文件。
 #
 # OPD_DRY_RUN=1 只组合并打印配置，不启动 ray。`--cfg job` 必须放在前面：

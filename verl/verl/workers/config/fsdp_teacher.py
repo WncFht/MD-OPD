@@ -28,7 +28,7 @@ from typing import Any, Optional
 
 from verl.base_config import BaseConfig
 
-__all__ = ["FsdpTeacherConfig", "route_by_ability"]
+__all__ = ["AnchorConfig", "FsdpTeacherConfig", "route_by_ability"]
 
 logger = logging.getLogger(__name__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "WARN"))
@@ -38,6 +38,10 @@ TOP_K_STRATEGIES = ("only_stu", "only_tch", "intersection", "union", "union-inte
 
 #: how the per-candidate rewards are weighted when top-K is enabled.
 REWARD_WEIGHT_MODES = ("student_p", "teacher_p", "none")
+
+#: name the anchor module takes inside the worker; deliberately outside the
+#: routed `teachers` list so no row is ever routed to it.
+ANCHOR_MODULE_NAME = "anchor"
 
 
 def route_by_ability(
@@ -97,6 +101,57 @@ def route_by_ability(
 
 
 @dataclass
+class AnchorConfig(BaseConfig):
+    """Frozen generator-snapshot (anchor ``b``) for MOPD residual checkpointing.
+
+    The anchor is the frozen distribution the trajectories were sampled from. It
+    rides the ``fsdp_teacher`` worker as a dedicated module *outside* the routed
+    ``teachers`` list: it scores every row in the batch rather than a routed
+    subset, because the per-state terms ``KL(b || pi_T)`` and ``E_b[log b]`` are
+    defined for every state, not per ability.
+
+    Args:
+        enabled: master switch for the anchor module and its batch fields.
+        path: HF path for the anchor's initial weights. ``None`` means "same
+            checkpoint as the actor" (``actor_rollout_ref.model.path``), which
+            is the window-0 snapshot ``b <- pi_theta0``.
+        from_actor: pull the actor's *live* weights into the anchor at init and
+            on every refresh, instead of keeping the ``path`` weights. Both use
+            the same ``refresh_anchor()`` path, so a ``path``-initialized anchor
+            with ``from_actor=True`` is just a warm start.
+        refresh_interval: global steps between ``b <- pi_theta`` re-snapshots;
+            0 disables refresh (anchor stays at its init weights).
+        temperature: temperature applied to anchor logits before taking
+            log-probs / softmax. Should match the rollout temperature used to
+            sample the trajectories, since ``b`` is that sampling distribution.
+        micro_batch_size_per_gpu: row granularity of the paired teacher+anchor
+            forward. The pair transiently holds two ``(rows, T, V)`` logits, so
+            halve this vs ``micro_batch_size_per_gpu`` when memory is tight.
+            0 means "same as ``micro_batch_size_per_gpu``".
+        expect_in_train: run the anchor inside the actor's own forward pass and
+            emit ``anchor_eb_logp`` = ``E_b[log pi_theta]`` per position, the
+            only term of the residual that depends on the *current* student.
+            Costs one anchor-class forward per actor micro-batch. Requires
+            ``use_remove_padding=True``, ``use_fused_kernels=False``, and the
+            same ``ulysses_sequence_parallel_size`` as the actor.
+        top_k: if >0, also store the anchor's own top-K token ids and log-probs
+            ``(B, T, K)`` so ``E_b[log pi_theta]`` can be approximated over the
+            truncated support. Ablation-only: the dropped tail mass biases the
+            per-state constant of the residual, shifting all tokens of a state
+            in the same direction.
+    """
+
+    enabled: bool = False
+    path: Optional[str] = None
+    from_actor: bool = True
+    refresh_interval: int = 0
+    temperature: float = 1.0
+    micro_batch_size_per_gpu: int = 0
+    expect_in_train: bool = False
+    top_k: int = 0
+
+
+@dataclass
 class FsdpTeacherConfig(BaseConfig):
     """OPD teacher configuration.
 
@@ -125,7 +180,7 @@ class FsdpTeacherConfig(BaseConfig):
             flash-attn is unavailable for the installed torch/CUDA pair.
     """
 
-    _mutable_fields = BaseConfig._mutable_fields | {"teachers", "ability_to_teacher", "default_teacher"}
+    _mutable_fields = BaseConfig._mutable_fields | {"teachers", "ability_to_teacher", "default_teacher", "anchor"}
 
     enabled: bool = False
     model_path: Optional[str] = None
@@ -135,6 +190,9 @@ class FsdpTeacherConfig(BaseConfig):
     ability_to_teacher: dict[str, str] = field(default_factory=dict)
     strict_routing: bool = False
     default_teacher: Optional[str] = None
+
+    # --- MOPD anchor (frozen generator snapshot b) ---
+    anchor: AnchorConfig = field(default_factory=AnchorConfig)
 
     # --- forward ---
     micro_batch_size_per_gpu: int = 24
@@ -155,8 +213,30 @@ class FsdpTeacherConfig(BaseConfig):
     attn_implementation: str = "flash_attention_2"
 
     def __post_init__(self):
+        # DictConfig -> plain-dict construction (TeacherWorker.__init__) leaves
+        # `anchor` as a dict; hydra/dataclass conversion already produces an
+        # AnchorConfig. Normalize so attribute access works on both paths.
+        if isinstance(self.anchor, dict):
+            self.anchor = AnchorConfig(**self.anchor)
+
         if not self.enabled:
             return
+
+        if self.anchor.enabled:
+            if self.anchor.refresh_interval < 0:
+                raise ValueError(f"[OPD] anchor.refresh_interval must be >= 0, got {self.anchor.refresh_interval}")
+            if self.anchor.top_k < 0:
+                raise ValueError(f"[OPD] anchor.top_k must be >= 0, got {self.anchor.top_k}")
+            if self.anchor.micro_batch_size_per_gpu < 0:
+                raise ValueError(
+                    "[OPD] anchor.micro_batch_size_per_gpu must be >= 0, "
+                    f"got {self.anchor.micro_batch_size_per_gpu}"
+                )
+            if "anchor" in self.teacher_names():
+                raise ValueError(
+                    "[OPD] 'anchor' is a reserved module name; do not use it as a "
+                    "teacher name in distillation.fsdp_teacher.teachers"
+                )
 
         if self.top_k_strategy not in TOP_K_STRATEGIES:
             raise ValueError(

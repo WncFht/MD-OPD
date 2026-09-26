@@ -1336,6 +1336,9 @@ class FSDPEngineWithLMHead(FSDPEngine):
         distillation_use_topk = tu.get_non_tensor_data(data=micro_batch, key="distillation_use_topk", default=False)
         distillation_only = tu.get_non_tensor_data(data=micro_batch, key="distillation_only", default=False)
         opd_student_top_k = tu.get_non_tensor_data(data=micro_batch, key="opd_student_top_k", default=0)
+        opd_anchor_expectation = tu.get_non_tensor_data(
+            data=micro_batch, key="opd_anchor_expectation", default=False
+        )
 
         if calculate_sum_pi_squared and use_fused_kernels:
             raise NotImplementedError(
@@ -1349,6 +1352,20 @@ class FSDPEngineWithLMHead(FSDPEngine):
                 "fused kernels never materialize the full logits tensor, so the student's top-K "
                 "support set cannot be extracted. Set log_prob_top_k=0/metric_top_k=0 to disable "
                 "top-K, or disable fused kernels."
+            )
+
+        if opd_anchor_expectation and use_fused_kernels:
+            raise NotImplementedError(
+                "MOPD anchor expectation requires actor_rollout_ref.model.use_fused_kernels=False: "
+                "fused kernels never materialize the full logits tensor that E_b[log pi_theta] "
+                "must dot against the anchor distribution. Set anchor.expect_in_train=False to "
+                "disable, or disable fused kernels."
+            )
+
+        if opd_anchor_expectation and not use_remove_padding:
+            raise NotImplementedError(
+                "MOPD anchor expectation requires actor_rollout_ref.model.use_remove_padding=True: "
+                "the paired anchor forward reuses the packed-input pipeline."
             )
 
         model_output = {}
@@ -1419,6 +1436,23 @@ class FSDPEngineWithLMHead(FSDPEngine):
                 if opd_student_top_k > 0:
                     opd_top_k_rmpad = self._emit_opd_student_top_k(logits_rmpad, opd_student_top_k)
 
+                if opd_anchor_expectation:
+                    # E_b[log pi_theta] = <b, z> - lse(z) per packed position.
+                    # The anchor half is detached (frozen snapshot); grad flows
+                    # only through the student logits, where backward gives b-pi.
+                    from verl.utils.opd_anchor import anchor_expected_log_prob
+
+                    anchor_logits_rmpad = output_args["anchor_logits"].squeeze(0)
+                    if isinstance(anchor_logits_rmpad, DTensor):
+                        anchor_logits_rmpad = anchor_logits_rmpad.full_tensor()
+                    anchor_eb_rmpad = anchor_expected_log_prob(
+                        anchor_logits_rmpad.to(logits_rmpad.dtype),
+                        logits_rmpad,
+                        anchor_temperature=tu.get_non_tensor_data(
+                            data=micro_batch, key="opd_anchor_temperature", default=1.0
+                        ),
+                    )
+
                 if not distillation_only:
                     # if use_sp: ((total_nnz / sp) + pad) ; if not use_sp: (batch, seqlen)
                     inplace_backward = True
@@ -1442,6 +1476,8 @@ class FSDPEngineWithLMHead(FSDPEngine):
                 # (total_nnz, K): gather_dim/unpad_dim are both the token axis, so
                 # the trailing K axis rides along untouched.
                 opd_top_k_rmpad = {k: self._gather_and_unpad_packed(v, pad_size) for k, v in opd_top_k_rmpad.items()}
+            if opd_anchor_expectation:
+                anchor_eb_rmpad = self._gather_and_unpad_packed(anchor_eb_rmpad, pad_size)
 
             if pad_mode == DatasetPadMode.NO_PADDING:
                 cu_seqlens = input_ids.offsets()
@@ -1455,6 +1491,10 @@ class FSDPEngineWithLMHead(FSDPEngine):
                 if opd_student_top_k > 0 and not use_fused_kernels:
                     for k, v in opd_top_k_rmpad.items():
                         model_output[k] = torch.nested.nested_tensor_from_jagged(v, cu_seqlens)
+                if opd_anchor_expectation:
+                    model_output["anchor_eb_logp"] = torch.nested.nested_tensor_from_jagged(
+                        anchor_eb_rmpad, cu_seqlens
+                    )
             else:
                 raise NotImplementedError(f"pad_mode {pad_mode} not implemented")
 
@@ -1573,6 +1613,24 @@ class FSDPEngineWithLMHead(FSDPEngine):
                 **model_inputs,
                 use_cache=False,
             )  # prevent model thinks we are generating
+
+            if tu.get_non_tensor_data(data=micro_batch, key="opd_anchor_expectation", default=False):
+                # The anchor and the actor share this colocated WorkerDict
+                # process: TeacherWorker registers the anchor module,
+                # ActorRolloutRefWorker registers the actor. This is the only
+                # point where b's full-vocab distribution meets the student's
+                # logits, which is what E_b[log pi_theta] needs.
+                from verl.utils.opd_anchor import get_opd_anchor_module
+
+                anchor_module = get_opd_anchor_module()
+                if anchor_module is None:
+                    raise ValueError(
+                        "[MOPD] opd_anchor_expectation requested but no anchor module is "
+                        "registered in this process; enable distillation.fsdp_teacher.anchor"
+                    )
+                with torch.no_grad():
+                    anchor_output = anchor_module(**model_inputs, use_cache=False)
+                output_args["anchor_logits"] = anchor_output.logits
 
             model_output = self.prepare_model_outputs(
                 output=raw_output, output_args=output_args, micro_batch=micro_batch, logits_processor_func=loss_function

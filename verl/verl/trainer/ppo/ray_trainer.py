@@ -397,6 +397,7 @@ class RayPPOTrainer(OPDTrainerMixin):
             )
         self.validate_opd_top_k_config()
         self.validate_mdpo_config()
+        self.validate_opd_anchor_config()
 
         self.use_rm = need_reward_model(self.config)
 
@@ -1566,6 +1567,9 @@ class RayPPOTrainer(OPDTrainerMixin):
         opd_top_k = self.opd_student_top_k()
         if opd_top_k > 0:
             tu.assign_non_tensor(batch_td, opd_student_top_k=opd_top_k)
+        # MOPD: the same pass also emits E_b[log pi_theta] against the frozen
+        # anchor when anchor.expect_in_train is on (see assign_anchor_expectation_flag).
+        self.assign_anchor_expectation_flag(batch_td)
         output = self.actor_rollout_wg.compute_log_prob(batch_td)
         # gather output
         entropy = tu.get(output, "entropy")
@@ -1593,6 +1597,13 @@ class RayPPOTrainer(OPDTrainerMixin):
             top_k_log_probs = no_padding_2_padding(tu.get(output, "student_top_k_log_probs"), batch_td)
             result["student_top_k_ids"] = top_k_ids.long()
             result["student_top_k_log_probs"] = top_k_log_probs.float()
+        if self.opd_anchor_expect_in_train():
+            # Same left-shift alignment as log_probs: anchor_eb_logp[t] is the
+            # E_b[log pi_theta] of state s_t, taken against the pre-update
+            # student (== rollout policy for on-policy steps).
+            result["anchor_eb_logp"] = no_padding_2_padding(
+                tu.get(output, "anchor_eb_logp"), batch_td
+            ).float()
         old_log_prob = tu.get_tensordict(result)
         old_log_prob = DataProto.from_tensordict(old_log_prob)
         return old_log_prob, old_log_prob_mfu
@@ -1654,6 +1665,10 @@ class RayPPOTrainer(OPDTrainerMixin):
         # ppo_loss takes the policy gradient over them (see opd_top_k_is_reward()).
         if self.opd_top_k_is_reward():
             tu.assign_non_tensor(batch_td, opd_student_top_k=self.opd_student_top_k())
+        # MOPD: emit E_b[log pi_theta] inside the train forward — it is the only
+        # residual term that depends on the *current* student, and the gradient
+        # through it (b - pi_theta) is what the M2 loss consumes.
+        self.assign_anchor_expectation_flag(batch_td)
         actor_output = self.actor_rollout_wg.update_actor(batch_td)
         actor_output = tu.get(actor_output, "metrics")
         actor_output = rename_dict(actor_output, "actor/")
