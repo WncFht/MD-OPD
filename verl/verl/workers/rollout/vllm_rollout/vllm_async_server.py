@@ -29,12 +29,10 @@ from vllm import SamplingParams
 from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.entrypoints.cli.serve import run_headless
 from vllm.entrypoints.openai.api_server import build_app, init_app_state
-from vllm.entrypoints.openai.parser.harmony_utils import get_encoding
 from vllm.inputs import TokensPrompt
 from vllm.lora.request import LoRARequest
 from vllm.outputs import RequestOutput
 from vllm.usage.usage_lib import UsageContext
-from vllm.utils.argparse_utils import FlexibleArgumentParser
 from vllm.v1.engine.async_llm import AsyncLLM
 
 from verl.plugin.platform import get_platform
@@ -66,7 +64,14 @@ from verl.workers.rollout.vllm_rollout.utils import (
 
 _VLLM_VERSION = version.parse(vllm.__version__)
 
+if _VLLM_VERSION < version.parse("0.12.0"):
+    from vllm.utils import FlexibleArgumentParser
+else:
+    from vllm.utils.argparse_utils import FlexibleArgumentParser
+
 if os.getenv("VERL_USE_GPT_OSS", "0") == "1":
+    from vllm.entrypoints.openai.parser.harmony_utils import get_encoding
+
     get_encoding()
 
 
